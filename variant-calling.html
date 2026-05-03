@@ -1,0 +1,328 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 5: Variant Calling — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="intro.html">Intro</a></li><li><a href="fastq-qc.html">FASTQ QC</a></li><li><a href="alignment.html">Align</a></li><li><a href="post-alignment.html">PostAln</a></li><li><a href="variant-calling.html" class="active">Calling</a></li><li><a href="joint-genotyping.html">Joint</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot</a></li><li><a href="interpretation.html">Interp</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="structural-variants.html">SV/CNV</a></li><li><a href="wes-considerations.html">WES</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 5 / 9</div>
+<h1 data-zh="變異呼叫 (Variant Calling)" data-en="Variant Calling">變異呼叫 (Variant Calling)</h1>
+<p class="subtitle" data-lang="zh">從 BAM 找出每個位點的 SNV 與 indel——HaplotypeCaller、DeepVariant、DRAGEN 三大主流的選擇。</p>
+<p class="subtitle" data-lang="en">Identify SNVs and indels at every site from a BAM — HaplotypeCaller, DeepVariant, DRAGEN: choosing among the three.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="為什麼" data-en="WHY">為什麼</div>
+<h2 data-zh="一、Variant Calling 在做什麼？" data-en="I. What does variant calling actually do?">一、Variant Calling 在做什麼？</h2>
+<div data-lang="zh">
+<p>給定一份 analysis-ready BAM 與參考基因組，variant caller 在每個位點問三個問題：</p>
+<ol>
+<li><strong>這個位點與 reference 不同嗎？</strong> 比對所有 overlap 此位點的 reads，看 ALT allele 出現比例。</li>
+<li><strong>差異是真實 variant 還是 noise？</strong> 整合 base quality、mapping quality、strand bias、context 等多重證據，計算 likelihood。</li>
+<li><strong>真實的話，genotype 是什麼？</strong> 0/0 (homozygous ref)、0/1 (heterozygous)、還是 1/1 (homozygous alt)？</li>
+</ol>
+<p>輸出標準格式為 <strong>VCF (Variant Call Format)</strong>，每行一個位點變異，欄位包含 CHROM、POS、ID、REF、ALT、QUAL、FILTER、INFO 與 per-sample FORMAT 欄位（GT、AD、DP、GQ、PL）。</p>
+</div>
+<div data-lang="en">
+<p>Given an analysis-ready BAM and reference, the caller asks three questions at every site:</p>
+<ol>
+<li><strong>Does this site differ from reference?</strong> Inspect all reads overlapping the site and the ALT allele frequency.</li>
+<li><strong>Is the difference a real variant or noise?</strong> Integrate base quality, mapping quality, strand bias, and context to compute likelihoods.</li>
+<li><strong>If real, what's the genotype?</strong> 0/0 (hom ref), 0/1 (het), or 1/1 (hom alt)?</li>
+</ol>
+<p>The standard output is <strong>VCF (Variant Call Format)</strong> — one variant per line, with CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO, and per-sample FORMAT fields (GT, AD, DP, GQ, PL).</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="格式" data-en="FORMAT">格式</div>
+<h2 data-zh="二、VCF 欄位剖析" data-en="II. Anatomy of a VCF Record">二、VCF 欄位剖析</h2>
+<div class="format-block">
+<div><span class="lbl">#CHROM</span> <span class="val">chr7</span> <span class="ann" data-zh="# 染色體" data-en="# chromosome"># 染色體</span></div>
+<div><span class="lbl">POS</span> <span class="val">117559590</span> <span class="ann" data-zh="# 位置 (1-based)" data-en="# position (1-based)"># 位置 (1-based)</span></div>
+<div><span class="lbl">ID</span> <span class="val">rs113993960</span> <span class="ann" data-zh="# dbSNP ID 或 . " data-en="# dbSNP ID or ."># dbSNP ID 或 .</span></div>
+<div><span class="lbl">REF</span> <span class="val">CTT</span> <span class="ann" data-zh="# 參考鹼基" data-en="# reference allele"># 參考鹼基</span></div>
+<div><span class="lbl">ALT</span> <span class="val">C</span> <span class="ann" data-zh="# 變異鹼基 (這是 2bp deletion: ΔF508)" data-en="# alt allele (a 2bp deletion: ΔF508)"># 變異鹼基 (這是 2bp deletion: ΔF508)</span></div>
+<div><span class="lbl">QUAL</span> <span class="val">2845.6</span> <span class="ann" data-zh="# Phred-scaled call quality" data-en="# Phred-scaled call quality"># Phred-scaled call quality</span></div>
+<div><span class="lbl">FILTER</span> <span class="val">PASS</span> <span class="ann" data-zh="# PASS 或 filter 名稱" data-en="# PASS or filter name"># PASS 或 filter 名稱</span></div>
+<div><span class="lbl">INFO</span> <span class="val">AC=1;AF=0.5;AN=2;DP=42;MQ=60</span> <span class="ann" data-zh="# 位點層級註解" data-en="# site-level annotations"># 位點層級註解</span></div>
+<div><span class="lbl">FORMAT</span> <span class="val">GT:AD:DP:GQ:PL</span> <span class="ann" data-zh="# 樣本欄位順序" data-en="# per-sample field order"># 樣本欄位順序</span></div>
+<div><span class="lbl">SAMPLE1</span> <span class="val">0/1:23,19:42:99:560,0,720</span> <span class="ann" data-zh="# heterozygous, AD=23 ref/19 alt" data-en="# heterozygous, AD=23 ref/19 alt"># heterozygous, AD=23 ref/19 alt</span></div>
+</div>
+
+<div class="card-grid" style="margin-top:18px">
+<div class="card"><h3>GT</h3><p data-lang="zh">genotype。<code>0/0</code>=homo ref, <code>0/1</code>=het, <code>1/1</code>=homo alt, <code>./.</code>=missing。</p><p data-lang="en">Genotype. <code>0/0</code>=hom ref, <code>0/1</code>=het, <code>1/1</code>=hom alt, <code>./.</code>=missing.</p></div>
+<div class="card"><h3>AD</h3><p data-lang="zh">Allelic Depth。每個 allele 支持的 read 數，順序為 ref,alt。</p><p data-lang="en">Allelic Depth. Read counts supporting each allele in order ref,alt.</p></div>
+<div class="card"><h3>DP</h3><p data-lang="zh">總 depth (此位點實際使用的 reads 數，可能小於 AD 總和因為 caller 過濾)。</p><p data-lang="en">Total depth at this site (after caller's own filtering — may be less than sum(AD)).</p></div>
+<div class="card"><h3>GQ</h3><p data-lang="zh">Genotype Quality (Phred scale, 0-99)。GQ &gt; 20 通常算可信。</p><p data-lang="en">Genotype Quality (Phred, 0-99). GQ &gt; 20 is typically considered confident.</p></div>
+<div class="card"><h3>PL</h3><p data-lang="zh">Phred-scaled Likelihoods，順序 0/0, 0/1, 1/1。最 likely genotype 的 PL = 0，其他越大代表越不可能。</p><p data-lang="en">Phred-scaled Likelihoods for 0/0, 0/1, 1/1. Most likely genotype has PL = 0; higher values are less likely.</p></div>
+<div class="card"><h3>VAF / AF</h3><p data-lang="zh">Variant Allele Frequency = AD[alt] / DP。germline het 應接近 0.5；somatic 可能任何值。</p><p data-lang="en">Variant Allele Frequency = AD[alt] / DP. Germline het should be near 0.5; somatic can be anything.</p></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
+<h2 data-zh="三、四大 caller 比較" data-en="III. Four Major Callers Compared">三、四大 caller 比較</h2>
+<div class="comp-table-wrap">
+<table class="comp-table">
+<thead><tr><th>Caller</th><th data-zh="演算法" data-en="Algorithm">演算法</th><th data-zh="速度" data-en="Speed">速度</th><th data-zh="SNV F1" data-en="SNV F1">SNV F1</th><th data-zh="Indel F1" data-en="Indel F1">Indel F1</th><th data-zh="特點" data-en="Characteristics">特點</th></tr></thead>
+<tbody>
+<tr><td><strong>HaplotypeCaller</strong> (GATK)</td><td data-zh="局部 de novo assembly + HMM" data-en="Local de novo assembly + HMM">局部 de novo assembly + HMM</td><td>★★☆☆☆</td><td>~99.6%</td><td>~99.4%</td><td data-zh="Best Practices 黃金標準；GVCF 模式支援聯合呼叫；CPU 慢但廣泛驗證" data-en="Best Practices gold standard; GVCF mode for joint calling; CPU-slow but widely validated">Best Practices 黃金標準；GVCF 模式支援聯合呼叫；CPU 慢但廣泛驗證</td></tr>
+<tr><td><strong>DeepVariant</strong> (Google)</td><td data-zh="CNN 對 pileup image 分類" data-en="CNN classifying pileup images">CNN 對 pileup image 分類</td><td>★★★☆☆</td><td><strong>~99.7%</strong></td><td>~99.5%</td><td data-zh="SNV 準確度業界第一；GPU 加速；不需 BQSR；模型可換 ONT/PacBio" data-en="Industry-leading SNV accuracy; GPU-accelerated; no BQSR needed; swappable models for ONT/PacBio">SNV 準確度業界第一；GPU 加速；不需 BQSR；模型可換 ONT/PacBio</td></tr>
+<tr><td><strong>DRAGEN</strong> (Illumina)</td><td data-zh="FPGA-加速圖式 caller" data-en="FPGA-accelerated graph-based caller">FPGA-加速圖式 caller</td><td>★★★★★</td><td>~99.6%</td><td><strong>~99.6%</strong></td><td data-zh="全 pipeline ~30 分鐘；商業 FPGA 卡；indel 表現最佳" data-en="Full pipeline ~30 min; commercial FPGA cards; best indel performance">全 pipeline ~30 分鐘；商業 FPGA 卡；indel 表現最佳</td></tr>
+<tr><td><strong>Strelka2</strong> (Illumina)</td><td data-zh="混合模型 + ML 訓練" data-en="Mixture model + ML training">混合模型 + ML 訓練</td><td>★★★★☆</td><td>~99.5%</td><td>~99.3%</td><td data-zh="速度與準確度兼顧；germline + somatic 雙模式；無 GVCF" data-en="Balances speed and accuracy; germline + somatic modes; no GVCF">速度與準確度兼顧；germline + somatic 雙模式；無 GVCF</td></tr>
+</tbody>
+</table>
+</div>
+<p class="comp-note" data-lang="zh">F1 數據來自 PrecisionFDA Truth Challenge V2 與 GIAB HG002 benchmark；實際表現會因樣本、coverage、reference build 而異。</p>
+<p class="comp-note" data-lang="en">F1 numbers from PrecisionFDA Truth Challenge V2 and GIAB HG002 benchmarks; real-world performance varies with sample, coverage, and reference build.</p>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="GVCF 模式" data-en="GVCF MODE">GVCF 模式</div>
+<h2 data-zh="四、為什麼要先輸出 GVCF？" data-en="IV. Why output GVCF first?">四、為什麼要先輸出 GVCF？</h2>
+<div data-lang="zh">
+<p>傳統 single-sample VCF 只記錄「有 variant」的位點。但要做<strong>群體聯合呼叫</strong>（下一章 Joint Genotyping）必須知道：「樣本 B 在樣本 A 的 variant 位點，是真的 0/0 還是因為 coverage 不夠看不清楚？」</p>
+<p><strong>GVCF (Genomic VCF)</strong> 就是答案：每個樣本獨立呼叫時，<em>所有位點</em>都記錄——variant 位點記詳細，non-variant 區段以 <code>&lt;NON_REF&gt;</code> 區塊壓縮表示，附帶該區段的最小 GQ。如此後續 GenotypeGVCFs 就能對 N 個樣本做正確的 joint calling。</p>
+<p>用 HaplotypeCaller 加上 <code>-ERC GVCF</code> 即可輸出。檔案稍大但壓縮後仍可接受（30× WGS 約 1-2 GB）。</p>
+</div>
+<div data-lang="en">
+<p>A traditional single-sample VCF records only sites with variants. But for <strong>cohort joint calling</strong> (next chapter, Joint Genotyping), you need to know: "At sample A's variant site, is sample B truly 0/0, or just under-covered so we can't tell?"</p>
+<p><strong>GVCF (Genomic VCF)</strong> answers this: every site is recorded — variant sites in detail, non-variant stretches as compressed <code>&lt;NON_REF&gt;</code> blocks with the block's minimum GQ. Downstream GenotypeGVCFs can then correctly joint-call N samples.</p>
+<p>Just add <code>-ERC GVCF</code> to HaplotypeCaller. Files are larger but still manageable after compression (~1–2 GB for 30× WGS).</p>
+</div>
+
+<div class="format-block">
+<div><span class="lbl"># Variant site:</span></div>
+<div><span class="val">chr1  10583  .  G  A,&lt;NON_REF&gt;  ...  0/1:5,4,0:9:99:124,0,142,140,154,294</span></div>
+<div><span class="lbl"># Non-variant block (positions 10584-10592):</span></div>
+<div><span class="val">chr1  10584  .  T  &lt;NON_REF&gt;  .  .  END=10592  GT:DP:GQ:MIN_DP:PL  0/0:8:24:7:0,21,315</span></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="五、互動模擬：Genotype 判定" data-en="V. Interactive: Genotype Decision">五、互動模擬：Genotype 判定</h2>
+<div data-lang="zh">
+<p>調整 ALT-supporting reads 數量與總 coverage，看 caller 如何根據 PL 給出 genotype。VAF (variant allele frequency) 接近 0 通常為 0/0，接近 0.5 為 0/1，接近 1 為 1/1——但低 depth 會讓所有判斷都不確定。</p>
+</div>
+<div data-lang="en">
+<p>Adjust ALT-supporting reads and total coverage to see how the caller assigns a genotype via PL. VAF near 0 usually means 0/0, near 0.5 means 0/1, near 1 means 1/1 — but low depth makes everything uncertain.</p>
+</div>
+
+<div class="interactive-panel">
+<div class="sim-controls">
+<label data-zh="Total depth (DP):" data-en="Total depth (DP):">Total depth (DP):</label>
+<input type="range" id="dpSlider" min="1" max="60" value="30" step="1">
+<span id="dpVal" class="sim-value">30</span>
+</div>
+<div class="sim-controls">
+<label data-zh="ALT-supporting reads:" data-en="ALT-supporting reads:">ALT-supporting reads:</label>
+<input type="range" id="altSlider" min="0" max="60" value="15" step="1">
+<span id="altVal" class="sim-value">15</span>
+</div>
+<div id="gtStats" class="sim-stats"></div>
+<div class="chart-wrap"><canvas id="plChart"></canvas></div>
+<div class="sim-note" data-lang="zh">PL 為 Phred-scaled likelihood，最 likely 的 genotype = 0，其他越大代表越不可能。GQ = 第二低 PL，反映判斷的「自信度」。</div>
+<div class="sim-note" data-lang="en">PL is the Phred-scaled likelihood; the most likely genotype has PL=0, higher = less likely. GQ = second-lowest PL, reflecting confidence in the call.</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="實務指令" data-en="CODE">實務指令</div>
+<h2 data-zh="六、Pipeline 指令範例" data-en="VI. Pipeline Commands">六、Pipeline 指令範例</h2>
+<div class="code-tabs">
+<div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'tab-hc')">HaplotypeCaller</button><button class="code-tab-btn" onclick="switchTab(this,'tab-dv')">DeepVariant</button><button class="code-tab-btn" onclick="switchTab(this,'tab-st')">Strelka2</button><button class="code-tab-btn" onclick="switchTab(this,'tab-vcf')">查看 VCF</button></div>
+
+<div id="tab-hc" class="code-tab-content active"><pre><code># GATK HaplotypeCaller — GVCF 模式 (推薦)
+gatk HaplotypeCaller \
+    -I analysis_ready.bam \
+    -R Homo_sapiens_assembly38.fasta \
+    -O sample.g.vcf.gz \
+    -ERC GVCF \
+    --tmp-dir /tmp \
+    -L wgs_calling_regions.hg38.interval_list
+
+# 加速：分染色體並行 (scatter-gather)
+for c in chr{1..22} chrX chrY; do
+  gatk HaplotypeCaller -I dedup.bam -R ref.fa \
+    -O sample.$c.g.vcf.gz -ERC GVCF -L $c &amp;
+done; wait
+
+# 合併
+gatk MergeVcfs -I sample.chr1.g.vcf.gz -I sample.chr2.g.vcf.gz ... -O sample.g.vcf.gz</code></pre></div>
+
+<div id="tab-dv" class="code-tab-content"><pre><code># DeepVariant via Docker (CPU)
+BIN_VERSION=1.6.0
+INPUT_DIR=/path/to/data
+OUTPUT_DIR=/path/to/output
+
+docker run \
+  -v "${INPUT_DIR}":"/input" \
+  -v "${OUTPUT_DIR}":"/output" \
+  google/deepvariant:"${BIN_VERSION}" \
+  /opt/deepvariant/bin/run_deepvariant \
+    --model_type=WGS \
+    --ref=/input/ref.fa \
+    --reads=/input/sample.bam \
+    --output_vcf=/output/sample.vcf.gz \
+    --output_gvcf=/output/sample.g.vcf.gz \
+    --num_shards=16
+
+# WES 換 --model_type=WES，PacBio 用 --model_type=PACBIO</code></pre></div>
+
+<div id="tab-st" class="code-tab-content"><pre><code># Strelka2 germline workflow
+configureStrelkaGermlineWorkflow.py \
+    --bam analysis_ready.bam \
+    --referenceFasta ref.fa \
+    --runDir strelka_germline
+
+# 執行
+strelka_germline/runWorkflow.py -m local -j 16
+
+# 結果在 strelka_germline/results/variants/variants.vcf.gz</code></pre></div>
+
+<div id="tab-vcf" class="code-tab-content"><pre><code># 看 header
+bcftools view -h sample.vcf.gz | less
+
+# 統計
+bcftools stats sample.vcf.gz | grep "^SN"
+# number of SNPs / indels / multiallelic / Ti/Tv ratio
+
+# 篩 PASS only
+bcftools view -f PASS sample.vcf.gz -Oz -o sample.pass.vcf.gz
+
+# 看某基因區段
+bcftools view -r chr7:117559590-117559700 sample.vcf.gz
+
+# Ti/Tv ratio (健康指標, WGS 應該 ~2.0-2.1, WES ~3.0-3.3)
+bcftools stats sample.vcf.gz | grep "tstv"</code></pre></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="常見問題" data-en="FAQ">常見問題</div>
+<h2 data-zh="七、FAQ" data-en="VII. FAQ">七、FAQ</h2>
+<div class="accordion">
+<details><summary data-zh="只有一個樣本，還需要 GVCF 嗎？" data-en="Only one sample — do I still need GVCF?">只有一個樣本，還需要 GVCF 嗎？</summary>
+<div data-lang="zh">不一定，但建議仍跑 GVCF 模式。理由：(1) 未來可能加入 cohort 重做 joint calling；(2) GVCF 保留 reference confidence，下游可區分「真 0/0」與「coverage 不足」。直接出 single-sample VCF 可加 <code>-ERC NONE</code>。</div>
+<div data-lang="en">Not strictly, but recommended. Reasons: (1) future cohorts can re-do joint calling; (2) GVCF preserves reference confidence, distinguishing true 0/0 from low coverage. Skip with <code>-ERC NONE</code> for direct single-sample VCF.</div>
+</details>
+<details><summary data-zh="Ti/Tv ratio 是什麼？多少算正常？" data-en="What is Ti/Tv ratio? What's normal?">Ti/Tv ratio 是什麼？多少算正常？</summary>
+<div data-lang="zh">Transition (A↔G, C↔T) 與 Transversion (其餘) 的比例。基於生化機制，真實 SNV 的 Ti/Tv 在人類 WGS 約 2.0-2.1，WES 偏高約 3.0-3.3 (因 exon 富 CpG)。明顯低於這個範圍 (如 1.5) 通常代表 false positive 太多。</div>
+<div data-lang="en">Ratio of transitions (A↔G, C↔T) to transversions (the rest). Real SNVs have Ti/Tv ~2.0–2.1 in human WGS, ~3.0–3.3 in WES (exons are CpG-rich). Markedly lower (e.g., 1.5) usually means too many false positives.</div>
+</details>
+<details><summary data-zh="HaplotypeCaller vs DeepVariant 該選哪個？" data-en="HaplotypeCaller vs DeepVariant — which one?">HaplotypeCaller vs DeepVariant 該選哪個？</summary>
+<div data-lang="zh">大型 cohort joint calling、需要 VQSR 與 GVCF 流程選 HaplotypeCaller；single-sample 重視準確度、有 GPU、處理 ONT/PacBio 選 DeepVariant。臨床診斷常用 DeepVariant，研究 cohort 常用 HaplotypeCaller。</div>
+<div data-lang="en">Large cohort joint calling that needs VQSR and GVCF workflow → HaplotypeCaller. Single-sample, accuracy-focused, GPU-equipped, or ONT/PacBio → DeepVariant. Clinical diagnostics often use DeepVariant; research cohorts often use HaplotypeCaller.</div>
+</details>
+<details><summary data-zh="需要 GATK best-practices interval_list 嗎？" data-en="Do I need the GATK best-practices interval_list?">需要 GATK best-practices interval_list 嗎？</summary>
+<div data-lang="zh">強烈建議。WGS 用 <code>wgs_calling_regions.hg38.interval_list</code> 排除 N-region 和 centromere；WES 用 capture kit 廠商提供的 BED + 100bp padding。沒指定會浪費時間呼叫無 reads 的區段。</div>
+<div data-lang="en">Strongly recommended. WGS: <code>wgs_calling_regions.hg38.interval_list</code> excludes N-regions and centromeres. WES: use the kit vendor's BED + 100bp padding. Without intervals, time is wasted calling regions with no reads.</div>
+</details>
+</div>
+</section>
+
+<section class="section quiz-section">
+<div class="section-label" data-zh="自我檢測" data-en="QUIZ">自我檢測</div>
+<h2 data-zh="八、小測驗" data-en="VIII. Quiz">八、小測驗</h2>
+
+<div class="quiz-q" data-answer="1">
+<p class="quiz-question" data-zh="Q1. 一個位點 GT=0/1, AD=22,18, DP=40, GQ=99，最可能的解釋？" data-en="Q1. A site has GT=0/1, AD=22,18, DP=40, GQ=99 — best interpretation?">Q1. 一個位點 GT=0/1, AD=22,18, DP=40, GQ=99，最可能的解釋？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="低品質呼叫，建議過濾" data-en="Low-quality call, should be filtered">低品質呼叫，建議過濾</button>
+<button class="quiz-opt" data-idx="1" data-zh="高信心 het 位點，VAF≈0.45 接近預期 0.5" data-en="High-confidence het site, VAF≈0.45 close to expected 0.5">高信心 het 位點，VAF≈0.45 接近預期 0.5</button>
+<button class="quiz-opt" data-idx="2" data-zh="可能是 somatic mutation" data-en="Likely a somatic mutation">可能是 somatic mutation</button>
+</div>
+<div class="quiz-feedback" id="fb1"></div>
+</div>
+
+<div class="quiz-q" data-answer="2">
+<p class="quiz-question" data-zh="Q2. 為什麼 cohort 分析要用 GVCF 而不是直接合併 single-sample VCF？" data-en="Q2. Why use GVCFs for cohort analysis instead of merging single-sample VCFs?">Q2. 為什麼 cohort 分析要用 GVCF 而不是直接合併 single-sample VCF？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="GVCF 檔案比較小" data-en="GVCFs are smaller">GVCF 檔案比較小</button>
+<button class="quiz-opt" data-idx="1" data-zh="VCF 不能合併" data-en="VCFs can't be merged">VCF 不能合併</button>
+<button class="quiz-opt" data-idx="2" data-zh="GVCF 保留 non-variant 位點的 reference confidence，可區分「真 0/0」與「coverage 不足」" data-en="GVCFs preserve reference confidence at non-variant sites, distinguishing true 0/0 from low coverage">GVCF 保留 non-variant 位點的 reference confidence，可區分「真 0/0」與「coverage 不足」</button>
+</div>
+<div class="quiz-feedback" id="fb2"></div>
+</div>
+
+<div class="quiz-q" data-answer="0">
+<p class="quiz-question" data-zh="Q3. WGS 的 Ti/Tv ratio 1.4 代表什麼？" data-en="Q3. A WGS Ti/Tv ratio of 1.4 indicates...">Q3. WGS 的 Ti/Tv ratio 1.4 代表什麼？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="可能有大量 false positive，需更嚴格的 filter" data-en="Likely many false positives — needs stricter filtering">可能有大量 false positive，需更嚴格的 filter</button>
+<button class="quiz-opt" data-idx="1" data-zh="這是 WGS 正常值" data-en="This is a normal WGS value">這是 WGS 正常值</button>
+<button class="quiz-opt" data-idx="2" data-zh="樣本是 cancer cell line" data-en="The sample is a cancer cell line">樣本是 cancer cell line</button>
+</div>
+<div class="quiz-feedback" id="fb3"></div>
+</div>
+</section>
+
+<nav class="page-nav">
+<a href="post-alignment.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 4: Post-Alignment</span></a>
+<a href="joint-genotyping.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 6: Joint Genotyping</span></a>
+</nav>
+</main>
+<footer class="site-footer">© WGS/WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// PL likelihood simulator: given DP and ALT count, compute Phred likelihoods for 0/0, 0/1, 1/1
+function logChoose(n,k){let s=0;for(let i=1;i<=k;i++)s+=Math.log10(n-i+1)-Math.log10(i);return s;}
+function logBinom(n,k,p){if(p<=0||p>=1)return p<=0?(k===0?0:-Infinity):(k===n?0:-Infinity);return logChoose(n,k)+k*Math.log10(p)+(n-k)*Math.log10(1-p);}
+function computePL(dp,alt){
+  const ref=dp-alt;
+  // P(observe alt | genotype): err=0.001 for hom ref, 0.5 for het, 0.999 for hom alt
+  const lp00=logBinom(dp,alt,0.001);
+  const lp01=logBinom(dp,alt,0.5);
+  const lp11=logBinom(dp,alt,0.999);
+  // PL = -10 * log10(L), normalize so min=0
+  const PLraw=[-10*lp00,-10*lp01,-10*lp11];
+  const m=Math.min(...PLraw);
+  return PLraw.map(x=>Math.min(999,Math.round(x-m)));
+}
+
+const plChart=new Chart(document.getElementById('plChart'),{type:'bar',data:{labels:['0/0','0/1','1/1'],datasets:[{label:'PL (Phred-scaled likelihood)',data:[0,0,0],backgroundColor:['rgba(43,79,129,0.75)','rgba(200,132,43,0.75)','rgba(58,138,103,0.75)'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,animation:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'PL (lower = more likely)'},beginAtZero:true},y:{title:{display:true,text:'Genotype'}}}}});
+
+function updateGT(){
+  const L=I18n.get();
+  const dp=+document.getElementById('dpSlider').value;
+  let alt=+document.getElementById('altSlider').value;
+  if(alt>dp){alt=dp;document.getElementById('altSlider').value=dp;}
+  document.getElementById('dpVal').textContent=dp;
+  document.getElementById('altVal').textContent=alt;
+  const PL=computePL(dp,alt);
+  const winIdx=PL.indexOf(0);
+  const sorted=[...PL].sort((a,b)=>a-b);
+  const GQ=Math.min(99,sorted[1]);
+  const VAF=dp>0?(alt/dp).toFixed(2):'-';
+  const gtLabels=['0/0','0/1','1/1'];
+  const callLabel=L==='zh'?'判定':'Called';
+  document.getElementById('gtStats').innerHTML=
+    `<span class="sim-stat pass">${callLabel}: ${gtLabels[winIdx]}</span>`+
+    `<span class="sim-stat">VAF: ${VAF}</span>`+
+    `<span class="sim-stat">GQ: ${GQ}</span>`+
+    `<span class="sim-stat">PL: ${PL.join(',')}</span>`;
+  plChart.data.datasets[0].data=PL.map(x=>Math.min(x,300));
+  plChart.data.datasets[0].label=L==='zh'?'PL (越低越可能)':'PL (lower = more likely)';
+  plChart.update('none');
+}
+['dpSlider','altSlider'].forEach(id=>document.getElementById(id).addEventListener('input',updateGT));
+document.addEventListener('langchange',updateGT);
+updateGT();
+
+const QF={
+  zh:{q1_y:'AD=22,18 → VAF=0.45，DP=40 充足，GQ=99 滿分，是教科書級的可信 het。',q1_n:'正解已標示。',q2_y:'GVCF 的 reference confidence block 是 joint calling 正確處理 missing 的關鍵。',q2_n:'正解已標示。',q3_y:'人類 WGS 期望 Ti/Tv≈2.0-2.1；1.4 代表大量 transversion-like FP，需更嚴格 filter。',q3_n:'正解已標示。'},
+  en:{q1_y:'AD=22,18 → VAF=0.45, DP=40 ample, GQ=99 maxed — textbook confident het.',q1_n:'Correct answer highlighted.',q2_y:'The reference-confidence block in GVCF is what makes correct missing-data handling possible in joint calling.',q2_n:'Correct answer highlighted.',q3_y:'Human WGS expects Ti/Tv≈2.0–2.1; 1.4 means lots of transversion-like FPs — tighten filters.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

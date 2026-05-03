@@ -1,0 +1,319 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 6: Joint Genotyping — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="intro.html">Intro</a></li><li><a href="fastq-qc.html">FASTQ QC</a></li><li><a href="alignment.html">Align</a></li><li><a href="post-alignment.html">PostAln</a></li><li><a href="variant-calling.html">Calling</a></li><li><a href="joint-genotyping.html" class="active">Joint</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot</a></li><li><a href="interpretation.html">Interp</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="structural-variants.html">SV/CNV</a></li><li><a href="wes-considerations.html">WES</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 6 / 9</div>
+<h1 data-zh="聯合基因型呼叫 (Joint Genotyping)" data-en="Joint Genotyping">聯合基因型呼叫 (Joint Genotyping)</h1>
+<p class="subtitle" data-lang="zh">把 N 份 GVCF 合併成一份 cohort VCF——讓「人多力量大」幫你抓出 single-sample 看不到的稀有變異。</p>
+<p class="subtitle" data-lang="en">Merge N GVCFs into a cohort VCF — let "strength in numbers" rescue rare variants invisible to single-sample calling.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="為什麼" data-en="WHY">為什麼</div>
+<h2 data-zh="一、為什麼需要 joint calling？" data-en="I. Why joint calling?">一、為什麼需要 joint calling？</h2>
+<div data-lang="zh">
+<p>單樣本呼叫 (single-sample calling) 在每個樣本身上獨立做決策，會遭遇兩個系統性問題：</p>
+<ul>
+<li><strong>低 coverage 位點被漏掉</strong>：某樣本在某位點只有 5× 覆蓋、其中 1 條 read 支持 ALT，single-sample caller 會視為 noise 直接 0/0。但若 100 個樣本中有 10 個都在這位點看到「1/5」訊號，joint calling 能整合證據判定為真 variant。</li>
+<li><strong>無法區分「真 0/0」與「missing」</strong>：合併 100 個 single-sample VCF 時，缺席的位點到底是「真 ref」還是「沒測到」？無法回答。GVCF 透過 reference-confidence block 解決這問題。</li>
+</ul>
+<p>結果：joint calling 對<strong>稀有變異</strong>的 sensitivity 顯著提升，且 cohort 越大效果越好——這也是為什麼 gnomAD、UK Biobank、All of Us 等百萬級資料集都用 joint calling。</p>
+</div>
+<div data-lang="en">
+<p>Single-sample calling decides independently per sample and hits two systematic problems:</p>
+<ul>
+<li><strong>Low-coverage sites are dropped</strong>: a sample with 5× coverage and 1 ALT-supporting read at a site is dismissed as noise and called 0/0. But if 10 of 100 samples show the same "1/5" signal, joint calling integrates the evidence and rescues the real variant.</li>
+<li><strong>Can't distinguish true 0/0 from missing</strong>: merging 100 single-sample VCFs leaves "absent at this site = true ref or untested?" unanswerable. GVCF's reference-confidence blocks solve this.</li>
+</ul>
+<p>The payoff: joint calling markedly improves sensitivity for <strong>rare variants</strong>, and effectiveness scales with cohort size — which is why gnomAD, UK Biobank, and All of Us all use it.</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
+<h2 data-zh="二、GATK 三步流程" data-en="II. The GATK Three-Step Workflow">二、GATK 三步流程</h2>
+
+<div class="comp-table-wrap">
+<table class="comp-table">
+<thead><tr><th data-zh="步驟" data-en="Step">步驟</th><th data-zh="工具" data-en="Tool">工具</th><th data-zh="輸入" data-en="Input">輸入</th><th data-zh="輸出" data-en="Output">輸出</th><th data-zh="說明" data-en="Description">說明</th></tr></thead>
+<tbody>
+<tr><td><strong>1</strong></td><td><code>HaplotypeCaller -ERC GVCF</code></td><td data-zh="每個 sample 一份 BAM" data-en="One BAM per sample">每個 sample 一份 BAM</td><td data-zh="N 份 GVCF" data-en="N GVCFs">N 份 GVCF</td><td data-zh="(已在 Step 5 完成) per-sample 獨立呼叫" data-en="(Done in Step 5) per-sample independent calling">(已在 Step 5 完成) per-sample 獨立呼叫</td></tr>
+<tr><td><strong>2</strong></td><td><code>GenomicsDBImport</code> 或 <code>CombineGVCFs</code></td><td data-zh="N 份 GVCF" data-en="N GVCFs">N 份 GVCF</td><td>GenomicsDB / combined GVCF</td><td data-zh="把 N 份 GVCF 索引到單一 columnar 資料庫，方便快速查詢" data-en="Indexes N GVCFs into a single columnar database for fast querying">把 N 份 GVCF 索引到單一 columnar 資料庫，方便快速查詢</td></tr>
+<tr><td><strong>3</strong></td><td><code>GenotypeGVCFs</code></td><td>GenomicsDB</td><td data-zh="cohort VCF" data-en="cohort VCF">cohort VCF</td><td data-zh="掃過所有位點，根據 N 樣本的 likelihood 重新呼叫 genotype" data-en="Scans all sites, re-calls genotypes using N-sample likelihoods">掃過所有位點，根據 N 樣本的 likelihood 重新呼叫 genotype</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout callout-info" style="margin-top:18px">
+<strong data-zh="GenomicsDBImport vs CombineGVCFs" data-en="GenomicsDBImport vs CombineGVCFs">GenomicsDBImport vs CombineGVCFs</strong>
+<p data-lang="zh">兩者目的相同，但 GenomicsDBImport（推薦）使用 Intel TileDB 後端，磁碟 I/O 與記憶體效率高很多，可處理數萬樣本；CombineGVCFs 是舊版作法，產生 plain text VCF，超過 ~200 樣本就吃不消。Broad Institute 內部 100,000-sample joint calling 即用 GenomicsDB。</p>
+<p data-lang="en">Same purpose, but GenomicsDBImport (recommended) uses Intel's TileDB backend for far better disk and memory efficiency, scaling to tens of thousands of samples. CombineGVCFs is the older approach producing plain VCF text and chokes past ~200 samples. Broad Institute's 100,000-sample joint calling uses GenomicsDB.</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="三、互動模擬：cohort size 如何救稀有變異" data-en="III. Interactive: How cohort size rescues rare variants">三、互動模擬：cohort size 如何救稀有變異</h2>
+<div data-lang="zh">
+<p>調整 cohort 樣本數，看 single-sample calling 與 joint calling 對「allele frequency 不同」的變異的 recall (sensitivity) 差異。常見變異 (AF=0.1) 兩者差不多；但稀有變異 (AF&lt;0.001) 只有大 cohort joint calling 才抓得到。</p>
+</div>
+<div data-lang="en">
+<p>Adjust cohort size to compare single-sample vs joint-calling recall (sensitivity) across allele frequencies. Common variants (AF=0.1) — comparable. Rare variants (AF&lt;0.001) — only large-cohort joint calling catches them.</p>
+</div>
+
+<div class="interactive-panel">
+<div class="sim-controls">
+<label data-zh="Cohort 樣本數:" data-en="Cohort size:">Cohort 樣本數:</label>
+<input type="range" id="cohSlider" min="1" max="1000" value="100" step="1">
+<span id="cohVal" class="sim-value">100</span>
+</div>
+<div id="cohStats" class="sim-stats"></div>
+<div class="chart-wrap"><canvas id="cohChart"></canvas></div>
+<div class="sim-note" data-lang="zh">藍 = single-sample calling 的 recall（與 cohort 大小無關）；橘 = joint calling 的 recall（隨 cohort 增大而上升）。X 軸為 log scale 的 allele frequency。</div>
+<div class="sim-note" data-lang="en">Blue = single-sample recall (independent of cohort size). Orange = joint-calling recall (rises with cohort size). X-axis is log-scale allele frequency.</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
+<h2 data-zh="四、scatter-gather 平行化" data-en="IV. Scatter-Gather Parallelization">四、scatter-gather 平行化</h2>
+<div data-lang="zh">
+<p>單一 GenotypeGVCFs job 對 30,000 樣本 × 全基因組會跑數天。實務上以 <strong>區段 scatter-gather</strong> 拆解：</p>
+<ol>
+<li>把 reference 切成 ~5 Mb 片段（可用 GATK 的 <code>SplitIntervals</code> 自動產生 ~50-100 片）</li>
+<li>每片段獨立執行 GenomicsDBImport + GenotypeGVCFs</li>
+<li>用 <code>GatherVcfs</code> 或 <code>MergeVcfs</code> 把所有片段合併</li>
+</ol>
+<p>在雲端（GCP DataProc, Terra workflow, AWS Batch）很容易啟動 100+ 平行 jobs，把全基因組 cohort joint calling 從幾天降到幾小時。Broad 的 <code>JointGenotyping.wdl</code> 就是這個架構。</p>
+</div>
+<div data-lang="en">
+<p>A single GenotypeGVCFs job on 30,000 samples × whole genome would take days. In practice, <strong>interval scatter-gather</strong> breaks it up:</p>
+<ol>
+<li>Split the reference into ~5 Mb chunks (GATK's <code>SplitIntervals</code> auto-generates ~50–100)</li>
+<li>Run GenomicsDBImport + GenotypeGVCFs per chunk independently</li>
+<li>Use <code>GatherVcfs</code> or <code>MergeVcfs</code> to combine all chunks</li>
+</ol>
+<p>On cloud (GCP Dataproc, Terra workflows, AWS Batch), spinning up 100+ parallel jobs cuts whole-genome cohort joint calling from days to hours. Broad's <code>JointGenotyping.wdl</code> uses exactly this pattern.</p>
+</div>
+
+<div class="card-grid">
+<div class="card"><div class="card-icon">🔪</div><h3 data-zh="切割" data-en="Split">切割</h3>
+<p data-lang="zh"><code>SplitIntervals</code> 依 region 大小切；<code>--scatter-count 100</code> 自動均分 100 等份。</p>
+<p data-lang="en"><code>SplitIntervals</code> divides by region size; <code>--scatter-count 100</code> creates 100 even chunks.</p>
+</div>
+<div class="card"><div class="card-icon">⚡</div><h3 data-zh="平行" data-en="Parallel">平行</h3>
+<p data-lang="zh">每片段獨立 import + genotype，可分散到不同 node；DB 建議放共用儲存或 cloud bucket。</p>
+<p data-lang="en">Each chunk is imported and genotyped independently across nodes; store DB on shared storage or a cloud bucket.</p>
+</div>
+<div class="card"><div class="card-icon">🧷</div><h3 data-zh="合併" data-en="Merge">合併</h3>
+<p data-lang="zh">用 <code>GatherVcfs</code> (快, 假設區段不重疊) 或 <code>MergeVcfs</code> (穩, 處理重疊)；統一壓縮為 bgzip + tabix index。</p>
+<p data-lang="en">Use <code>GatherVcfs</code> (fast, assumes no overlap) or <code>MergeVcfs</code> (robust to overlaps); compress with bgzip + tabix.</p>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="實務指令" data-en="CODE">實務指令</div>
+<h2 data-zh="五、Pipeline 指令範例" data-en="V. Pipeline Commands">五、Pipeline 指令範例</h2>
+<div class="code-tabs">
+<div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'tab-import')">GenomicsDBImport</button><button class="code-tab-btn" onclick="switchTab(this,'tab-geno')">GenotypeGVCFs</button><button class="code-tab-btn" onclick="switchTab(this,'tab-scatter')">Scatter-gather</button></div>
+
+<div id="tab-import" class="code-tab-content active"><pre><code># 1. 準備 sample-name-map (一行一樣本: name TAB path)
+cat &gt; cohort.sample_map &lt;&lt;EOF
+sample001	/data/gvcfs/sample001.g.vcf.gz
+sample002	/data/gvcfs/sample002.g.vcf.gz
+sample003	/data/gvcfs/sample003.g.vcf.gz
+EOF
+
+# 2. Import 到 GenomicsDB (per-interval)
+gatk --java-options "-Xmx16g" GenomicsDBImport \
+    --genomicsdb-workspace-path my_database \
+    --batch-size 50 \
+    -L chr20 \
+    --sample-name-map cohort.sample_map \
+    --tmp-dir /tmp \
+    --reader-threads 5
+
+# 注意：workspace 必須是「不存在的目錄」，工具會自己建立</code></pre></div>
+
+<div id="tab-geno" class="code-tab-content"><pre><code># Joint calling
+gatk --java-options "-Xmx16g" GenotypeGVCFs \
+    -R Homo_sapiens_assembly38.fasta \
+    -V gendb://my_database \
+    -O cohort_chr20.vcf.gz \
+    --tmp-dir /tmp
+
+# 加 dbSNP 註解 ID
+gatk GenotypeGVCFs \
+    -R ref.fa \
+    -V gendb://my_database \
+    --dbsnp Homo_sapiens_assembly38.dbsnp138.vcf \
+    -O cohort_chr20.vcf.gz</code></pre></div>
+
+<div id="tab-scatter" class="code-tab-content"><pre><code># Scatter-gather 全流程 (bash 簡化版)
+REF=Homo_sapiens_assembly38.fasta
+INTERVALS=wgs_calling_regions.hg38.interval_list
+
+# Step A: 切成 100 份
+gatk SplitIntervals -R $REF -L $INTERVALS \
+    --scatter-count 100 -O scatter_dir
+
+# Step B: per-interval import + genotype 平行 (用 GNU parallel)
+ls scatter_dir/*.interval_list | parallel -j 16 '
+    chunk=$(basename {} .interval_list)
+    gatk GenomicsDBImport \
+        --genomicsdb-workspace-path db_${chunk} \
+        --sample-name-map cohort.sample_map \
+        -L {} --batch-size 50
+    gatk GenotypeGVCFs \
+        -R '$REF' -V gendb://db_${chunk} \
+        -O cohort_${chunk}.vcf.gz
+'
+
+# Step C: 合併
+ls cohort_*.vcf.gz | sort -V &gt; vcf_list.txt
+gatk GatherVcfs -I vcf_list.txt -O cohort_final.vcf.gz
+gatk IndexFeatureFile -I cohort_final.vcf.gz</code></pre></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="常見問題" data-en="FAQ">常見問題</div>
+<h2 data-zh="六、FAQ" data-en="VI. FAQ">六、FAQ</h2>
+<div class="accordion">
+<details><summary data-zh="cohort 要多大才有意義？" data-en="How large does a cohort need to be?">cohort 要多大才有意義？</summary>
+<div data-lang="zh">家系分析 3-4 人就有用 (de novo identification)。族群關聯研究通常 ≥ 1,000 人才能達到稀有變異統計力。gnomAD v4 包含 ~80,000 WGS + 730,000 WES。實務上 100 人以上 joint calling 就能看到對 single-sample 顯著的 recall 提升。</div>
+<div data-lang="en">Trio analyses (3-4 people) are useful for de novo identification. Population association studies typically need ≥1,000 to reach rare-variant power. gnomAD v4 includes ~80,000 WGS + 730,000 WES. In practice, joint calling with ≥100 samples shows clearly better recall than single-sample calling.</div>
+</details>
+<details><summary data-zh="可以「加入新樣本」到已存在的 GenomicsDB 嗎？" data-en="Can I add new samples to an existing GenomicsDB?">可以「加入新樣本」到已存在的 GenomicsDB 嗎？</summary>
+<div data-lang="zh">可以。再次執行 GenomicsDBImport 並指定 <code>--genomicsdb-update-workspace-path</code>（取代 <code>--genomicsdb-workspace-path</code>）即可附加。但 cohort 改變後仍需重跑 GenotypeGVCFs。</div>
+<div data-lang="en">Yes. Re-run GenomicsDBImport with <code>--genomicsdb-update-workspace-path</code> instead of <code>--genomicsdb-workspace-path</code> to append. The cohort has changed, so GenotypeGVCFs must be re-run.</div>
+</details>
+<details><summary data-zh="N+1 問題：有新樣本就要重跑全 cohort 嗎？" data-en="The N+1 problem: must I re-run the whole cohort for new samples?">N+1 問題：有新樣本就要重跑全 cohort 嗎？</summary>
+<div data-lang="zh">是的，這是 GATK joint calling 的設計缺陷。每加入新樣本，joint genotyping 必須重跑（雖然 GVCF 本身不必重產）。GLnexus 與 DRAGEN 的 incremental joint calling 部分緩解此問題；大 cohort（&gt;100k）通常分批 freeze。</div>
+<div data-lang="en">Yes, this is GATK joint calling's design limitation. Adding samples requires re-running joint genotyping (though GVCFs themselves are not regenerated). GLnexus and DRAGEN's incremental joint calling partially mitigate this; very large cohorts (&gt;100k) typically freeze in batches.</div>
+</details>
+<details><summary data-zh="輸出 cohort VCF 多大？" data-en="How big is the output cohort VCF?">輸出 cohort VCF 多大？</summary>
+<div data-lang="zh">100 樣本 30× WGS 約 100-200 GB（bgzip 壓縮）。隨 cohort 線性增長，10,000 樣本可達數 TB。長期儲存常分 chromosome 切片，並轉成 Hail Table 或 VariantStore (Apache Iceberg) 便於分析。</div>
+<div data-lang="en">100 samples × 30× WGS: ~100–200 GB bgzipped. Grows linearly; 10,000 samples can reach multiple TB. Long-term storage often slices by chromosome and converts to Hail Tables or a VariantStore (Apache Iceberg) for analysis.</div>
+</details>
+</div>
+</section>
+
+<section class="section quiz-section">
+<div class="section-label" data-zh="自我檢測" data-en="QUIZ">自我檢測</div>
+<h2 data-zh="七、小測驗" data-en="VII. Quiz">七、小測驗</h2>
+
+<div class="quiz-q" data-answer="2">
+<p class="quiz-question" data-zh="Q1. 為什麼合併 single-sample VCF 不等於 joint calling？" data-en="Q1. Why is merging single-sample VCFs not equivalent to joint calling?">Q1. 為什麼合併 single-sample VCF 不等於 joint calling？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="格式不相容" data-en="Format incompatible">格式不相容</button>
+<button class="quiz-opt" data-idx="1" data-zh="合併會破壞 chromosome 順序" data-en="Merging breaks chromosome order">合併會破壞 chromosome 順序</button>
+<button class="quiz-opt" data-idx="2" data-zh="無法區分「真 0/0」與「沒測到」，且不能整合 borderline 證據" data-en="Can't distinguish true 0/0 from untested, and can't integrate borderline evidence">無法區分「真 0/0」與「沒測到」，且不能整合 borderline 證據</button>
+</div>
+<div class="quiz-feedback" id="fb1"></div>
+</div>
+
+<div class="quiz-q" data-answer="1">
+<p class="quiz-question" data-zh="Q2. GenomicsDBImport 比 CombineGVCFs 適合大 cohort 的主因？" data-en="Q2. Main reason GenomicsDBImport scales better than CombineGVCFs for large cohorts?">Q2. GenomicsDBImport 比 CombineGVCFs 適合大 cohort 的主因？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="支援的 reference build 比較多" data-en="Supports more reference builds">支援的 reference build 比較多</button>
+<button class="quiz-opt" data-idx="1" data-zh="使用 TileDB columnar 後端，磁碟 I/O 與記憶體效率高" data-en="Uses TileDB columnar backend with much better disk and memory efficiency">使用 TileDB columnar 後端，磁碟 I/O 與記憶體效率高</button>
+<button class="quiz-opt" data-idx="2" data-zh="呼叫的 variant 數量比較多" data-en="Calls more variants">呼叫的 variant 數量比較多</button>
+</div>
+<div class="quiz-feedback" id="fb2"></div>
+</div>
+
+<div class="quiz-q" data-answer="0">
+<p class="quiz-question" data-zh="Q3. 一個 30× WGS sample joint-call 完，下一週又進來 1 個新樣本，最佳作法？" data-en="Q3. After joint-calling a 30× WGS cohort, a new sample arrives the next week — best practice?">Q3. 一個 30× WGS sample joint-call 完，下一週又進來 1 個新樣本，最佳作法？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="新樣本產生 GVCF，加入 GenomicsDB 後重跑 GenotypeGVCFs；GVCF 本身不必重產" data-en="Generate the new sample's GVCF, add to GenomicsDB, re-run GenotypeGVCFs; existing GVCFs don't need regenerating">新樣本產生 GVCF，加入 GenomicsDB 後重跑 GenotypeGVCFs；GVCF 本身不必重產</button>
+<button class="quiz-opt" data-idx="1" data-zh="所有舊樣本的 BAM 都要重新從頭 call 一次" data-en="All old BAMs must be re-called from scratch">所有舊樣本的 BAM 都要重新從頭 call 一次</button>
+<button class="quiz-opt" data-idx="2" data-zh="新樣本獨立做 single-sample VCF 即可，不必合併" data-en="Just generate a single-sample VCF for the new sample, no need to combine">新樣本獨立做 single-sample VCF 即可，不必合併</button>
+</div>
+<div class="quiz-feedback" id="fb3"></div>
+</div>
+</section>
+
+<nav class="page-nav">
+<a href="variant-calling.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 5: Variant Calling</span></a>
+<a href="filtering.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 7: Filtering (VQSR)</span></a>
+</nav>
+</main>
+<footer class="site-footer">© WGS/WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// cohort-size effect on rare variant recall
+// AF range from 1e-4 to 0.5 (log scale)
+const afVals=Array.from({length:30},(_,i)=>Math.pow(10,-4+i*(Math.log10(0.5)-(-4))/29));
+
+// single-sample recall: function of expected variant carriers ~ AF * 30 reads. Approximate roughly.
+// Single-sample recall is ~constant: depth = 30, het VAF=0.5, so detection ~99% if depth ok, regardless of AF.
+// But VERY rare variants are statistically harder to validate due to noise. Approx flat ~0.95 for AF>0.001, dropping for ultra-rare.
+function singleSampleRecall(af){
+  if(af>=0.001) return 0.96;
+  return 0.96 * Math.pow(af/0.001, 0.18); // gentle dropoff
+}
+// Joint-calling recall: scales with carrier count = N*2*AF (approx). Need >=1 carrier with strong evidence + cohort statistical power.
+// Asymptotic to ~0.99 once N*AF >= ~3. Use sigmoid:
+function jointRecall(af, N){
+  const carriers=N*2*af;
+  // Probability of at least one carrier observed: 1 - (1-AF)^(2N) ≈ 1 - exp(-2NAF)
+  const Pobs=1-Math.exp(-2*N*af);
+  // Calling reliability rises with carriers (more independent evidence)
+  const reliability=1 - 0.4/(1+carriers/2);
+  return Math.min(0.99, Pobs * reliability);
+}
+
+const ssRecall=afVals.map(singleSampleRecall);
+let jcRecall=afVals.map(af=>jointRecall(af,100));
+
+const cohChart=new Chart(document.getElementById('cohChart'),{type:'line',data:{labels:afVals.map(v=>v.toExponential(1)),datasets:[
+  {label:'Single-sample',data:ssRecall,borderColor:'rgba(43,79,129,0.95)',backgroundColor:'transparent',borderWidth:2.5,pointRadius:0,tension:0.25},
+  {label:'Joint calling',data:jcRecall,borderColor:'rgba(200,132,43,0.95)',backgroundColor:'transparent',borderWidth:2.5,pointRadius:0,tension:0.25}
+]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},scales:{x:{title:{display:true,text:'Allele frequency (log scale)'},ticks:{maxTicksLimit:8}},y:{title:{display:true,text:'Recall (sensitivity)'},min:0,max:1}}}});
+
+function updateCohort(){
+  const L=I18n.get();
+  const N=+document.getElementById('cohSlider').value;
+  document.getElementById('cohVal').textContent=N;
+  jcRecall=afVals.map(af=>jointRecall(af,N));
+  const rareIdx=afVals.findIndex(v=>v>=0.001);
+  const rareSS=(ssRecall[rareIdx]*100).toFixed(0);
+  const rareJC=(jcRecall[rareIdx]*100).toFixed(0);
+  // Ultra-rare AF=1e-4
+  const ultraSS=(ssRecall[0]*100).toFixed(0);
+  const ultraJC=(jcRecall[0]*100).toFixed(0);
+  document.getElementById('cohStats').innerHTML=
+    `<span class="sim-stat">${L==='zh'?'AF=10⁻³ Single':'AF=10⁻³ Single'}: ${rareSS}%</span>`+
+    `<span class="sim-stat pass">${L==='zh'?'AF=10⁻³ Joint':'AF=10⁻³ Joint'}: ${rareJC}%</span>`+
+    `<span class="sim-stat warn">${L==='zh'?'AF=10⁻⁴ Single':'AF=10⁻⁴ Single'}: ${ultraSS}%</span>`+
+    `<span class="sim-stat pass">${L==='zh'?'AF=10⁻⁴ Joint':'AF=10⁻⁴ Joint'}: ${ultraJC}%</span>`;
+  cohChart.data.datasets[1].data=jcRecall;
+  cohChart.data.datasets[0].label=L==='zh'?'單樣本呼叫':'Single-sample';
+  cohChart.data.datasets[1].label=L==='zh'?`Joint calling (N=${N})`:`Joint calling (N=${N})`;
+  cohChart.update('none');
+}
+document.getElementById('cohSlider').addEventListener('input',updateCohort);
+document.addEventListener('langchange',updateCohort);
+updateCohort();
+
+const QF={
+  zh:{q1_y:'缺乏 reference confidence，且彼此 likelihood 無法整合，是 single-sample VCF 合併的根本侷限。',q1_n:'正解已標示。',q2_y:'TileDB 的 columnar 設計讓萬樣本級別 import 與查詢成為可能。',q2_n:'正解已標示。',q3_y:'這是 N+1 的標準作法：舊 GVCF 重用、只重跑 joint genotyping 步驟。',q3_n:'正解已標示。'},
+  en:{q1_y:'No reference confidence and no way to integrate borderline likelihoods — these are the fundamental limits of merged single-sample VCFs.',q1_n:'Correct answer highlighted.',q2_y:'TileDB\'s columnar design enables import and query at tens-of-thousands sample scale.',q2_n:'Correct answer highlighted.',q3_y:'This is the standard N+1 workflow: reuse old GVCFs, re-run only joint genotyping.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

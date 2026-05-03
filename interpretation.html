@@ -1,0 +1,361 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 9: Clinical Interpretation — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="intro.html">Intro</a></li><li><a href="fastq-qc.html">FASTQ QC</a></li><li><a href="alignment.html">Align</a></li><li><a href="post-alignment.html">PostAln</a></li><li><a href="variant-calling.html">Calling</a></li><li><a href="joint-genotyping.html">Joint</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot</a></li><li><a href="interpretation.html" class="active">Interp</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="structural-variants.html">SV/CNV</a></li><li><a href="wes-considerations.html">WES</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 9 / 9</div>
+<h1 data-zh="臨床判讀 (ACMG/AMP)" data-en="Clinical Interpretation (ACMG/AMP)">臨床判讀 (ACMG/AMP)</h1>
+<p class="subtitle" data-lang="zh">28 個證據碼、5 級分類、1 套規則——把 annotated VCF 變成可發報告的 P / LP / VUS / LB / B 判定。</p>
+<p class="subtitle" data-lang="en">28 evidence codes, 5 classification tiers, 1 rule set — turn an annotated VCF into reportable P / LP / VUS / LB / B classifications.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="為什麼" data-en="WHY">為什麼</div>
+<h2 data-zh="一、為什麼需要 ACMG 標準？" data-en="I. Why ACMG standards?">一、為什麼需要 ACMG 標準？</h2>
+<div data-lang="zh">
+<p>2015 年之前，每個臨床實驗室對「這個變異致病嗎」的判定都靠專家經驗，結果同一變異可能被 A 實驗室判 Pathogenic、B 實驗室判 VUS、C 實驗室判 Benign。這不只是學術差異——病人會因此接受不同治療。</p>
+<p>2015 年 <strong>ACMG (American College of Medical Genetics) 與 AMP (Association for Molecular Pathology)</strong> 聯合發表 <em>Standards and Guidelines for the Interpretation of Sequence Variants</em>（Richards et al. 2015），定義了 28 個標準化證據碼與組合規則，把判讀從「主觀經驗」推向「結構化推理」。</p>
+<p>之後 ClinGen 持續發布<strong>基因專屬與證據專屬</strong>的精修指引（如 PVS1 細化、PP3/BP4 計分校準、SVI working groups），是目前全球臨床診斷的事實標準。</p>
+</div>
+<div data-lang="en">
+<p>Before 2015, every clinical lab judged variant pathogenicity by expert opinion — the same variant might be Pathogenic at lab A, VUS at lab B, Benign at lab C. Not just an academic discrepancy — patients received different treatments based on this.</p>
+<p>In 2015 the <strong>ACMG (American College of Medical Genetics) and AMP (Association for Molecular Pathology)</strong> jointly published <em>Standards and Guidelines for the Interpretation of Sequence Variants</em> (Richards et al. 2015), defining 28 standardized evidence codes and combining rules — pushing interpretation from "subjective expertise" toward "structured reasoning."</p>
+<p>ClinGen has since continuously released <strong>gene-specific and evidence-specific</strong> refinements (e.g., PVS1 specification, PP3/BP4 calibration, SVI working groups) and is now the de facto global standard.</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="架構" data-en="FRAMEWORK">架構</div>
+<h2 data-zh="二、五級分類" data-en="II. Five-Tier Classification">二、五級分類</h2>
+<div class="acmg-grid">
+<div class="acmg-cell acmg-p"><div style="font-size:1rem;font-weight:700">P</div><div data-lang="zh">致病</div><div data-lang="en">Pathogenic</div></div>
+<div class="acmg-cell acmg-lp"><div style="font-size:1rem;font-weight:700">LP</div><div data-lang="zh">可能致病</div><div data-lang="en">Likely Pathogenic</div></div>
+<div class="acmg-cell acmg-vus"><div style="font-size:1rem;font-weight:700">VUS</div><div data-lang="zh">意義未明</div><div data-lang="en">Uncertain</div></div>
+<div class="acmg-cell acmg-lb"><div style="font-size:1rem;font-weight:700">LB</div><div data-lang="zh">可能良性</div><div data-lang="en">Likely Benign</div></div>
+<div class="acmg-cell acmg-b"><div style="font-size:1rem;font-weight:700">B</div><div data-lang="zh">良性</div><div data-lang="en">Benign</div></div>
+</div>
+<div data-lang="zh">
+<p><strong>LP</strong> 與 <strong>P</strong> 在臨床上常一視同仁（&gt; 90% 機率致病），可作為診斷依據。<strong>VUS</strong> 不可作為臨床決策依據——這是 ACMG 報告中最常見也最棘手的類別，常需家系驗證或 functional study。</p>
+</div>
+<div data-lang="en">
+<p><strong>LP</strong> and <strong>P</strong> are typically treated equivalently in clinical settings (&gt;90% probability of pathogenicity) and may serve as diagnostic basis. <strong>VUS</strong> cannot be used for clinical decision-making — the most common and trickiest category in ACMG reports, often requiring family validation or functional studies.</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="證據碼" data-en="EVIDENCE CODES">證據碼</div>
+<h2 data-zh="三、28 個證據碼總覽" data-en="III. The 28 Evidence Codes">三、28 個證據碼總覽</h2>
+
+<h3 data-zh="致病性證據（PVS / PS / PM / PP）" data-en="Pathogenic evidence (PVS / PS / PM / PP)">致病性證據（PVS / PS / PM / PP）</h3>
+<div class="comp-table-wrap">
+<table class="comp-table">
+<thead><tr><th data-zh="代碼" data-en="Code">代碼</th><th data-zh="權重" data-en="Strength">權重</th><th data-zh="證據類型" data-en="Evidence type">證據類型</th><th data-zh="說明" data-en="Description">說明</th></tr></thead>
+<tbody>
+<tr><td><strong>PVS1</strong></td><td data-zh="極強" data-en="Very Strong">極強</td><td data-zh="LoF + 機制吻合" data-en="LoF + mechanism match">LoF + 機制吻合</td><td data-zh="nonsense / frameshift / splice ±1,2 / start-loss / 全外顯子 deletion，且該基因 LoF 為已知致病機制" data-en="nonsense / frameshift / splice ±1,2 / start-loss / whole-exon deletion in a gene where LoF is the known disease mechanism">nonsense / frameshift / splice ±1,2 / start-loss / 全外顯子 deletion，且該基因 LoF 為已知致病機制</td></tr>
+<tr><td><strong>PS1</strong></td><td data-zh="強" data-en="Strong">強</td><td data-zh="蛋白變異等同已知致病" data-en="Same protein change as known pathogenic">蛋白變異等同已知致病</td><td data-zh="不同 nucleotide change 但產生相同 amino acid 變化" data-en="Different nucleotide but same amino acid change as a known pathogenic variant">不同 nucleotide change 但產生相同 amino acid 變化</td></tr>
+<tr><td><strong>PS2</strong></td><td data-zh="強" data-en="Strong">強</td><td data-zh="de novo + 親子關係確認" data-en="Confirmed de novo">de novo + 親子關係確認</td><td data-zh="父母均為陰性 (paternity/maternity 已確認)" data-en="Confirmed de novo with verified parent-child relationship">父母均為陰性 (paternity/maternity 已確認)</td></tr>
+<tr><td><strong>PS3</strong></td><td data-zh="強" data-en="Strong">強</td><td data-zh="功能性研究" data-en="Functional study">功能性研究</td><td data-zh="well-established functional assays 顯示功能受損" data-en="Well-established functional assays show damaged function">well-established functional assays 顯示功能受損</td></tr>
+<tr><td><strong>PS4</strong></td><td data-zh="強" data-en="Strong">強</td><td data-zh="病例對照" data-en="Case-control">病例對照</td><td data-zh="患者中顯著富集 (OR &gt; 5, CI 不跨 1.0)" data-en="Significantly enriched in cases (OR > 5, CI excludes 1.0)">患者中顯著富集 (OR &gt; 5, CI 不跨 1.0)</td></tr>
+<tr><td><strong>PM1</strong></td><td data-zh="中" data-en="Moderate">中</td><td data-zh="變異位於熱點" data-en="Located in hotspot">變異位於熱點</td><td data-zh="位於已知 mutational hotspot 或 functional domain" data-en="Located in a known mutational hotspot or functional domain">位於已知 mutational hotspot 或 functional domain</td></tr>
+<tr><td><strong>PM2</strong></td><td data-zh="中→支持" data-en="Mod→Supporting">中→支持</td><td data-zh="人群中極罕" data-en="Absent or ultra-rare in populations">人群中極罕</td><td data-zh="gnomAD 中缺席或極低 AF；ClinGen 後續降為 Supporting" data-en="Absent or very low AF in gnomAD; ClinGen later down-graded to Supporting">gnomAD 中缺席或極低 AF；ClinGen 後續降為 Supporting</td></tr>
+<tr><td><strong>PM3</strong></td><td data-zh="中" data-en="Moderate">中</td><td data-zh="隱性疾病的 trans 證據" data-en="In trans for recessive">隱性疾病的 trans 證據</td><td data-zh="與已知 pathogenic 變異 in trans 出現於患者" data-en="In trans with a known pathogenic variant in an affected individual">與已知 pathogenic 變異 in trans 出現於患者</td></tr>
+<tr><td><strong>PM4</strong></td><td data-zh="中" data-en="Moderate">中</td><td data-zh="蛋白質長度變化" data-en="Protein-length change">蛋白質長度變化</td><td data-zh="非重複區的 in-frame indel 或 stop-loss 改變蛋白質長度" data-en="In-frame indel in non-repeat region or stop-loss changes protein length">非重複區的 in-frame indel 或 stop-loss 改變蛋白質長度</td></tr>
+<tr><td><strong>PM5</strong></td><td data-zh="中" data-en="Moderate">中</td><td data-zh="新 missense 但同位置已知致病" data-en="Novel missense at known pathogenic site">新 missense 但同位置已知致病</td><td data-zh="同 codon 之前已有不同的 pathogenic missense" data-en="Different missense at the same codon was previously reported pathogenic">同 codon 之前已有不同的 pathogenic missense</td></tr>
+<tr><td><strong>PM6</strong></td><td data-zh="中" data-en="Moderate">中</td><td data-zh="疑似 de novo" data-en="Assumed de novo">疑似 de novo</td><td data-zh="父母 negative 但 paternity 未驗證" data-en="Parents negative but paternity not confirmed">父母 negative 但 paternity 未驗證</td></tr>
+<tr><td><strong>PP1-5</strong></td><td data-zh="支持" data-en="Supporting">支持</td><td data-zh="家系共分離 / missense gene / in silico / 表型一致 / 信譽資料庫" data-en="Co-segregation / missense gene / in silico / phenotype match / reputable source">家系共分離 / missense gene / in silico / 表型一致 / 信譽資料庫</td><td data-zh="5 個輔助證據碼，影響力較弱" data-en="Five supporting codes, less weight individually">5 個輔助證據碼，影響力較弱</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3 data-zh="良性證據（BA / BS / BP）" data-en="Benign evidence (BA / BS / BP)">良性證據（BA / BS / BP）</h3>
+<div class="comp-table-wrap">
+<table class="comp-table">
+<thead><tr><th>Code</th><th data-zh="權重" data-en="Strength">權重</th><th data-zh="說明" data-en="Description">說明</th></tr></thead>
+<tbody>
+<tr><td><strong>BA1</strong></td><td data-zh="獨立 (Stand-alone)" data-en="Stand-alone">獨立 (Stand-alone)</td><td data-zh="gnomAD popmax AF &gt; 5% (ClinGen 已細化到不同基因有不同閾值)" data-en="gnomAD popmax AF > 5% (ClinGen has refined per-gene thresholds)">gnomAD popmax AF &gt; 5% (ClinGen 已細化到不同基因有不同閾值)</td></tr>
+<tr><td><strong>BS1</strong></td><td data-zh="強" data-en="Strong">強</td><td data-zh="AF &gt; 預期疾病盛行率" data-en="AF > expected disease prevalence">AF &gt; 預期疾病盛行率</td></tr>
+<tr><td><strong>BS2</strong></td><td data-zh="強" data-en="Strong">強</td><td data-zh="健康成年 homozygous / hemizygous 觀察到" data-en="Observed homozygous/hemizygous in healthy adults">健康成年 homozygous / hemizygous 觀察到</td></tr>
+<tr><td><strong>BS3</strong></td><td data-zh="強" data-en="Strong">強</td><td data-zh="功能研究顯示無影響" data-en="Functional studies show no effect">功能研究顯示無影響</td></tr>
+<tr><td><strong>BS4</strong></td><td data-zh="強" data-en="Strong">強</td><td data-zh="家系不共分離 (在患病者中缺席)" data-en="Lack of segregation (absent in affected family members)">家系不共分離 (在患病者中缺席)</td></tr>
+<tr><td><strong>BP1-7</strong></td><td data-zh="支持" data-en="Supporting">支持</td><td data-zh="LoF 基因的 missense / in silico benign / synonymous + 無 splice 預測 ...等 7 項" data-en="Missense in LoF gene / in silico benign / synonymous + no splice impact... 7 codes total">LoF 基因的 missense / in silico benign / synonymous + 無 splice 預測 ...等 7 項</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="組合規則" data-en="COMBINING RULES">組合規則</div>
+<h2 data-zh="四、證據如何組合成最終分類" data-en="IV. How Evidence Combines into Final Classification">四、證據如何組合成最終分類</h2>
+<div class="comp-table-wrap">
+<table class="comp-table">
+<thead><tr><th data-zh="判定" data-en="Verdict">判定</th><th data-zh="所需證據" data-en="Required evidence">所需證據</th></tr></thead>
+<tbody>
+<tr><td><strong style="color:#b83a2c">Pathogenic</strong></td><td>1 PVS1 + (1 PS) <em data-zh="或" data-en="or">或</em> 1 PVS1 + (≥2 PM) <em data-zh="或" data-en="or">或</em> 1 PVS1 + 1 PM + 1 PP <em data-zh="或" data-en="or">或</em> 1 PVS1 + ≥2 PP <em data-zh="或" data-en="or">或</em> ≥2 PS <em data-zh="或" data-en="or">或</em> 1 PS + (≥3 PM) ...</td></tr>
+<tr><td><strong style="color:#e08644">Likely Pathogenic</strong></td><td>1 PVS1 + 1 PM <em data-zh="或" data-en="or">或</em> 1 PS + (1-2 PM) <em data-zh="或" data-en="or">或</em> 1 PS + ≥2 PP <em data-zh="或" data-en="or">或</em> ≥3 PM <em data-zh="或" data-en="or">或</em> 2 PM + ≥2 PP <em data-zh="或" data-en="or">或</em> 1 PM + ≥4 PP</td></tr>
+<tr><td><strong style="color:#5b8db8">Likely Benign</strong></td><td data-zh="1 BS + 1 BP 或 ≥2 BP" data-en="1 BS + 1 BP or ≥2 BP">1 BS + 1 BP <em>或</em> ≥2 BP</td></tr>
+<tr><td><strong style="color:#3a7d52">Benign</strong></td><td data-zh="1 BA1 (獨立) 或 ≥2 BS" data-en="1 BA1 (stand-alone) or ≥2 BS">1 BA1 (獨立) <em>或</em> ≥2 BS</td></tr>
+<tr><td><strong style="color:#9ca3af">VUS</strong></td><td data-zh="不符合上述任一組合，或證據互相衝突" data-en="Doesn't meet any criteria, or evidence conflicts">不符合上述任一組合，或證據互相衝突</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="五、互動模擬：ACMG 分類器" data-en="V. Interactive: ACMG Classifier">五、互動模擬：ACMG 分類器</h2>
+<div data-lang="zh">
+<p>勾選你蒐集到的證據碼，自動算出最終 ACMG 分類。注意這是<strong>教學示意</strong>，實務臨床判讀需要對該變異的全面文獻、家系、功能研究綜合評估。</p>
+</div>
+<div data-lang="en">
+<p>Tick the evidence codes you've gathered to auto-compute the final ACMG classification. This is an <strong>illustrative tool</strong>; real clinical interpretation requires comprehensive literature, family, and functional study integration.</p>
+</div>
+
+<div class="interactive-panel">
+<div id="acmgGroups" style="display:flex;flex-direction:column;gap:14px;margin:14px 0"></div>
+<div id="acmgVerdict" style="margin-top:18px;padding:18px;border-radius:12px;text-align:center;font-family:var(--font-display);font-size:1.4rem;font-weight:700;background:#9ca3af;color:#fff">VUS</div>
+<div id="acmgExplain" class="sim-note" style="margin-top:10px"></div>
+<button id="acmgReset" style="margin-top:12px;padding:8px 18px;background:var(--c-bg-alt);border:1px solid var(--c-border);border-radius:8px;cursor:pointer;font-weight:600" data-zh="清除全部" data-en="Reset all">清除全部</button>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="工具" data-en="TOOLS">工具</div>
+<h2 data-zh="六、自動化判讀工具與資料庫" data-en="VI. Auto-Classification Tools and Resources">六、自動化判讀工具與資料庫</h2>
+<div class="card-grid">
+<div class="card"><h3>InterVar</h3>
+<p data-lang="zh">第一個 ACMG 自動化工具（Wang lab, AJHG 2017）。整合 ANNOVAR + 28 規則。輸出建議分類，但無法完全取代手動判讀。</p>
+<p data-lang="en">The first ACMG auto-classification tool (Wang lab, AJHG 2017). Wraps ANNOVAR + the 28 rules. Outputs suggested classification but cannot fully replace manual review.</p>
+</div>
+<div class="card"><h3>Franklin (Genoox)</h3>
+<p data-lang="zh">商業 web 平台，自動套 ACMG + ClinGen 細化規則，支援 manual override 與報告生成。臨床診斷實驗室主流選擇之一。</p>
+<p data-lang="en">Commercial web platform applying ACMG + ClinGen-refined rules, with manual override and report generation. A mainstream choice for clinical diagnostic labs.</p>
+</div>
+<div class="card"><h3>Varsome / VarSeq</h3>
+<p data-lang="zh">類似的整合平台，內建 InterVar engine + 多 prediction tool 整合。Varsome 有免費社群版。</p>
+<p data-lang="en">Similar integrated platforms with InterVar engine + multi-predictor integration. Varsome has a free community edition.</p>
+</div>
+<div class="card"><h3>ClinGen Variant Curation Interface (VCI)</h3>
+<p data-lang="zh">ClinGen 官方手動 curation 平台，給 expert panel 使用。判讀結果直接進入 ClinVar，是最權威來源。</p>
+<p data-lang="en">ClinGen's official manual curation platform for expert panels. Decisions feed directly into ClinVar — the most authoritative source.</p>
+</div>
+<div class="card"><h3>ClinVar</h3>
+<p data-lang="zh">NCBI 維護的 variant-disease 公開資料庫。每個 entry 標註 review status (1-4 stars)，4 stars = expert panel reviewed。臨床判讀時必查。</p>
+<p data-lang="en">NCBI's public variant-disease database. Each entry has a review status (1–4 stars); 4 stars = expert panel reviewed. Always check during clinical interpretation.</p>
+</div>
+<div class="card"><h3>gnomAD</h3>
+<p data-lang="zh">~80,000 WGS + 730,000 WES 的 allele frequency 參考。BA1 / BS1 / PM2 都需要查 gnomAD popmax AF。v4 已是 GRCh38 standard。</p>
+<p data-lang="en">Allele frequency reference from ~80,000 WGS + 730,000 WES. BA1, BS1, PM2 all rely on gnomAD popmax AF lookups. v4 is the GRCh38 standard.</p>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="常見問題" data-en="FAQ">常見問題</div>
+<h2 data-zh="七、FAQ" data-en="VII. FAQ">七、FAQ</h2>
+<div class="accordion">
+<details><summary data-zh="VUS 太多怎麼辦？" data-en="What if there are too many VUS?">VUS 太多怎麼辦？</summary>
+<div data-lang="zh">這是 ACMG 最大的痛點。應對策略：(1) 跑 trio 看 de novo / co-segregation; (2) functional study (mini-gene splicing assay, expression assay); (3) 等 ClinVar 累積更多 submitter; (4) 加入 Matchmaker Exchange 找其他病例; (5) 遵循 ClinGen 基因專屬指引重新計分。新工具如 AlphaMissense 也持續減少 missense VUS 比例。</div>
+<div data-lang="en">VUS overload is ACMG's biggest pain point. Strategies: (1) trio analysis for de novo / co-segregation; (2) functional studies (mini-gene splicing assay, expression assay); (3) wait for more ClinVar submissions; (4) join Matchmaker Exchange to find other cases; (5) re-score using ClinGen gene-specific guidelines. New tools like AlphaMissense are reducing the missense VUS fraction over time.</div>
+</details>
+<details><summary data-zh="ACMG 與癌症 somatic 變異的判讀一樣嗎？" data-en="Are ACMG criteria the same for cancer somatic variants?">ACMG 與癌症 somatic 變異的判讀一樣嗎？</summary>
+<div data-lang="zh">不一樣。ACMG 2015 主要針對 germline 遺傳疾病。Somatic（cancer）有獨立的 <strong>AMP/ASCO/CAP 2017 指引</strong>，分四級 (Tier I–IV)，著重「臨床可行性 (actionability)」而非「致病性」。Tier I = FDA-approved drug target；Tier IV = unknown clinical significance。</div>
+<div data-lang="en">No. ACMG 2015 targets germline genetic disease. Somatic (cancer) variants have separate <strong>AMP/ASCO/CAP 2017 guidelines</strong> with four tiers (I–IV), emphasizing "clinical actionability" over "pathogenicity." Tier I = FDA-approved drug target; Tier IV = unknown clinical significance.</div>
+</details>
+<details><summary data-zh="不同 reviewer 判讀結果不一致怎麼處理？" data-en="What if different reviewers reach different conclusions?">不同 reviewer 判讀結果不一致怎麼處理？</summary>
+<div data-lang="zh">建議 dual review + consensus meeting：兩位獨立 curator 各自評分，差異點由團隊討論裁定。臨床診斷實驗室通常還有第三位 sign-off authority。ClinGen 的 VCEP (Variant Curation Expert Panel) 對重要基因會有共識指引。</div>
+<div data-lang="en">Use dual review + consensus meeting: two independent curators score independently; differences resolved by team discussion. Clinical labs typically also have a third sign-off authority. ClinGen's VCEPs (Variant Curation Expert Panels) issue consensus guidelines for important genes.</div>
+</details>
+<details><summary data-zh="incidental finding (IF) / secondary finding (SF) 是什麼？" data-en="What are incidental / secondary findings?">incidental finding (IF) / secondary finding (SF) 是什麼？</summary>
+<div data-lang="zh">在做 WES/WGS 找原本疾病基因的同時，意外發現其他疾病基因的致病變異。ACMG SF v3.2 (2023) 列出 81 個基因（如 BRCA1/2, MLH1, RYR1, KCNQ1）必須回報，因為「可採取臨床行動」。病人有 opt-out 權利。</div>
+<div data-lang="en">Pathogenic variants in genes unrelated to the primary indication, found incidentally during WES/WGS. ACMG SF v3.2 (2023) lists 81 genes (e.g., BRCA1/2, MLH1, RYR1, KCNQ1) that must be reported because they are "clinically actionable." Patients have the right to opt out.</div>
+</details>
+</div>
+</section>
+
+<section class="section quiz-section">
+<div class="section-label" data-zh="自我檢測" data-en="QUIZ">自我檢測</div>
+<h2 data-zh="八、小測驗" data-en="VIII. Quiz">八、小測驗</h2>
+
+<div class="quiz-q" data-answer="1">
+<p class="quiz-question" data-zh="Q1. PVS1 適用的條件是？" data-en="Q1. PVS1 applies when:">Q1. PVS1 適用的條件是？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="任何 missense variant" data-en="Any missense variant">任何 missense variant</button>
+<button class="quiz-opt" data-idx="1" data-zh="LoF 變異 (nonsense / frameshift / splice ±1,2 ...) 且該基因 LoF 為已知致病機制" data-en="LoF variant (nonsense / frameshift / splice ±1,2...) AND LoF is the known disease mechanism for the gene">LoF 變異 (nonsense / frameshift / splice ±1,2 ...) 且該基因 LoF 為已知致病機制</button>
+<button class="quiz-opt" data-idx="2" data-zh="只要 in silico 預測為 deleterious 就可以" data-en="Whenever in silico predicts deleterious">只要 in silico 預測為 deleterious 就可以</button>
+</div>
+<div class="quiz-feedback" id="fb1"></div>
+</div>
+
+<div class="quiz-q" data-answer="2">
+<p class="quiz-question" data-zh="Q2. gnomAD popmax AF=12% 的 missense 變異最可能被分類為？" data-en="Q2. A missense variant with gnomAD popmax AF=12% is most likely classified as:">Q2. gnomAD popmax AF=12% 的 missense 變異最可能被分類為？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="Likely Pathogenic" data-en="Likely Pathogenic">Likely Pathogenic</button>
+<button class="quiz-opt" data-idx="1" data-zh="VUS" data-en="VUS">VUS</button>
+<button class="quiz-opt" data-idx="2" data-zh="Benign (BA1 已成立)" data-en="Benign (BA1 met)">Benign (BA1 已成立)</button>
+</div>
+<div class="quiz-feedback" id="fb2"></div>
+</div>
+
+<div class="quiz-q" data-answer="0">
+<p class="quiz-question" data-zh="Q3. 為什麼 VUS 不能作為臨床決策依據？" data-en="Q3. Why can't VUS be used for clinical decisions?">Q3. 為什麼 VUS 不能作為臨床決策依據？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="證據不足以判斷致病或良性，盲目作為依據可能造成誤治療或不必要焦慮" data-en="Evidence is insufficient to call pathogenic or benign; using it could lead to mistreatment or unnecessary anxiety">證據不足以判斷致病或良性，盲目作為依據可能造成誤治療或不必要焦慮</button>
+<button class="quiz-opt" data-idx="1" data-zh="VUS 一定是 false positive" data-en="VUS is always a false positive">VUS 一定是 false positive</button>
+<button class="quiz-opt" data-idx="2" data-zh="VUS 不存在於 ClinVar" data-en="VUS doesn't exist in ClinVar">VUS 不存在於 ClinVar</button>
+</div>
+<div class="quiz-feedback" id="fb3"></div>
+</div>
+</section>
+
+<nav class="page-nav">
+<a href="annotation.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 8: Annotation</span></a>
+<a href="somatic.html"><span class="nav-dir" data-zh="進階 →" data-en="Advanced →">進階 →</span><span class="nav-title">Advanced: Somatic Calling</span></a>
+</nav>
+</main>
+<footer class="site-footer">© WGS/WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+
+// ACMG classifier
+const ACMG_EVIDENCE={
+  PVS:[{c:'PVS1',zh:'LoF 變異且 LoF 為已知致病機制',en:'LoF variant + LoF is known mechanism'}],
+  PS:[
+    {c:'PS1',zh:'同 amino acid 變化（已知致病）',en:'Same amino acid change as known pathogenic'},
+    {c:'PS2',zh:'已驗證 de novo',en:'Confirmed de novo'},
+    {c:'PS3',zh:'功能研究顯示 damaging',en:'Functional study damaging'},
+    {c:'PS4',zh:'病例對照富集 (OR>5)',en:'Case-control enriched (OR>5)'}
+  ],
+  PM:[
+    {c:'PM1',zh:'位於 mutational hotspot',en:'Located in mutational hotspot'},
+    {c:'PM2',zh:'gnomAD 缺席或極罕',en:'Absent / ultra-rare in gnomAD'},
+    {c:'PM3',zh:'隱性疾病的 in trans 證據',en:'In trans for recessive disease'},
+    {c:'PM4',zh:'蛋白質長度變化',en:'Protein-length change'},
+    {c:'PM5',zh:'同 codon 不同 missense 已知致病',en:'Different missense at same codon known pathogenic'},
+    {c:'PM6',zh:'疑似 de novo (paternity 未驗)',en:'Assumed de novo (paternity unverified)'}
+  ],
+  PP:[
+    {c:'PP1',zh:'家系共分離',en:'Family co-segregation'},
+    {c:'PP2',zh:'位於 missense 致病基因',en:'Missense in gene where missense common'},
+    {c:'PP3',zh:'多項 in silico 預測 damaging',en:'Multiple in silico predict damaging'},
+    {c:'PP4',zh:'病人表型高度吻合',en:'Patient phenotype highly specific'},
+    {c:'PP5',zh:'信譽資料庫已標 pathogenic',en:'Reputable source reports pathogenic'}
+  ],
+  BA:[{c:'BA1',zh:'gnomAD popmax AF > 5% (獨立)',en:'gnomAD popmax AF > 5% (stand-alone)'}],
+  BS:[
+    {c:'BS1',zh:'AF > 預期疾病盛行率',en:'AF > expected disease prevalence'},
+    {c:'BS2',zh:'健康成年人 homo/hemi 觀察',en:'Observed homo/hemi in healthy adults'},
+    {c:'BS3',zh:'功能研究無影響',en:'Functional study no effect'},
+    {c:'BS4',zh:'家系不共分離',en:'Lack of family co-segregation'}
+  ],
+  BP:[
+    {c:'BP1',zh:'LoF 基因的 missense',en:'Missense in LoF-mechanism gene'},
+    {c:'BP2',zh:'與已知 dominant pathogenic 共觀察',en:'Observed in trans/cis with known dominant pathogenic'},
+    {c:'BP3',zh:'重複區的 in-frame indel',en:'In-frame indel in repeat region'},
+    {c:'BP4',zh:'多項 in silico 預測 benign',en:'Multiple in silico predict benign'},
+    {c:'BP5',zh:'其他基因解釋已找到',en:'Alternate molecular cause found'},
+    {c:'BP6',zh:'信譽資料庫已標 benign',en:'Reputable source reports benign'},
+    {c:'BP7',zh:'同義變異無 splice 影響',en:'Synonymous with no splice impact'}
+  ]
+};
+const groupColors={PVS:'#b83a2c',PS:'#cc5533',PM:'#e08644',PP:'#e8a866',BA:'#3a7d52',BS:'#5b8db8',BP:'#8eaecc'};
+
+const groupsEl=document.getElementById('acmgGroups');
+function renderGroups(){
+  const L=I18n.get();
+  groupsEl.innerHTML='';
+  for(const [grp,arr] of Object.entries(ACMG_EVIDENCE)){
+    const div=document.createElement('div');
+    div.style.cssText=`border-left:4px solid ${groupColors[grp]};padding-left:12px`;
+    const title=document.createElement('div');
+    title.style.cssText=`font-weight:700;color:${groupColors[grp]};font-size:.88rem;margin-bottom:6px`;
+    const titleMap={PVS:L==='zh'?'極強致病 (PVS)':'Pathogenic Very Strong (PVS)',PS:L==='zh'?'強致病 (PS)':'Pathogenic Strong (PS)',PM:L==='zh'?'中等致病 (PM)':'Pathogenic Moderate (PM)',PP:L==='zh'?'支持致病 (PP)':'Pathogenic Supporting (PP)',BA:L==='zh'?'獨立良性 (BA)':'Benign Stand-alone (BA)',BS:L==='zh'?'強良性 (BS)':'Benign Strong (BS)',BP:L==='zh'?'支持良性 (BP)':'Benign Supporting (BP)'};
+    title.textContent=titleMap[grp];
+    div.appendChild(title);
+    const wrap=document.createElement('div');
+    wrap.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
+    arr.forEach(e=>{
+      const lbl=document.createElement('label');
+      lbl.style.cssText='display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--c-bg-alt);border-radius:6px;cursor:pointer;font-size:.78rem;font-weight:500;user-select:none';
+      const cb=document.createElement('input');
+      cb.type='checkbox';
+      cb.dataset.code=e.c;
+      cb.dataset.group=grp;
+      cb.style.margin='0';
+      cb.addEventListener('change',computeVerdict);
+      lbl.appendChild(cb);
+      const span=document.createElement('span');
+      span.innerHTML=`<strong>${e.c}</strong> · ${L==='zh'?e.zh:e.en}`;
+      lbl.appendChild(span);
+      wrap.appendChild(lbl);
+    });
+    div.appendChild(wrap);
+    groupsEl.appendChild(div);
+  }
+}
+renderGroups();
+
+function computeVerdict(){
+  const L=I18n.get();
+  const checks={PVS:0,PS:0,PM:0,PP:0,BA:0,BS:0,BP:0};
+  document.querySelectorAll('#acmgGroups input[type=checkbox]:checked').forEach(cb=>{checks[cb.dataset.group]++;});
+  const {PVS,PS,PM,PP,BA,BS,BP}=checks;
+  let verdict='VUS', cls='vus';
+  // Benign rules first
+  if(BA>=1 || BS>=2){verdict=L==='zh'?'Benign 良性':'Benign';cls='b';}
+  else if((BS>=1 && BP>=1) || BP>=2){verdict=L==='zh'?'Likely Benign 可能良性':'Likely Benign';cls='lb';}
+  // Pathogenic rules
+  // Pathogenic
+  else if(
+    (PVS>=1 && (PS>=1 || PM>=2 || (PM>=1&&PP>=1) || PP>=2)) ||
+    (PS>=2) ||
+    (PS>=1 && (PM>=3 || (PM>=2&&PP>=2) || (PM>=1&&PP>=4)))
+  ){verdict=L==='zh'?'Pathogenic 致病':'Pathogenic';cls='p';}
+  // Likely Pathogenic
+  else if(
+    (PVS>=1 && PM>=1) ||
+    (PS>=1 && (PM>=1 || PP>=2)) ||
+    (PM>=3) ||
+    (PM>=2 && PP>=2) ||
+    (PM>=1 && PP>=4)
+  ){verdict=L==='zh'?'Likely Pathogenic 可能致病':'Likely Pathogenic';cls='lp';}
+  // Conflicting check
+  const totalP=PVS+PS+PM+PP;
+  const totalB=BA+BS+BP;
+  let explain='';
+  if(totalP>0 && totalB>0 && cls==='vus'){explain=L==='zh'?'證據互相衝突，預設為 VUS。臨床上需仔細權衡並可能進行 expert review。':'Evidence conflicts — default to VUS. Clinically, weigh carefully and consider expert review.';}
+  else if(totalP===0 && totalB===0){explain=L==='zh'?'尚未選擇任何證據碼。':'No evidence codes selected.';}
+  else {
+    const counts=[];
+    if(PVS)counts.push(`PVS×${PVS}`);if(PS)counts.push(`PS×${PS}`);if(PM)counts.push(`PM×${PM}`);if(PP)counts.push(`PP×${PP}`);
+    if(BA)counts.push(`BA×${BA}`);if(BS)counts.push(`BS×${BS}`);if(BP)counts.push(`BP×${BP}`);
+    explain=(L==='zh'?'已選擇證據：':'Evidence selected: ')+counts.join(', ');
+  }
+  const colors={p:'#b83a2c',lp:'#e08644',vus:'#9ca3af',lb:'#5b8db8',b:'#3a7d52'};
+  const v=document.getElementById('acmgVerdict');
+  v.textContent=verdict;
+  v.style.background=colors[cls];
+  document.getElementById('acmgExplain').textContent=explain;
+}
+computeVerdict();
+
+document.getElementById('acmgReset').addEventListener('click',()=>{
+  document.querySelectorAll('#acmgGroups input[type=checkbox]').forEach(cb=>cb.checked=false);
+  computeVerdict();
+});
+document.addEventListener('langchange',()=>{renderGroups();computeVerdict();});
+
+const QF={
+  zh:{q1_y:'PVS1 雙重要求：(1) LoF 類型 (2) gene 的 LoF 機制已知，缺一不可。',q1_n:'正解已標示。',q2_y:'gnomAD popmax > 5% 直接觸發 BA1，獨立成立 Benign。',q2_n:'正解已標示。',q3_y:'VUS 字面就是「不確定」，臨床上不能作為診斷或治療決策的依據。',q3_n:'正解已標示。'},
+  en:{q1_y:'PVS1 has two requirements: (1) LoF type, (2) gene\'s LoF mechanism known. Both are required.',q1_n:'Correct answer highlighted.',q2_y:'gnomAD popmax > 5% directly triggers BA1, which alone establishes Benign.',q2_n:'Correct answer highlighted.',q3_y:'VUS literally means "uncertain" — clinically it cannot be the basis for diagnostic or treatment decisions.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

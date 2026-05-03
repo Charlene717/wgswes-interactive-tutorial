@@ -1,0 +1,336 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 4: Post-Alignment Processing — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="intro.html">Intro</a></li><li><a href="fastq-qc.html">FASTQ QC</a></li><li><a href="alignment.html">Align</a></li><li><a href="post-alignment.html" class="active">PostAln</a></li><li><a href="variant-calling.html">Calling</a></li><li><a href="joint-genotyping.html">Joint</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot</a></li><li><a href="interpretation.html">Interp</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="structural-variants.html">SV/CNV</a></li><li><a href="wes-considerations.html">WES</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 4 / 9</div>
+<h1 data-zh="比對後處理 (Post-Alignment Processing)" data-en="Post-Alignment Processing">比對後處理 (Post-Alignment Processing)</h1>
+<p class="subtitle" data-lang="zh">標記 PCR duplicates、重新校正鹼基品質——讓 BAM 從「原始」變成「analysis-ready」。</p>
+<p class="subtitle" data-lang="en">Mark PCR duplicates and recalibrate base qualities — turn a raw BAM into an "analysis-ready" BAM.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="為什麼" data-en="WHY">為什麼</div>
+<h2 data-zh="一、為什麼還沒能直接 call variants？" data-en="I. Why can't we call variants yet?">一、為什麼還沒能直接 call variants？</h2>
+<div data-lang="zh">
+<p>剛產生的 sorted BAM 檔還帶著兩個系統性偏誤，會直接污染下游 variant calling：</p>
+<ul>
+<li><strong>PCR duplicates</strong>：建庫時 PCR 擴增會把單一 DNA 分子複製成多條 reads。如果不標記，HaplotypeCaller 會以為「同一個鹼基被觀察到 8 次」而高估 variant evidence。</li>
+<li><strong>系統性鹼基品質偏誤</strong>：定序機回報的 Phred Q 並非完美——它會因 cycle、read group、context (前後鹼基) 而系統性偏高或偏低。<strong>BQSR (Base Quality Score Recalibration)</strong> 用已知 variants 當錨點，學出每個 (cycle, context, RG) 組合的實際錯誤率，再校正每個鹼基的 Q 值。</li>
+</ul>
+<p>這兩步合稱「Data Pre-processing」的尾段，是 GATK Best Practices 中 variant calling 之前的最後關卡。</p>
+</div>
+<div data-lang="en">
+<p>The freshly-sorted BAM still carries two systematic biases that would directly contaminate downstream variant calling:</p>
+<ul>
+<li><strong>PCR duplicates</strong>: library-prep PCR amplifies a single DNA molecule into many reads. Without marking, HaplotypeCaller will interpret "the same base observed 8 times" as inflated variant evidence.</li>
+<li><strong>Systematic base-quality bias</strong>: the Phred Q reported by the sequencer is imperfect — it is systematically biased per cycle, read group, and sequence context. <strong>BQSR (Base Quality Score Recalibration)</strong> uses known variants as anchors to learn the real error rate per (cycle, context, RG) combination, and recalibrates each base's Q value.</li>
+</ul>
+<p>Together these form the tail of "Data Pre-processing" — the final gate before variant calling in GATK Best Practices.</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
+<h2 data-zh="二、MarkDuplicates 怎麼判斷 duplicate？" data-en="II. How does MarkDuplicates identify duplicates?">二、MarkDuplicates 怎麼判斷 duplicate？</h2>
+<div data-lang="zh">
+<p>判斷規則出乎意料地簡單：<strong>兩條 paired reads 如果 5' 端 mapping 座標完全一樣（兩端都一樣，且方向一樣），就視為來自同一個原始 DNA 分子</strong>。當一群 reads 都符合這條件時，工具會挑「總和 base quality 最高」那條當代表，其餘加上 SAM flag <code>0x400</code> (1024) 標記為 duplicate。</p>
+<p>注意：duplicate <strong>不會被刪除</strong>，只是標記。HaplotypeCaller、Mutect2 等工具預設會略過帶 0x400 flag 的 reads。要實際移除可加 <code>--REMOVE_DUPLICATES true</code>，但通常沒必要——保留可追溯性更重要。</p>
+</div>
+<div data-lang="en">
+<p>The rule is surprisingly simple: <strong>two paired reads are duplicates if both 5' mapping coordinates match and orientations agree</strong>. Among all reads sharing this signature, the tool picks the one with highest summed base quality as the representative; the rest get SAM flag <code>0x400</code> (1024) marking them as duplicates.</p>
+<p>Note: duplicates are <strong>marked, not deleted</strong>. HaplotypeCaller, Mutect2, etc. skip reads with flag 0x400 by default. To physically remove them, add <code>--REMOVE_DUPLICATES true</code> — but usually unnecessary; traceability matters more.</p>
+</div>
+
+<div class="card-grid">
+<div class="card"><div class="card-icon">📌</div><h3 data-zh="Picard MarkDuplicates" data-en="Picard MarkDuplicates">Picard MarkDuplicates</h3>
+<p data-lang="zh">GATK Best Practices 的官方工具。準確、輸出 metrics 詳細（含 LIBRARY-level duplication rate），但對大 BAM 較慢、記憶體吃重。</p>
+<p data-lang="en">The official GATK Best Practices tool. Accurate, detailed metrics (incl. LIBRARY-level duplication rate), but slower and memory-hungry on large BAMs.</p>
+</div>
+<div class="card"><div class="card-icon">⚡</div><h3 data-zh="samtools markdup" data-en="samtools markdup">samtools markdup</h3>
+<p data-lang="zh">速度快數倍、記憶體少，結果與 Picard 高度一致。但需要先跑 <code>samtools fixmate -m</code> 補上 MS/MC tag。近年已被許多 pipeline 採用作為 Picard 替代品。</p>
+<p data-lang="en">Several times faster with lower memory; results highly consistent with Picard. Requires <code>samtools fixmate -m</code> first to add MS/MC tags. Increasingly used as a Picard replacement in modern pipelines.</p>
+</div>
+<div class="card"><div class="card-icon">🔧</div><h3 data-zh="MarkDuplicatesSpark" data-en="MarkDuplicatesSpark">MarkDuplicatesSpark</h3>
+<p data-lang="zh">GATK 的 Spark 版本，支援多執行緒，可同時做 sort + markdup。對單機多核 CPU 友善，但仍是 beta 狀態。</p>
+<p data-lang="en">GATK's Spark variant — multi-threaded, can sort and mark in one pass. Friendly to multi-core single nodes but still flagged beta.</p>
+</div>
+<div class="card"><div class="card-icon">⚠️</div><h3 data-zh="UMI-aware tools" data-en="UMI-aware tools">UMI-aware tools</h3>
+<p data-lang="zh">若建庫使用 UMI (Unique Molecular Identifier)，傳統座標比對會誤殺真正的不同分子。改用 <code>fgbio GroupReadsByUmi</code> + <code>CallMolecularConsensusReads</code> 或 Picard <code>UmiAwareMarkDuplicatesWithMateCigar</code>。</p>
+<p data-lang="en">If the library uses UMIs (Unique Molecular Identifiers), coordinate-only marking incorrectly collapses distinct molecules. Use <code>fgbio GroupReadsByUmi</code> + <code>CallMolecularConsensusReads</code>, or Picard <code>UmiAwareMarkDuplicatesWithMateCigar</code>.</p>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
+<h2 data-zh="三、BQSR 兩階段流程" data-en="III. The BQSR Two-Stage Workflow">三、BQSR 兩階段流程</h2>
+<div data-lang="zh">
+<p>BQSR 的核心假設是：<strong>已知 variant sites 之外的所有「mismatch」都是定序錯誤</strong>。所以給工具一份「known sites VCF」（dbSNP + Mills indels + 1000G indels），就能用「BAM 中所有非 known-sites 的 mismatch」當作錯誤的 ground truth。</p>
+</div>
+<div data-lang="en">
+<p>BQSR's core assumption: <strong>any mismatch outside known variant sites is a sequencing error</strong>. Given a "known sites VCF" (dbSNP + Mills indels + 1000G indels), the tool treats every non-known-site mismatch as ground-truth error.</p>
+</div>
+
+<div class="comp-table-wrap">
+<table class="comp-table">
+<thead><tr><th data-zh="階段" data-en="Stage">階段</th><th data-zh="工具" data-en="Tool">工具</th><th data-zh="輸入" data-en="Input">輸入</th><th data-zh="輸出" data-en="Output">輸出</th><th data-zh="做什麼" data-en="What it does">做什麼</th></tr></thead>
+<tbody>
+<tr><td><strong>1</strong></td><td><code>BaseRecalibrator</code></td><td data-zh="dedup BAM + known-sites VCF" data-en="dedup BAM + known-sites VCF">dedup BAM + known-sites VCF</td><td><code>recal.table</code></td><td data-zh="掃過所有 reads，建立 (cycle × context × RG × QualScore) 的錯誤率表格" data-en="Scans all reads, builds an error-rate table indexed by (cycle × context × RG × QualScore)">掃過所有 reads，建立 (cycle × context × RG × QualScore) 的錯誤率表格</td></tr>
+<tr><td><strong>2</strong></td><td><code>ApplyBQSR</code></td><td data-zh="原 BAM + recal.table" data-en="Original BAM + recal.table">原 BAM + recal.table</td><td data-zh="recalibrated BAM" data-en="Recalibrated BAM">recalibrated BAM</td><td data-zh="逐個 base 查表，將原 Q 替換為校正後 Q" data-en="Per-base table lookup, replaces original Q with the recalibrated Q">逐個 base 查表，將原 Q 替換為校正後 Q</td></tr>
+<tr><td><strong>3 (選)</strong></td><td><code>AnalyzeCovariates</code></td><td data-zh="校正前後兩份 recal.table" data-en="Before & after recal tables">校正前後兩份 recal.table</td><td>PDF</td><td data-zh="畫圖驗證 BQSR 是否成功收斂" data-en="Plots to verify BQSR converged successfully">畫圖驗證 BQSR 是否成功收斂</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout callout-info" style="margin-top:18px">
+<strong data-zh="什麼時候可以略過 BQSR？" data-en="When can BQSR be skipped?">什麼時候可以略過 BQSR？</strong>
+<p data-lang="zh">DRAGEN 與 DeepVariant 內建自己的鹼基品質模型，<strong>不需要也不應該再跑 BQSR</strong>。對於 non-model organism（沒有 known-sites VCF）也應略過——強行跑會把真實 variants 當成錯誤校正掉。GATK HaplotypeCaller 在 non-model 物種上的官方建議是：跳過 BQSR，改用 hard filtering。</p>
+<p data-lang="en">DRAGEN and DeepVariant ship their own base-quality models — <strong>BQSR should be skipped</strong>. For non-model organisms (no known-sites VCF), also skip — forcing it would calibrate real variants away as "errors". GATK's official recommendation for HaplotypeCaller on non-model species: skip BQSR, use hard filtering instead.</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="四、互動模擬：BQSR 校正前後品質分布" data-en="IV. Interactive: Quality Distribution Before vs After BQSR">四、互動模擬：BQSR 校正前後品質分布</h2>
+<div data-lang="zh">
+<p>移動滑桿來模擬不同 sequencing cycle 下的品質校正效果。原始 Q 通常在 read 的後段被高估（機器仍報 Q35，但真實錯誤率對應 Q25），BQSR 會把它拉回來——校正後的 Q 與真實錯誤率對應更準。</p>
+</div>
+<div data-lang="en">
+<p>Move the slider to simulate quality recalibration at different sequencing cycles. The reported Q is typically inflated late in a read (machine reports Q35, but real error rate corresponds to Q25); BQSR pulls it back so the recalibrated Q tracks the true error rate.</p>
+</div>
+
+<div class="interactive-panel">
+<div class="sim-controls">
+<label data-zh="Sequencing cycle (read 中的位置, bp):" data-en="Sequencing cycle (position in read, bp):">Sequencing cycle (read 中的位置, bp):</label>
+<input type="range" id="cycSlider" min="1" max="150" value="75" step="1">
+<span id="cycVal" class="sim-value">75</span>
+</div>
+<div id="bqsrStats" class="sim-stats"></div>
+<div class="chart-wrap"><canvas id="bqsrChart"></canvas></div>
+<div class="sim-note" data-lang="zh">藍 = 機器原報 Q（Reported Q），橘 = BQSR 校正後 Q（Empirical Q），灰 = 該 cycle 實測錯誤率對應的真實 Q。校正後的橘線應更貼近灰線。</div>
+<div class="sim-note" data-lang="en">Blue = original reported Q. Orange = BQSR-recalibrated Q. Gray = the true Q corresponding to the empirical error rate at that cycle. The orange line should track the gray line more closely after recalibration.</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
+<h2 data-zh="五、Known-sites 三劍客" data-en="V. The Three Known-Sites VCFs">五、Known-sites 三劍客</h2>
+<div data-lang="zh">
+<p>BQSR 的 <code>--known-sites</code> 參數可以重複指定。GATK 官方對 GRCh38 human 的標準三件組：</p>
+</div>
+<div data-lang="en">
+<p>BQSR's <code>--known-sites</code> argument can be repeated. GATK's standard trio for GRCh38 human:</p>
+</div>
+
+<div class="card-grid">
+<div class="card"><h3>dbSNP</h3>
+<p data-lang="zh"><code>Homo_sapiens_assembly38.dbsnp138.vcf</code> — 最大宗的 SNP 集合，~7 億條 entries。提供大部分 SNV 校正錨點。</p>
+<p data-lang="en"><code>Homo_sapiens_assembly38.dbsnp138.vcf</code> — the largest SNP set (~700 M entries). Provides most of the SNV calibration anchors.</p>
+</div>
+<div class="card"><h3>Mills & 1000G Gold Indels</h3>
+<p data-lang="zh"><code>Mills_and_1000G_gold_standard.indels.hg38.vcf.gz</code> — 高品質 indel 集合，是 indel 校正的主力。</p>
+<p data-lang="en"><code>Mills_and_1000G_gold_standard.indels.hg38.vcf.gz</code> — high-confidence indel set, the workhorse for indel calibration.</p>
+</div>
+<div class="card"><h3>1000G Phase 1 Indels</h3>
+<p data-lang="zh"><code>Homo_sapiens_assembly38.known_indels.vcf.gz</code> — 補充 indel 集合，覆蓋 Mills 之外的常見變異。</p>
+<p data-lang="en"><code>Homo_sapiens_assembly38.known_indels.vcf.gz</code> — supplementary indel set, covering common variants beyond Mills.</p>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="實務指令" data-en="CODE">實務指令</div>
+<h2 data-zh="六、Pipeline 指令範例" data-en="VI. Pipeline Commands">六、Pipeline 指令範例</h2>
+<div class="code-tabs">
+<div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'tab-md')">Picard MarkDuplicates</button><button class="code-tab-btn" onclick="switchTab(this,'tab-sm')">samtools markdup</button><button class="code-tab-btn" onclick="switchTab(this,'tab-bqsr')">BQSR</button><button class="code-tab-btn" onclick="switchTab(this,'tab-flow')">完整 Pipeline</button></div>
+
+<div id="tab-md" class="code-tab-content active"><pre><code># Picard / GATK MarkDuplicates
+gatk MarkDuplicates \
+    -I sorted.bam \
+    -O dedup.bam \
+    -M dedup_metrics.txt \
+    --CREATE_INDEX true
+
+# 讀 metrics 看 duplication rate
+grep -A2 "^LIBRARY" dedup_metrics.txt
+# PERCENT_DUPLICATION 通常 WGS &lt; 15%, WES 可能 20-30%</code></pre></div>
+
+<div id="tab-sm" class="code-tab-content"><pre><code># samtools markdup (需要先 fixmate)
+samtools sort -n -@ 8 sorted.bam -o nsort.bam
+samtools fixmate -m -@ 8 nsort.bam fix.bam
+samtools sort -@ 8 fix.bam -o resort.bam
+samtools markdup -@ 8 -s resort.bam dedup.bam 2&gt; markdup_stats.txt
+samtools index dedup.bam
+# -s 輸出統計到 stderr</code></pre></div>
+
+<div id="tab-bqsr" class="code-tab-content"><pre><code># Stage 1: build recalibration table
+gatk BaseRecalibrator \
+    -I dedup.bam \
+    -R reference.fasta \
+    --known-sites Homo_sapiens_assembly38.dbsnp138.vcf \
+    --known-sites Mills_and_1000G_gold_standard.indels.hg38.vcf.gz \
+    --known-sites Homo_sapiens_assembly38.known_indels.vcf.gz \
+    -O recal.table
+
+# Stage 2: apply
+gatk ApplyBQSR \
+    -I dedup.bam \
+    -R reference.fasta \
+    --bqsr-recal-file recal.table \
+    -O analysis_ready.bam
+
+# (Optional) Stage 3: visualize
+gatk BaseRecalibrator -I analysis_ready.bam -R reference.fasta \
+    --known-sites ... -O recal_post.table
+gatk AnalyzeCovariates -before recal.table -after recal_post.table -plots BQSR.pdf</code></pre></div>
+
+<div id="tab-flow" class="code-tab-content"><pre><code># Streaming 範例：BWA-MEM2 → sort → markdup → BQSR
+THREADS=16
+SAMPLE=NA12878
+REF=Homo_sapiens_assembly38.fasta
+
+bwa-mem2 mem -t $THREADS -R "@RG\tID:${SAMPLE}\tSM:${SAMPLE}\tLB:lib1\tPL:ILLUMINA" \
+    $REF ${SAMPLE}_R1.fq.gz ${SAMPLE}_R2.fq.gz \
+  | samtools sort -@ $THREADS -o ${SAMPLE}.sorted.bam -
+samtools index ${SAMPLE}.sorted.bam
+
+gatk MarkDuplicates -I ${SAMPLE}.sorted.bam -O ${SAMPLE}.dedup.bam -M ${SAMPLE}.metrics.txt --CREATE_INDEX true
+
+gatk BaseRecalibrator -I ${SAMPLE}.dedup.bam -R $REF \
+    --known-sites Homo_sapiens_assembly38.dbsnp138.vcf \
+    --known-sites Mills_and_1000G_gold_standard.indels.hg38.vcf.gz \
+    -O ${SAMPLE}.recal.table
+
+gatk ApplyBQSR -I ${SAMPLE}.dedup.bam -R $REF \
+    --bqsr-recal-file ${SAMPLE}.recal.table \
+    -O ${SAMPLE}.analysis_ready.bam</code></pre></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="常見問題" data-en="FAQ">常見問題</div>
+<h2 data-zh="七、FAQ" data-en="VII. FAQ">七、FAQ</h2>
+<div class="accordion">
+<details><summary data-zh="duplication rate 多少算正常？" data-en="What's a normal duplication rate?">duplication rate 多少算正常？</summary>
+<div data-lang="zh">30× WGS 一般 5-15%；WES 因 library complexity 較低、PCR cycle 較多，常見 15-30%。超過 40% 通常代表 library 起始 input 太少，需要重做。Amplicon panel 可能 &gt; 50% 屬正常。</div>
+<div data-lang="en">30× WGS: typically 5–15%. WES: 15–30% (lower library complexity, more PCR cycles). Over 40% usually means too little starting material — re-prep. Amplicon panels can exceed 50% normally.</div>
+</details>
+<details><summary data-zh="BQSR 跑完後 Q 值會變怎樣？" data-en="How do Q values change after BQSR?">BQSR 跑完後 Q 值會變怎樣？</summary>
+<div data-lang="zh">通常高 Q 值會被往下拉（從 Q40 → Q35），低 Q 值微調，整體分布變得更窄、更貼近真實錯誤率。AnalyzeCovariates 的 PDF 會顯示「校正前 reported vs empirical 偏差很大、校正後幾乎重疊」。</div>
+<div data-lang="en">High Q's are typically pulled down (Q40 → Q35), low Q's lightly adjusted, distribution narrows toward truth. The AnalyzeCovariates PDF should show large reported-vs-empirical gap before, near-overlap after.</div>
+</details>
+<details><summary data-zh="可以先 BQSR 再 MarkDuplicates 嗎？" data-en="Can I run BQSR before MarkDuplicates?">可以先 BQSR 再 MarkDuplicates 嗎？</summary>
+<div data-lang="zh">不行。順序必須是 sort → markdup → BQSR。BQSR 必須略過 duplicate reads（避免同一個錯誤被計算多次），所以前提是 duplicate flag 已經被打上。</div>
+<div data-lang="en">No. Order must be sort → markdup → BQSR. BQSR must skip duplicate reads (so the same error isn't counted multiple times), which requires the dup flag to already be set.</div>
+</details>
+<details><summary data-zh="FASTQ-to-BAM 全程要多久？" data-en="How long does FASTQ-to-BAM take?">FASTQ-to-BAM 全程要多久？</summary>
+<div data-lang="zh">30× WGS、16 cores：BWA-MEM2 約 4-6 小時，sort+markdup 約 1-2 小時，BQSR 約 2-4 小時，合計 8-12 小時。DRAGEN FPGA 板可在 30 分鐘內完成全流程。</div>
+<div data-lang="en">30× WGS on 16 cores: BWA-MEM2 ~4–6 h, sort+markdup ~1–2 h, BQSR ~2–4 h — total 8–12 h. DRAGEN FPGA cards complete the full flow in under 30 minutes.</div>
+</details>
+</div>
+</section>
+
+<section class="section quiz-section">
+<div class="section-label" data-zh="自我檢測" data-en="QUIZ">自我檢測</div>
+<h2 data-zh="八、小測驗" data-en="VIII. Quiz">八、小測驗</h2>
+
+<div class="quiz-q" data-answer="1">
+<p class="quiz-question" data-zh="Q1. 為什麼 MarkDuplicates 之後不直接刪除 duplicates？" data-en="Q1. Why doesn't MarkDuplicates physically remove duplicates by default?">Q1. 為什麼 MarkDuplicates 之後不直接刪除 duplicates？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="刪除會破壞 BAM 索引" data-en="Removal would break the BAM index">刪除會破壞 BAM 索引</button>
+<button class="quiz-opt" data-idx="1" data-zh="保留可追溯性、且下游工具會自動忽略 0x400 flag" data-en="Traceability is preserved, and downstream tools auto-skip flag 0x400">保留可追溯性、且下游工具會自動忽略 0x400 flag</button>
+<button class="quiz-opt" data-idx="2" data-zh="duplicates 其實對 variant calling 無害" data-en="Duplicates are actually harmless for variant calling">duplicates 其實對 variant calling 無害</button>
+</div>
+<div class="quiz-feedback" id="fb1"></div>
+</div>
+
+<div class="quiz-q" data-answer="2">
+<p class="quiz-question" data-zh="Q2. BQSR 用「known-sites VCF」的目的是什麼？" data-en="Q2. What's the purpose of the 'known-sites VCF' in BQSR?">Q2. BQSR 用「known-sites VCF」的目的是什麼？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="當作 variant calling 的 ground truth" data-en="As ground truth for variant calling">當作 variant calling 的 ground truth</button>
+<button class="quiz-opt" data-idx="1" data-zh="排除 known sites 之後，剩下的 mismatch 才能視為定序錯誤" data-en="To exclude known sites — remaining mismatches can then be treated as sequencing errors">排除 known sites 之後，剩下的 mismatch 才能視為定序錯誤</button>
+<button class="quiz-opt" data-idx="2" data-zh="把 known SNPs 強制插入 BAM" data-en="To force-inject known SNPs into the BAM">把 known SNPs 強制插入 BAM</button>
+</div>
+<div class="quiz-feedback" id="fb2"></div>
+</div>
+
+<div class="quiz-q" data-answer="0">
+<p class="quiz-question" data-zh="Q3. 為什麼用 DeepVariant 或 DRAGEN 不需要 BQSR？" data-en="Q3. Why don't DeepVariant or DRAGEN need BQSR?">Q3. 為什麼用 DeepVariant 或 DRAGEN 不需要 BQSR？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="它們內建自己的鹼基品質學習模型，再跑 BQSR 反而傷害準確度" data-en="They include their own learned base-quality models — running BQSR on top hurts accuracy">它們內建自己的鹼基品質學習模型，再跑 BQSR 反而傷害準確度</button>
+<button class="quiz-opt" data-idx="1" data-zh="它們不接受 recalibrated BAM 作為輸入" data-en="They don't accept recalibrated BAM as input">它們不接受 recalibrated BAM 作為輸入</button>
+<button class="quiz-opt" data-idx="2" data-zh="DeepVariant 與 DRAGEN 只支援 RNA-seq" data-en="DeepVariant and DRAGEN only support RNA-seq">DeepVariant 與 DRAGEN 只支援 RNA-seq</button>
+</div>
+<div class="quiz-feedback" id="fb3"></div>
+</div>
+</section>
+
+<nav class="page-nav">
+<a href="alignment.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 3: Alignment</span></a>
+<a href="variant-calling.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 5: Variant Calling</span></a>
+</nav>
+</main>
+<footer class="site-footer">© WGS/WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// BQSR before/after simulator
+// True empirical Q at each cycle: degrades from Q40 at start to Q22 by cycle 150
+function trueQ(c){return Math.max(20, 40 - 0.13*c - 0.0003*c*c);}
+// Reported Q: optimistically flat at ~Q35, slight tilt
+function reportedQ(c){return 35 - 0.02*c;}
+// After BQSR: closer to truth
+function recalQ(c){return trueQ(c) + (Math.random()-0.5)*0.6 + 0.5;}
+
+const cycles=Array.from({length:150},(_,i)=>i+1);
+const repArr=cycles.map(reportedQ);
+const trueArr=cycles.map(trueQ);
+let recalArr=cycles.map(recalQ);
+
+const bqsrChart=new Chart(document.getElementById('bqsrChart'),{type:'line',data:{labels:cycles,datasets:[
+  {label:'Reported Q',data:repArr,borderColor:'rgba(43,79,129,0.95)',backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:0.2},
+  {label:'BQSR-recalibrated Q',data:recalArr,borderColor:'rgba(200,132,43,0.95)',backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:0.2},
+  {label:'True empirical Q',data:trueArr,borderColor:'rgba(80,80,80,0.7)',backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:0,tension:0.2}
+]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},scales:{x:{title:{display:true,text:'Sequencing cycle (bp)'},ticks:{maxTicksLimit:11}},y:{title:{display:true,text:'Phred Q'},min:18,max:42}}}});
+
+function updateBqsr(){
+  const L=I18n.get();
+  const c=+document.getElementById('cycSlider').value;
+  document.getElementById('cycVal').textContent=c;
+  const rep=repArr[c-1].toFixed(1);
+  const tru=trueArr[c-1].toFixed(1);
+  const rec=recalArr[c-1].toFixed(1);
+  const gap=Math.abs(rep-tru).toFixed(1);
+  document.getElementById('bqsrStats').innerHTML=
+    `<span class="sim-stat">${L==='zh'?'機器報':'Reported'}: Q${rep}</span>`+
+    `<span class="sim-stat warn">${L==='zh'?'真實':'True'}: Q${tru}</span>`+
+    `<span class="sim-stat pass">${L==='zh'?'校正後':'Recalibrated'}: Q${rec}</span>`+
+    `<span class="sim-stat">${L==='zh'?'校正前偏差':'Pre-cal gap'}: ${gap}</span>`;
+  // Highlight chosen cycle by no other change—rebuild dataset to show
+  bqsrChart.data.datasets[0].label=L==='zh'?'機器原報 Q':'Reported Q';
+  bqsrChart.data.datasets[1].label=L==='zh'?'BQSR 校正後 Q':'BQSR-recalibrated Q';
+  bqsrChart.data.datasets[2].label=L==='zh'?'真實 empirical Q':'True empirical Q';
+  bqsrChart.update('none');
+}
+document.getElementById('cycSlider').addEventListener('input',updateBqsr);
+document.addEventListener('langchange',updateBqsr);
+updateBqsr();
+
+const QF={
+  zh:{q1_y:'下游 caller 預設略過 0x400，標記比刪除更安全可逆。',q1_n:'正解已標示。',q2_y:'BQSR 把 known sites 之外的 mismatch 視為 ground-truth 錯誤來訓練校正模型。',q2_n:'正解已標示。',q3_y:'兩者都自帶學習式品質模型，再跑 BQSR 等於雙重校正、傷害準確度。',q3_n:'正解已標示。'},
+  en:{q1_y:'Downstream callers skip flag 0x400 by default; marking is safer and reversible than deleting.',q1_n:'Correct answer highlighted.',q2_y:'BQSR treats non-known-site mismatches as ground-truth errors to train the recalibration model.',q2_n:'Correct answer highlighted.',q3_y:'Both ship with their own learned quality models; layering BQSR on top is double-calibration that hurts accuracy.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

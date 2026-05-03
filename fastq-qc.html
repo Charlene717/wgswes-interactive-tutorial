@@ -1,0 +1,278 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 2: FASTQ QC — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="intro.html">Intro</a></li><li><a href="fastq-qc.html" class="active">FASTQ QC</a></li><li><a href="alignment.html">Align</a></li><li><a href="post-alignment.html">PostAln</a></li><li><a href="variant-calling.html">Calling</a></li><li><a href="joint-genotyping.html">Joint</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot</a></li><li><a href="interpretation.html">Interp</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="structural-variants.html">SV/CNV</a></li><li><a href="wes-considerations.html">WES</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 2 / 9</div>
+<h1 data-zh="FASTQ 品質管控" data-en="FASTQ Quality Control">FASTQ 品質管控</h1>
+<p class="subtitle" data-lang="zh">在 reads 進入 BWA 之前，先讀懂 Phred 分數、移除 adapter、過濾低品質。垃圾進，垃圾出。</p>
+<p class="subtitle" data-lang="en">Before reads hit BWA — read the Phred scores, strip adapters, filter low quality. Garbage in, garbage out.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== Section 1: FASTQ format ===== -->
+<section class="section">
+<div class="section-label" data-zh="檔案格式" data-en="FILE FORMAT">檔案格式</div>
+<h2 data-zh="一、FASTQ 是什麼？" data-en="I. What is FASTQ?">一、FASTQ 是什麼？</h2>
+<div data-lang="zh">
+<p>FASTQ 是一個純文字檔，每個 read 用 <strong>4 行</strong>表示：read ID、序列、分隔符 (<code>+</code>)、品質分數。對於 paired-end 定序，每個樣本會有 R1 和 R2 兩個檔案，read 順序兩兩對應。</p>
+</div>
+<div data-lang="en">
+<p>FASTQ is a plain-text file. Each read uses <strong>4 lines</strong>: read ID, sequence, separator (<code>+</code>), and quality scores. For paired-end sequencing, each sample has R1 and R2 files with reads in matching order.</p>
+</div>
+<div class="format-block"><span class="lbl">@A00123:45:HXXX:1:1101:1234:5678 1:N:0:ATCACG</span> <span class="ann">← read ID + run/flowcell/coords + R1/R2 flag</span>
+<span class="val">GATTACAGATTACAGATTACAGATTACAGATTACAGATTAC...</span>      <span class="ann">← sequence (A/C/G/T/N), 150bp typical</span>
++
+<span class="val">FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF...</span>      <span class="ann">← Phred quality (ASCII-encoded, Phred+33)</span></div>
+
+<div class="callout tip"><span class="callout-icon">🔑</span><div>
+<span data-lang="zh"><strong>Phred 分數</strong> Q = -10·log₁₀(P)，其中 P 是錯誤機率。Q30 = 1/1000 錯誤率（99.9% 準確）。Illumina 平台目標是 ≥80% bases Q30+。</span>
+<span data-lang="en"><strong>Phred score</strong> Q = -10·log₁₀(P), where P is error probability. Q30 = 1/1000 error rate (99.9% accuracy). Illumina platforms target ≥80% of bases at Q30+.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 2: Phred score interactive ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="二、Phred 分數轉換器" data-en="II. Phred Score Converter">二、Phred 分數轉換器</h2>
+<div data-lang="zh"><p>拖動滑桿觀察 Phred 分數對應的錯誤率與 ASCII 字元。注意 Q30 是工業標準分界線。</p></div>
+<div data-lang="en"><p>Drag the slider to see how Phred scores map to error rates and ASCII characters. Q30 is the industry-standard cutoff.</p></div>
+<div class="interactive-panel">
+<div class="slider-group"><label><span data-zh="Phred 分數 (Q)" data-en="Phred score (Q)">Phred 分數</span> <span id="qVal">Q30</span></label><input type="range" id="qSlider" min="0" max="42" value="30" step="1"></div>
+<div class="sim-stats">
+<span class="sim-stat pass" id="qErr">—</span>
+<span class="sim-stat pass" id="qAcc">—</span>
+<span class="sim-stat warn" id="qChar">—</span>
+<span class="sim-stat" id="qVerdict" style="background:var(--c-accent-light);color:var(--c-accent-dark);">—</span>
+</div>
+<div class="chart-container" style="height:240px;"><canvas id="qChart"></canvas></div>
+</div>
+</section>
+
+<!-- ===== Section 3: FastQC modules ===== -->
+<section class="section">
+<div class="section-label" data-zh="QC 工具" data-en="QC TOOLS">QC 工具</div>
+<h2 data-zh="三、FastQC 主要檢查項目" data-en="III. Key FastQC Modules">三、FastQC 主要檢查項目</h2>
+<div data-lang="zh"><p>FastQC 是 Java 寫的單檔工具，輸出 HTML report 與 11 個檢測模組。對 WGS/WES 專案最關鍵的 6 個模組是：</p></div>
+<div data-lang="en"><p>FastQC is a Java-based tool producing HTML reports with 11 detection modules. The 6 most critical for WGS/WES projects are:</p></div>
+<div class="card-grid cols-3">
+<div class="card"><div class="card-icon">📈</div><h4 data-zh="Per base sequence quality" data-en="Per Base Sequence Quality">Per base sequence quality</h4>
+<div data-lang="zh"><p>沿 read 長度展示每個位置的品質分數箱線圖。Illumina 數據通常前段高、後段下降；R2 通常比 R1 差。<strong>red zone (&lt;Q20)</strong> 大量出現代表需要 trim。</p></div>
+<div data-lang="en"><p>Box plots of quality at each cycle along the read. Illumina reads start strong then degrade; R2 is usually worse than R1. Heavy entry into the <strong>red zone (&lt;Q20)</strong> means trimming is needed.</p></div>
+</div>
+<div class="card"><div class="card-icon">🧬</div><h4 data-zh="Per base sequence content" data-en="Per Base Sequence Content">Per base sequence content</h4>
+<div data-lang="zh"><p>每個位置 A/T/G/C 的比例。應接近平直線（A≈T、G≈C）。前 9–13 bp 常見不平衡（隨機引子偏好），不必擔心；其他位置劇烈起伏可能是 adapter 或污染。</p></div>
+<div data-lang="en"><p>Proportion of A/T/G/C at each position. Should be roughly flat lines (A≈T, G≈C). Imbalance in the first 9–13 bp is normal (random hexamer bias); fluctuations elsewhere may indicate adapters or contamination.</p></div>
+</div>
+<div class="card"><div class="card-icon">🔁</div><h4 data-zh="Sequence duplication levels" data-en="Sequence Duplication Levels">Duplication levels</h4>
+<div data-lang="zh"><p>WGS 不應該有大量 duplicates（5–25% 正常）；WES 通常較高（20–60%）因為 capture 集中。極高的 duplication（&gt;80%）暗示 PCR over-amplification 或 library 複雜度低。</p></div>
+<div data-lang="en"><p>WGS should not show heavy duplication (5–25% normal); WES is typically higher (20–60%) due to capture concentration. Very high duplication (&gt;80%) suggests PCR over-amplification or low library complexity.</p></div>
+</div>
+<div class="card"><div class="card-icon">🔌</div><h4 data-zh="Adapter content" data-en="Adapter Content">Adapter content</h4>
+<div data-lang="zh"><p>3' 端常見 adapter read-through（當 insert 短於 read length 時）。FastQC 偵測 5 種常見 adapter (Illumina、Nextera、SOLID、Small RNA)。任何明顯的 adapter signal 都應該 trim。</p></div>
+<div data-lang="en"><p>3' adapter read-through is common (when insert is shorter than read length). FastQC detects 5 common adapter classes (Illumina, Nextera, SOLID, Small RNA). Any noticeable adapter signal should be trimmed.</p></div>
+</div>
+<div class="card"><div class="card-icon">📊</div><h4 data-zh="Per sequence GC content" data-en="Per Sequence GC Content">Per sequence GC content</h4>
+<div data-lang="zh"><p>整個 read 的 GC% 分布。人類預期約 41% 為峰值，呈正常分布。雙峰或位移暗示<strong>跨物種污染</strong>（如細菌、mycoplasma）或 adapter dimer。</p></div>
+<div data-lang="en"><p>Per-read GC% distribution. Expected to peak around 41% for human samples in a normal-looking curve. Double peaks or shifts suggest <strong>cross-species contamination</strong> (bacteria, mycoplasma) or adapter dimers.</p></div>
+</div>
+<div class="card"><div class="card-icon">🔁</div><h4 data-zh="Overrepresented sequences" data-en="Overrepresented Sequences">Overrepresented sequences</h4>
+<div data-lang="zh"><p>列出佔比 ≥0.1% 的單一序列。常見來源：adapter、ribosomal RNA（如 RNA-seq 殘留）、PCR primer dimer。每個序列 FastQC 會嘗試自動 BLAST 比對標註來源。</p></div>
+<div data-lang="en"><p>Lists single sequences making up ≥0.1% of reads. Common sources: adapters, ribosomal RNA (RNA-seq carryover), PCR primer dimers. FastQC auto-BLASTs each to suggest the source.</p></div>
+</div>
+</div>
+</section>
+
+<!-- ===== Section 4: fastp vs alternatives ===== -->
+<section class="section">
+<div class="section-label" data-zh="工具比較" data-en="TOOL COMPARISON">工具比較</div>
+<h2 data-zh="四、QC + Trimming 工具比較" data-en="IV. QC + Trimming Tool Comparison">四、QC + Trimming 工具比較</h2>
+<div data-lang="zh"><p>傳統流程是 FastQC → Trimmomatic / Cutadapt → 再跑一次 FastQC——三個工具、三次 I/O。<strong>fastp</strong>（2018 釋出，2025 更新到 1.0）把這些整合到一次掃描，速度比傳統組合快 2–5 倍，並輸出與 FastQC 同等資訊量的 HTML report。</p></div>
+<div data-lang="en"><p>The classic flow is FastQC → Trimmomatic / Cutadapt → re-run FastQC — three tools, three I/O passes. <strong>fastp</strong> (released 2018, updated to 1.0 in 2025) integrates all of this into a single scan, running 2–5× faster than the legacy combo while producing FastQC-equivalent HTML reports.</p></div>
+<table class="comp-table"><thead><tr><th data-zh="特性" data-en="Feature">特性</th><th>FastQC</th><th>Trimmomatic</th><th>Cutadapt</th><th>fastp</th></tr></thead><tbody>
+<tr><td><strong data-zh="QC 報告" data-en="QC Report">QC 報告</strong></td><td>✅ HTML</td><td>❌</td><td>❌</td><td>✅ HTML + JSON</td></tr>
+<tr><td><strong data-zh="Adapter trimming" data-en="Adapter Trimming">Adapter trim</strong></td><td>❌</td><td>✅</td><td>✅</td><td>✅ <span data-lang="zh">自動偵測</span><span data-lang="en">auto-detect</span></td></tr>
+<tr><td><strong data-zh="Quality trim" data-en="Quality Trim">Quality trim</strong></td><td>❌</td><td>✅ <span data-lang="zh">滑動視窗</span><span data-lang="en">sliding window</span></td><td>⚠️ <span data-lang="zh">基本</span><span data-lang="en">basic</span></td><td>✅ <span data-lang="zh">滑動視窗</span><span data-lang="en">sliding window</span></td></tr>
+<tr><td><strong data-zh="UMI 處理" data-en="UMI Handling">UMI 處理</strong></td><td>❌</td><td>❌</td><td>⚠️</td><td>✅</td></tr>
+<tr><td><strong data-zh="polyG/polyX trim" data-en="polyG/polyX trim">polyG trim<br><span style="font-size:.75rem;color:var(--c-ink-muted)" data-zh="(NextSeq/NovaSeq 必要)" data-en="(needed for NextSeq/NovaSeq)">(NextSeq/NovaSeq 必要)</span></strong></td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
+<tr><td><strong data-zh="速度" data-en="Speed">速度</strong></td><td>🔵</td><td>🐢</td><td>🐢</td><td>⚡⚡⚡</td></tr>
+<tr><td><strong data-zh="Multi-thread" data-en="Multi-thread">多執行緒</strong></td><td>⚠️</td><td>✅</td><td>✅</td><td>✅ <span data-lang="zh">原生</span><span data-lang="en">native</span></td></tr>
+<tr><td><strong data-zh="持續維護" data-en="Maintained">仍在維護</strong></td><td>✅</td><td>❌ <span data-lang="zh">2019 後停止</span><span data-lang="en">stopped 2019</span></td><td>✅</td><td>✅</td></tr>
+</tbody></table>
+
+<div class="decision-tree"><h4>🌳 <span data-zh="該用哪個工具？" data-en="Which tool to use?">該用哪個工具？</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">A:</span><div>2024 年起的新專案 → <strong>fastp</strong>（QC + trim 一次完成）。</div></div>
+<div class="dt-node"><span class="dt-q">B:</span><div>需要與既有 pipeline 對齊 → <strong>FastQC + Trimmomatic</strong> 仍可。</div></div>
+<div class="dt-node"><span class="dt-q">C:</span><div>NovaSeq / NextSeq 平台 → 必須選有 <strong>polyG trimming</strong> 的工具（fastp 預設啟用）。</div></div>
+<div class="dt-node"><span class="dt-q">D:</span><div>超大型批次（&gt;100 sample） → <strong>fastp + MultiQC</strong> 統整所有報告。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">A:</span><div>New projects from 2024 onward → <strong>fastp</strong> (QC + trim in one pass).</div></div>
+<div class="dt-node"><span class="dt-q">B:</span><div>Need to align with existing pipeline → <strong>FastQC + Trimmomatic</strong> still fine.</div></div>
+<div class="dt-node"><span class="dt-q">C:</span><div>NovaSeq / NextSeq platform → must use a tool with <strong>polyG trimming</strong> (fastp enables it by default).</div></div>
+<div class="dt-node"><span class="dt-q">D:</span><div>Huge cohorts (&gt;100 samples) → <strong>fastp + MultiQC</strong> to consolidate all reports.</div></div>
+</div></div>
+</section>
+
+<!-- ===== Section 5: Code samples ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="五、實作範例" data-en="V. Code Examples">五、實作範例</h2>
+<div class="code-tabs"><div class="code-tab-btns">
+<button class="code-tab-btn active" onclick="switchTab(this,'c1')">FastQC</button>
+<button class="code-tab-btn" onclick="switchTab(this,'c2')">fastp (推薦)</button>
+<button class="code-tab-btn" onclick="switchTab(this,'c3')">Trimmomatic</button>
+<button class="code-tab-btn" onclick="switchTab(this,'c4')">MultiQC</button>
+</div>
+<div class="code-tab-content active" id="c1"><pre><span class="comment"># 對 paired-end FASTQ 跑 FastQC（產出 HTML + zip）</span>
+fastqc -o qc_out/ -t <span class="num">8</span> sample_R1.fastq.gz sample_R2.fastq.gz
+
+<span class="comment"># 結果：</span>
+<span class="comment">#   qc_out/sample_R1_fastqc.html  ← 視覺化報告</span>
+<span class="comment">#   qc_out/sample_R1_fastqc.zip   ← 原始數據 (給 MultiQC 整合)</span></pre></div>
+
+<div class="code-tab-content" id="c2"><pre><span class="comment"># fastp：一個指令同時做 QC、adapter、quality trim、polyG</span>
+fastp \
+  -i sample_R1.fastq.gz -I sample_R2.fastq.gz \
+  -o sample_R1.trim.fastq.gz -O sample_R2.trim.fastq.gz \
+  <span class="flag">--detect_adapter_for_pe</span> \                      <span class="comment"># PE 自動偵測 adapter</span>
+  <span class="flag">--cut_right --cut_right_window_size</span> <span class="num">4</span> <span class="flag">--cut_right_mean_quality</span> <span class="num">20</span> \  <span class="comment"># 滑動視窗</span>
+  <span class="flag">--length_required</span> <span class="num">50</span> \                          <span class="comment"># trim 後仍 ≥50bp 才保留</span>
+  <span class="flag">--trim_poly_g</span> \                                <span class="comment"># NovaSeq/NextSeq polyG 假信號</span>
+  <span class="flag">--thread</span> <span class="num">8</span> \
+  <span class="flag">--html</span> sample.fastp.html <span class="flag">--json</span> sample.fastp.json
+
+<span class="comment"># 一次完成。HTML 內含 before/after 對比圖。</span></pre></div>
+
+<div class="code-tab-content" id="c3"><pre><span class="comment"># Trimmomatic（傳統，仍可用但已停止更新）</span>
+trimmomatic PE -phred33 -threads <span class="num">8</span> \
+  sample_R1.fastq.gz sample_R2.fastq.gz \
+  sample_R1.trim.fastq.gz sample_R1.unpaired.fastq.gz \
+  sample_R2.trim.fastq.gz sample_R2.unpaired.fastq.gz \
+  ILLUMINACLIP:adapters/TruSeq3-PE.fa:<span class="num">2</span>:<span class="num">30</span>:<span class="num">10</span> \  <span class="comment"># adapter 比對嚴格度</span>
+  LEADING:<span class="num">3</span> TRAILING:<span class="num">3</span> \                       <span class="comment"># 兩端 trim Q&lt;3</span>
+  SLIDINGWINDOW:<span class="num">4</span>:<span class="num">20</span> \                          <span class="comment"># 4bp 視窗，平均 Q≥20</span>
+  MINLEN:<span class="num">50</span></pre></div>
+
+<div class="code-tab-content" id="c4"><pre><span class="comment"># MultiQC：把所有 sample 的 fastp/FastQC 報告整合成一份</span>
+multiqc qc_out/ fastp_out/ -o multiqc_report/
+
+<span class="comment"># 自動掃描所有支援的工具輸出，產出 multiqc_report.html</span>
+<span class="comment"># 支援 FastQC、fastp、Trimmomatic、Picard、samtools、GATK 等 100+ 工具</span></pre></div></div>
+</section>
+
+<!-- ===== Section 6: Common issues ===== -->
+<section class="section">
+<div class="section-label" data-zh="常見問題" data-en="FAQ">FAQ</div>
+<h2 data-zh="六、常見問題與排查" data-en="VI. Common Issues & Troubleshooting">六、常見問題與排查</h2>
+
+<div class="accordion-item"><button class="accordion-btn" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')"><span data-zh="FastQC 紅燈一定要修嗎？" data-en="Must I fix every FastQC red flag?">FastQC 紅燈一定要修嗎？</span></button><div class="accordion-body">
+<div data-lang="zh"><p>不一定。FastQC 的 pass/warn/fail 是基於 RNA-seq/general 預設值，對 WGS 與 WES 來說很多 fail 可以忽略：例如 WES 的 <em>Sequence Duplication Levels</em> 因 target 集中而高是正常的；<em>Per base sequence content</em> 在前 13bp 不平衡是 random hexamer 偏好，無需處理。<strong>關鍵是看 trend，不是看燈號。</strong></p></div>
+<div data-lang="en"><p>Not always. FastQC's pass/warn/fail uses defaults tuned for RNA-seq/general data. Many "fails" are acceptable for WGS/WES: WES's high <em>Sequence Duplication</em> is expected due to capture concentration; <em>Per base sequence content</em> imbalance in the first 13 bp reflects random hexamer bias and needs no fix. <strong>Read the trend, not the traffic light.</strong></p></div>
+</div></div>
+
+<div class="accordion-item"><button class="accordion-btn" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')"><span data-zh="GATK pipeline 真的需要先 trim 嗎？" data-en="Does the GATK pipeline really need pre-trimming?">GATK pipeline 真的需要先 trim 嗎？</span></button><div class="accordion-body">
+<div data-lang="zh"><p>BWA-MEM 對輕度 adapter 污染與末端低品質有一定容忍度（會 soft-clip）。但 GATK 官方建議仍是 <strong>先做 adapter trim</strong>，因為：(1) adapter contamination 會在 BAM 產生大量 soft-clipped reads 影響後續 BQSR 統計；(2) 短 fragment 樣本（如 cfDNA）adapter read-through 嚴重時必須處理。Quality trim 則是可選——多數現代 caller 會考量 base quality。</p></div>
+<div data-lang="en"><p>BWA-MEM tolerates mild adapter contamination and end-quality drops (soft-clips them). But GATK's official recommendation remains <strong>pre-trim adapters</strong> because: (1) adapter contamination creates many soft-clipped reads in the BAM, affecting downstream BQSR statistics; (2) short-fragment samples (e.g. cfDNA) with severe adapter read-through must be cleaned. Quality trimming is optional — most modern callers already account for base quality.</p></div>
+</div></div>
+
+<div class="accordion-item"><button class="accordion-btn" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')"><span data-zh="Per sequence GC content 出現雙峰怎麼辦？" data-en="What does a double-peak GC distribution mean?">Per sequence GC content 出現雙峰怎麼辦？</span></button><div class="accordion-body">
+<div data-lang="zh"><p>常見原因有三：(1) <strong>跨物種污染</strong>（細菌 GC% 跟人類不同，如 mycoplasma 約 32%）→ 用 Kraken2 或 FastQ Screen 篩查。(2) <strong>Adapter dimer</strong> 形成單一極端 GC 峰 → fastp 可清除。(3) <strong>多個物種樣本意外混合</strong>。發現雙峰時，最重要的下一步是<strong>定量污染源</strong>，不要直接進入比對。</p></div>
+<div data-lang="en"><p>Three common causes: (1) <strong>Cross-species contamination</strong> (bacterial GC% differs from human, e.g. mycoplasma ~32%) → screen with Kraken2 or FastQ Screen. (2) <strong>Adapter dimers</strong> create one extreme GC peak → fastp removes them. (3) <strong>Accidental sample mixing</strong>. When you see a double peak, the next step is to <strong>quantify the contamination source</strong>, not push to alignment.</p></div>
+</div></div>
+
+<div class="accordion-item"><button class="accordion-btn" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')"><span data-zh="NovaSeq 為什麼會有 polyG 偽信號？" data-en="Why does NovaSeq produce polyG artifacts?">NovaSeq 為什麼會有 polyG 偽信號？</span></button><div class="accordion-body">
+<div data-lang="zh"><p>Illumina 兩色化學（NovaSeq、NextSeq）用「沒有信號」代表 G base。當 fragment 比 read length 短時，sequencer 在 fragment 結束後仍繼續讀，產生長串「沒有信號」即被誤判為 polyG。<strong>必須在 trimming 階段移除</strong>，否則會嚴重影響比對品質。fastp <code>--trim_poly_g</code> 預設啟用即可解決。</p></div>
+<div data-lang="en"><p>Illumina 2-color chemistry (NovaSeq, NextSeq) encodes G base as "no signal." When the fragment is shorter than read length, the sequencer keeps reading past the fragment end, producing long "no-signal" stretches misread as polyG. <strong>This must be trimmed</strong> or alignment quality suffers severely. fastp's <code>--trim_poly_g</code> (default on) handles it.</p></div>
+</div></div>
+</section>
+
+<!-- ===== Quiz ===== -->
+<section class="quiz-section"><h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. 你打開 FastQC 報告，發現 <em>Sequence Duplication Levels</em> 顯示 50% duplicates，紅燈警告。樣本是 WES。應該？</p>
+<p data-lang="en">1. Your FastQC report shows 50% sequence duplication with a red flag. The sample is WES. You should:</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 立刻丟棄樣本，重做定序</span><span data-lang="en">A. Discard the sample, re-sequence immediately</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 用 dedup 工具強制把 duplicates 全部移除再進入比對</span><span data-lang="en">B. Force-remove all duplicates with a dedup tool before alignment</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 不必擔心，WES 的 duplication 偏高是 capture 集中的正常現象；交給 BAM 階段的 MarkDuplicates 處理</span><span data-lang="en">C. Don't worry — high WES duplication is normal due to capture concentration; let MarkDuplicates handle it at the BAM stage</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 改變 trimming 參數</span><span data-lang="en">D. Change the trimming parameters</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">2. NovaSeq 平台產生的 reads，end of read 經常出現 polyG 序列。這是因為？</p>
+<p data-lang="en">2. NovaSeq reads often end in polyG sequences. This is because:</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 樣本 DNA 本身富含 G</span><span data-lang="en">A. The sample DNA is genuinely G-rich</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 兩色化學中「沒有信號」被解讀為 G，當 fragment 短於 read length 時就出現假 polyG</span><span data-lang="en">B. 2-color chemistry encodes "no signal" as G, producing false polyG when fragment is shorter than read length</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. PCR 引子設計不良</span><span data-lang="en">C. Poor PCR primer design</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. Reference genome 包含 polyG repeats</span><span data-lang="en">D. The reference genome contains polyG repeats</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">3. 一個 read 的某 base 標示為 Phred Q40，這代表？</p>
+<p data-lang="en">3. A base in a read is labeled Phred Q40. This means:</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 該 base 錯誤機率為 1/10000（99.99% 準確）</span><span data-lang="en">A. The base has a 1/10000 error probability (99.99% accuracy)</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 該 base 是 reference 上第 40 個位置</span><span data-lang="en">B. The base is at position 40 in the reference</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 整個 read 平均品質為 40</span><span data-lang="en">C. The overall read quality averages 40</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 該位置覆蓋深度為 40×</span><span data-lang="en">D. Coverage depth at that position is 40×</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="intro.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 1: Intro</span></a>
+<a href="alignment.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 3: Alignment</span></a>
+</nav>
+</main>
+<footer class="site-footer">© WGS/WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// Phred score interactive
+const qPoints=[];
+for(let q=0;q<=42;q++) qPoints.push({x:q,y:Math.pow(10,-q/10)});
+const qChart=new Chart(document.getElementById('qChart'),{type:'line',data:{labels:qPoints.map(p=>'Q'+p.x),datasets:[{label:'Error probability',data:qPoints.map(p=>p.y),borderColor:'rgba(43,79,129,1)',backgroundColor:'rgba(43,79,129,0.15)',borderWidth:2,fill:true,pointRadius:0,tension:0.3},{label:'Selected',data:[],pointRadius:8,pointBackgroundColor:'rgba(200,132,43,1)',borderWidth:0,showLine:false}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{y:{type:'logarithmic',title:{display:true,text:'Error probability (log)'},min:1e-5,max:1.2},x:{title:{display:true,text:'Phred score'}}}}});
+
+function updateQ(){
+  const L=I18n.get();
+  const q=+document.getElementById('qSlider').value;
+  const p=Math.pow(10,-q/10);
+  const acc=(1-p)*100;
+  const ch=String.fromCharCode(q+33);
+  document.getElementById('qVal').textContent='Q'+q;
+  document.getElementById('qErr').textContent=(L==='zh'?'錯誤率: 1/':'Error: 1/')+(p<1?Math.round(1/p).toLocaleString():'1');
+  document.getElementById('qAcc').textContent=(L==='zh'?'準確率: ':'Accuracy: ')+acc.toFixed(q<10?2:q<20?4:6)+'%';
+  document.getElementById('qChar').textContent=(L==='zh'?'ASCII 字元: ':'ASCII: ')+'"'+ch+'"';
+  let v;
+  if(q<20)v=L==='zh'?'❌ 太差，應 trim':'❌ Too low, should trim';
+  else if(q<30)v=L==='zh'?'⚠️ 可接受':'⚠️ Acceptable';
+  else if(q<37)v=L==='zh'?'✅ 標準品質':'✅ Standard quality';
+  else v=L==='zh'?'⭐ 極高品質':'⭐ Very high quality';
+  document.getElementById('qVerdict').textContent=v;
+  qChart.data.datasets[1].data=[{x:'Q'+q,y:p}];
+  qChart.update('none');
+}
+document.getElementById('qSlider').addEventListener('input',updateQ);
+document.addEventListener('langchange',updateQ);
+updateQ();
+
+// Quiz
+const QF={
+  zh:{q1_y:'WES 因捕獲集中，duplication 偏高 (20–60%) 是預期結果，不需事先處理。',q1_n:'正解已標示。',q2_y:'兩色化學「沒有信號」即代表 G，是 NovaSeq/NextSeq 的已知特性。',q2_n:'正解已標示。',q3_y:'Phred 公式 Q = -10·log₁₀(P)，Q40 對應 1/10000 錯誤率。',q3_n:'正解已標示。'},
+  en:{q1_y:'High WES duplication (20-60%) is expected due to capture concentration; no need to pre-treat.',q1_n:'Correct answer highlighted.',q2_y:'2-color chemistry encodes "no signal" as G — a known characteristic of NovaSeq/NextSeq.',q2_n:'Correct answer highlighted.',q3_y:'Phred formula Q = -10·log₁₀(P); Q40 corresponds to 1/10000 error rate.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

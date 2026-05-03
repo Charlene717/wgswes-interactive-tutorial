@@ -1,0 +1,394 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Advanced: WES Considerations — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="intro.html">Intro</a></li><li><a href="fastq-qc.html">FASTQ QC</a></li><li><a href="alignment.html">Align</a></li><li><a href="post-alignment.html">PostAln</a></li><li><a href="variant-calling.html">Calling</a></li><li><a href="joint-genotyping.html">Joint</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot</a></li><li><a href="interpretation.html">Interp</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="structural-variants.html">SV/CNV</a></li><li><a href="wes-considerations.html" class="active">WES</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">ADVANCED</div>
+<h1 data-zh="WES 專屬考量 (Capture, QC, Blind Spots)" data-en="WES-Specific Considerations">WES 專屬考量 (Capture, QC, Blind Spots)</h1>
+<p class="subtitle" data-lang="zh">Capture kit 選擇、target enrichment 工作流、CollectHsMetrics QC、與 WES 永恆的盲點——把 WES pipeline 跑好的關鍵細節。</p>
+<p class="subtitle" data-lang="en">Capture kit selection, target enrichment workflow, CollectHsMetrics QC, and WES's perennial blind spots — the key details for running WES well.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="基礎" data-en="BASICS">基礎</div>
+<h2 data-zh="一、Target enrichment 工作流" data-en="I. Target Enrichment Workflow">一、Target enrichment 工作流</h2>
+<div data-lang="zh">
+<p>WES 與 WGS 在 wet lab 端的根本差異：WES 在 library prep 後加一步 <strong>target capture</strong>，用幾十萬個 biotinylated probe 去 hybridize 並「釣出」exon 區段：</p>
+<ol style="padding-left:24px;line-height:2">
+<li><strong>Genomic DNA fragmentation</strong>（超音波或酶切，~200-300 bp）</li>
+<li><strong>Library prep</strong>（end repair, A-tail, adapter ligation, PCR amplify）</li>
+<li><strong>Hybridization</strong>：library 與 biotinylated capture probe 在液相中混合 16-24 小時</li>
+<li><strong>Streptavidin bead pulldown</strong>：磁珠抓住 biotin，洗掉未結合的非 target 片段</li>
+<li><strong>Post-capture PCR</strong>（10-12 cycles）放大濃度，再上 Illumina 定序</li>
+</ol>
+<p>這個 capture 步驟是 WES 所有「特色問題」的根源——uneven coverage、capture bias、GC bias、PCR duplicates，全來自此。</p>
+</div>
+<div data-lang="en">
+<p>The fundamental wet-lab difference between WES and WGS: WES adds a <strong>target capture</strong> step after library prep, where hundreds of thousands of biotinylated probes hybridize and "fish out" exon segments:</p>
+<ol style="padding-left:24px;line-height:2">
+<li><strong>Genomic DNA fragmentation</strong> (sonication or enzymatic, ~200–300 bp)</li>
+<li><strong>Library prep</strong> (end repair, A-tail, adapter ligation, PCR amplify)</li>
+<li><strong>Hybridization</strong>: library mixed with biotinylated capture probes in solution for 16–24 hours</li>
+<li><strong>Streptavidin bead pulldown</strong>: magnetic beads grab biotin, washing off unbound non-target fragments</li>
+<li><strong>Post-capture PCR</strong> (10–12 cycles) re-amplifies concentration, then loaded onto Illumina</li>
+</ol>
+<p>This capture step is the root of all WES's "characteristic problems" — uneven coverage, capture bias, GC bias, PCR duplicates all originate here.</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="比較" data-en="COMPARISON">比較</div>
+<h2 data-zh="二、四大 Exome capture kit 比較" data-en="II. Four Major Exome Capture Kits">二、四大 Exome capture kit 比較</h2>
+<div class="comp-table-wrap">
+<table class="comp-table">
+<thead><tr><th>Kit</th><th data-zh="廠商" data-en="Vendor">廠商</th><th data-zh="Target size" data-en="Target size">Target size</th><th data-zh="均勻度" data-en="Uniformity">均勻度</th><th data-zh="特色 / 弱點" data-en="Strength / Weakness">特色 / 弱點</th></tr></thead>
+<tbody>
+<tr><td><strong>Twist Exome 2.0</strong></td><td>Twist Bioscience</td><td data-zh="~36 Mb" data-en="~36 Mb">~36 Mb</td><td data-zh="★★★★★ (最佳)" data-en="★★★★★ (best)">★★★★★ (最佳)</td><td data-zh="2018 後新一代，雙鏈 DNA probe，FOLD_80 ≈ 1.5；GC bias 最低；目前主流選擇" data-en="Post-2018 next-gen, dsDNA probes, FOLD_80 ≈ 1.5; lowest GC bias; current mainstream choice">2018 後新一代，雙鏈 DNA probe，FOLD_80 ≈ 1.5；GC bias 最低；目前主流選擇</td></tr>
+<tr><td><strong>Agilent SureSelect</strong></td><td>Agilent</td><td data-zh="~50 Mb (V8)" data-en="~50 Mb (V8)">~50 Mb (V8)</td><td data-zh="★★★★ (良好)" data-en="★★★★ (good)">★★★★ (良好)</td><td data-zh="經典老牌，RNA probe，target 含 UTR 與 microRNA；FOLD_80 ≈ 2.0；GC-rich 區較弱" data-en="Classic veteran; RNA probes; target includes UTRs and microRNAs; FOLD_80 ≈ 2.0; weaker in GC-rich regions">經典老牌，RNA probe，target 含 UTR 與 microRNA；FOLD_80 ≈ 2.0；GC-rich 區較弱</td></tr>
+<tr><td><strong>IDT xGen Exome</strong></td><td>IDT</td><td data-zh="~39 Mb" data-en="~39 Mb">~39 Mb</td><td data-zh="★★★★ (良好)" data-en="★★★★ (good)">★★★★ (良好)</td><td data-zh="DNA probe，低 input (10 ng) 表現好；常用於 cfDNA / FFPE / single-cell" data-en="DNA probes; strong low-input (10 ng) performance; commonly used for cfDNA / FFPE / single-cell">DNA probe，低 input (10 ng) 表現好；常用於 cfDNA / FFPE / single-cell</td></tr>
+<tr><td><strong>Illumina TruSeq Exome</strong></td><td>Illumina</td><td data-zh="~45 Mb" data-en="~45 Mb">~45 Mb</td><td data-zh="★★★ (一般)" data-en="★★★ (average)">★★★ (一般)</td><td data-zh="與 Illumina sequencer 整合工作流；新版本較少更新；逐漸被取代" data-en="Integrated workflow with Illumina sequencers; less frequently updated; gradually being replaced">與 Illumina sequencer 整合工作流；新版本較少更新；逐漸被取代</td></tr>
+</tbody>
+</table>
+<div class="comp-note" data-lang="zh">註：FOLD_80 = 80th percentile coverage / mean coverage；越接近 1 表示 coverage 越均勻。</div>
+<div class="comp-note" data-lang="en">Note: FOLD_80 = 80th percentile coverage / mean coverage; closer to 1 means more uniform coverage.</div>
+</div>
+
+<div class="callout callout-info" style="margin-top:18px">
+<strong data-zh="Padding intervals 是什麼？" data-en="What are padding intervals?">Padding intervals 是什麼？</strong>
+<p data-lang="zh">capture probe 雖然只在 exon 上，但 hybridization 會「順帶」抓到 probe 周圍 ~50-100 bp 的 flanking sequence。為了 variant calling 包含 splice site (exon-intron boundary ±10 bp 是 splice donor/acceptor 關鍵區)，下游分析應使用「padded intervals」：原 target intervals 兩側各延伸 50-100 bp。GATK 預設 100 bp padding。</p>
+<p data-lang="en">Capture probes target only exons, but hybridization incidentally captures ~50–100 bp of flanking sequence around the probe. To include splice sites (exon-intron boundary ±10 bp is the splice donor/acceptor critical region), downstream analysis should use "padded intervals" — original target intervals extended 50–100 bp on each side. GATK defaults to 100-bp padding.</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="QC" data-en="QC">QC</div>
+<h2 data-zh="三、CollectHsMetrics — WES 的 QC 之王" data-en="III. CollectHsMetrics — WES's QC Crown">三、CollectHsMetrics — WES 的 QC 之王</h2>
+<div data-lang="zh">
+<p>Picard 的 <code>CollectHsMetrics</code>（"Hs" = Hybrid Selection）專門評估 capture 品質，每個 WES 樣本都應該跑。關鍵 metrics：</p>
+</div>
+<div data-lang="en">
+<p>Picard's <code>CollectHsMetrics</code> ("Hs" = Hybrid Selection) is purpose-built for capture QC; every WES sample should run it. Key metrics:</p>
+</div>
+
+<div class="comp-table-wrap">
+<table class="comp-table">
+<thead><tr><th>Metric</th><th data-zh="意義" data-en="Meaning">意義</th><th data-zh="可接受範圍" data-en="Acceptable range">可接受範圍</th></tr></thead>
+<tbody>
+<tr><td><code>PCT_SELECTED_BASES</code></td><td data-zh="比對到 target 或 padding 區的 base 比例 (capture 效率)" data-en="Fraction of bases mapped to target or padding region (capture efficiency)">比對到 target 或 padding 區的 base 比例 (capture 效率)</td><td>&gt; 60% (Twist 常 &gt; 80%)</td></tr>
+<tr><td><code>PCT_OFF_BAIT</code></td><td data-zh="未對到 target / padding 的 read 比例 (浪費)" data-en="Fraction of reads not on target/padding (wasted)">未對到 target / padding 的 read 比例 (浪費)</td><td>&lt; 30%</td></tr>
+<tr><td><code>MEAN_TARGET_COVERAGE</code></td><td data-zh="target 區的平均 coverage" data-en="Mean coverage on target region">target 區的平均 coverage</td><td data-zh="≥ 80× (germline)、≥ 200× (somatic)" data-en="≥ 80× (germline), ≥ 200× (somatic)">≥ 80× (germline)、≥ 200× (somatic)</td></tr>
+<tr><td><code>PCT_TARGET_BASES_30X</code></td><td data-zh="target base 中達到 30× 以上的比例 (medical exome 關鍵)" data-en="Fraction of target bases ≥ 30× (key for medical exome)">target base 中達到 30× 以上的比例 (medical exome 關鍵)</td><td>&gt; 90%</td></tr>
+<tr><td><code>FOLD_80_BASE_PENALTY</code></td><td data-zh="均勻度指標：80% target 達到目標 coverage 所需 fold over-sequencing；越低越均勻" data-en="Uniformity metric: fold over-sequencing needed for 80% of targets to reach goal; lower = more uniform">均勻度指標：80% target 達到目標 coverage 所需 fold over-sequencing；越低越均勻</td><td>&lt; 2.5 (Twist 常 1.5)</td></tr>
+<tr><td><code>AT_DROPOUT</code> / <code>GC_DROPOUT</code></td><td data-zh="極端 AT-rich (&lt; 30%) 或 GC-rich (&gt; 70%) 區段的覆蓋損失" data-en="Coverage loss in extreme AT-rich (&lt;30%) or GC-rich (&gt;70%) regions">極端 AT-rich (&lt; 30%) 或 GC-rich (&gt; 70%) 區段的覆蓋損失</td><td data-zh="各 &lt; 5%；&gt; 10% 警示" data-en="Each &lt; 5%; &gt; 10% warning">各 &lt; 5%；&gt; 10% 警示</td></tr>
+<tr><td><code>PCT_PF_UQ_READS_ALIGNED</code></td><td data-zh="Pass-Filter unique aligned reads 比例" data-en="Pass-Filter unique aligned reads fraction">Pass-Filter unique aligned reads 比例</td><td>&gt; 95%</td></tr>
+<tr><td><code>HS_LIBRARY_SIZE</code></td><td data-zh="估計的 library 複雜度（unique molecules）" data-en="Estimated library complexity (unique molecules)">估計的 library 複雜度（unique molecules）</td><td data-zh="越高越好；低值代表 PCR duplicate 嚴重" data-en="Higher is better; low values mean heavy PCR duplication">越高越好；低值代表 PCR duplicate 嚴重</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="四、互動模擬：capture uniformity (FOLD_80)" data-en="IV. Interactive: Capture Uniformity (FOLD_80)">四、互動模擬：capture uniformity (FOLD_80)</h2>
+<div data-lang="zh">
+<p>調整 FOLD_80_BASE_PENALTY，觀察 mean coverage 100× 時 target base coverage 的分布。FOLD_80 越低（越均勻），coverage 分布越集中；越高越散開，意味著要把「最差的那 20% target」也打到 30× 以上，必須付出更高的 mean coverage 代價。</p>
+</div>
+<div data-lang="en">
+<p>Adjust FOLD_80_BASE_PENALTY to see the target-base coverage distribution at 100× mean coverage. Lower FOLD_80 (more uniform) = more concentrated distribution; higher = more spread out, meaning to bring the worst 20% of targets above 30× requires a higher mean coverage premium.</p>
+</div>
+
+<div class="interactive-panel">
+<div class="sim-controls">
+<label data-zh="FOLD_80 penalty:" data-en="FOLD_80 penalty:">FOLD_80 penalty:</label>
+<input type="range" id="fold80" min="120" max="400" value="180" step="10">
+<span id="fold80Val" class="sim-value">1.8</span>
+</div>
+<div class="sim-controls">
+<label data-zh="Mean coverage:" data-en="Mean coverage:">Mean coverage:</label>
+<input type="range" id="meanCov" min="40" max="300" value="100" step="10">
+<span id="meanCovVal" class="sim-value">100×</span>
+</div>
+<div id="capStats" class="sim-stats"></div>
+<div class="chart-wrap"><canvas id="capChart"></canvas></div>
+<div class="sim-note" data-lang="zh">紅線 = 30× 醫療診斷常用最低標。黃 = 20%-80% percentile 範圍。FOLD_80 = 1.5 是 Twist 的水平；&gt; 3.0 通常代表 capture 失敗。</div>
+<div class="sim-note" data-lang="en">Red line = 30× minimum standard for medical diagnostics. Yellow = 20%-80% percentile range. FOLD_80 = 1.5 is Twist's level; &gt;3.0 typically indicates capture failure.</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="盲點" data-en="BLIND SPOTS">盲點</div>
+<h2 data-zh="五、WES 永恆的盲點" data-en="V. WES's Perennial Blind Spots">五、WES 永恆的盲點</h2>
+<div data-lang="zh">
+<p>即使最好的 capture kit + 高 coverage，WES 仍有結構性盲點。這些區域若是研究目標，必須改用 WGS 或加 targeted sequencing 補強：</p>
+</div>
+<div data-lang="en">
+<p>Even with the best capture kit + high coverage, WES has structural blind spots. If these regions matter to your study, switch to WGS or add targeted sequencing to compensate:</p>
+</div>
+
+<div class="card-grid">
+<div class="card"><h3 data-zh="GC-rich 基因 (e.g. GBA, HBA, ABO)" data-en="GC-rich genes (e.g., GBA, HBA, ABO)">GC-rich 基因 (e.g. GBA, HBA, ABO)</h3>
+<p data-lang="zh">GC &gt; 70% 區的 PCR amplification 嚴重 bias。<strong>GBA</strong>（Gaucher disease）的問題還更複雜：旁邊有高度同源的 GBAP1 pseudogene，會造成 mapping ambiguity。臨床建議用 long-range PCR + Sanger 或 long-read 補正。</p>
+<p data-lang="en">PCR amplification in GC &gt; 70% regions has severe bias. <strong>GBA</strong> (Gaucher disease) is even more complex — adjacent highly homologous GBAP1 pseudogene creates mapping ambiguity. Clinical practice supplements with long-range PCR + Sanger, or long-reads.</p>
+</div>
+<div class="card"><h3 data-zh="Pseudogene 干擾" data-en="Pseudogene interference">Pseudogene 干擾</h3>
+<p data-lang="zh">許多重要基因有 high-identity pseudogene（PMS2 / PMS2CL, CYP2D6 / CYP2D7P, NCF1 / NCF1B），short read 無法區分，variant call 不可靠。需 specific NGS panel 加 long PCR 才能解。</p>
+<p data-lang="en">Many important genes have high-identity pseudogenes (PMS2 / PMS2CL, CYP2D6 / CYP2D7P, NCF1 / NCF1B). Short reads can't distinguish them; variant calls are unreliable. Requires specific NGS panel + long PCR.</p>
+</div>
+<div class="card"><h3 data-zh="深度 intronic 變異" data-en="Deep intronic variants">深度 intronic 變異</h3>
+<p data-lang="zh">距 splice site &gt; 100 bp 的 cryptic splice variants WES 完全看不到。例：CFTR, DMD, NF1 都有 deep intronic pathogenic variants。Splicing assay 或 RNA-seq 可補抓。</p>
+<p data-lang="en">Cryptic splice variants &gt; 100 bp from splice sites are invisible to WES. Examples: CFTR, DMD, NF1 all have deep intronic pathogenic variants. Splicing assays or RNA-seq can compensate.</p>
+</div>
+<div class="card"><h3 data-zh="調控區 (promoter / enhancer / 5'UTR)" data-en="Regulatory regions (promoter / enhancer / 5'UTR)">調控區 (promoter / enhancer / 5'UTR)</h3>
+<p data-lang="zh">大多數 WES kit 不涵蓋 promoter / enhancer，但這些區域的變異也能造成嚴重表達失調（如 TBX5 enhancer、TERT promoter）。WGS 必要。</p>
+<p data-lang="en">Most WES kits don't cover promoters / enhancers, but variants there can cause severe expression dysregulation (e.g., TBX5 enhancer, TERT promoter). WGS is required.</p>
+</div>
+<div class="card"><h3 data-zh="Tandem repeats / VNTR" data-en="Tandem repeats / VNTR">Tandem repeats / VNTR</h3>
+<p data-lang="zh">如 HTT (Huntington), FMR1 (Fragile X), C9orf72 (ALS) 的 repeat expansion，short-read WES/WGS 都難以準確 sizing，long-read 是首選。</p>
+<p data-lang="en">Repeat expansions like HTT (Huntington), FMR1 (Fragile X), C9orf72 (ALS) — short-read WES/WGS struggle to size accurately; long-reads are preferred.</p>
+</div>
+<div class="card"><h3 data-zh="CNV 與 SV (見 SV 章節)" data-en="CNVs and SVs (see SV chapter)">CNV 與 SV (見 SV 章節)</h3>
+<p data-lang="zh">WES 的不連續 capture 讓 read-depth 訊號不可靠；intronic / intergenic breakpoints 完全看不到。CNV 偵測效能遠差於 WGS。</p>
+<p data-lang="en">WES's discontinuous capture makes read-depth signals unreliable; intronic/intergenic breakpoints are invisible. CNV detection is far worse than WGS.</p>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="實務指令" data-en="CODE">實務指令</div>
+<h2 data-zh="六、Pipeline 指令範例" data-en="VI. Pipeline Commands">六、Pipeline 指令範例</h2>
+<div class="code-tabs">
+<div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'tab-prep')">Interval prep</button><button class="code-tab-btn" onclick="switchTab(this,'tab-hs')">CollectHsMetrics</button><button class="code-tab-btn" onclick="switchTab(this,'tab-wesvc')">WES Variant Calling</button><button class="code-tab-btn" onclick="switchTab(this,'tab-wescnv')">WES CNV</button></div>
+
+<div id="tab-prep" class="code-tab-content active"><pre><code># 把 capture kit 提供的 BED 轉為 Picard interval_list 格式
+gatk BedToIntervalList \
+    -I twist_exome_v2_targets.bed \
+    -O twist_exome_v2_targets.interval_list \
+    -SD Homo_sapiens_assembly38.dict
+
+# probe (bait) 與 target 通常不同 — bait 是物理 probe 位置，
+# target 是想偵測的基因組區段。CollectHsMetrics 兩者都需要。
+gatk BedToIntervalList \
+    -I twist_exome_v2_baits.bed \
+    -O twist_exome_v2_baits.interval_list \
+    -SD Homo_sapiens_assembly38.dict
+
+# 為 variant calling 加 padding (100 bp 每側)
+gatk IntervalListTools \
+    -I twist_exome_v2_targets.interval_list \
+    -O twist_exome_v2_targets_padded100.interval_list \
+    --PADDING 100</code></pre></div>
+
+<div id="tab-hs" class="code-tab-content"><pre><code># 跑 CollectHsMetrics — 每個 WES 樣本必跑
+gatk CollectHsMetrics \
+    -I sample.dedup.bam \
+    -O sample.hs_metrics.txt \
+    -BI twist_exome_v2_baits.interval_list \
+    -TI twist_exome_v2_targets.interval_list \
+    -R Homo_sapiens_assembly38.fasta \
+    --PER_TARGET_COVERAGE sample.per_target.txt \
+    --PER_BASE_COVERAGE sample.per_base.txt
+
+# 看關鍵 metrics
+grep -A1 "## METRICS" sample.hs_metrics.txt | tail -1 | \
+    awk '{print "PCT_SELECTED_BASES:",$11,"\nMEAN_TARGET_COV:",$23,
+              "\nPCT_TARGET_30X:",$36,"\nFOLD_80:",$45,
+              "\nGC_DROPOUT:",$54}'
+
+# 結合 MultiQC 視覺化整批樣本
+multiqc . -n wes_qc_report</code></pre></div>
+
+<div id="tab-wesvc" class="code-tab-content"><pre><code># WES variant calling — 用 padded intervals
+gatk HaplotypeCaller \
+    -R Homo_sapiens_assembly38.fasta \
+    -I sample.dedup.bqsr.bam \
+    -L twist_exome_v2_targets_padded100.interval_list \
+    -ERC GVCF \
+    -O sample.g.vcf.gz \
+    --tmp-dir /scratch
+
+# 注意：WES 樣本量 &lt; 30 通常不適合 VQSR (statistical model 需要量)
+# 建議改用 GATK Hard Filter，或 DeepVariant + RTG vcfeval 評估
+
+# DeepVariant on WES (推薦對 small cohort)
+docker run -v $(pwd):/data google/deepvariant:1.6.0 \
+    /opt/deepvariant/bin/run_deepvariant \
+    --model_type=WES \
+    --ref=/data/Homo_sapiens_assembly38.fasta \
+    --reads=/data/sample.dedup.bam \
+    --regions=/data/twist_exome_v2_targets_padded100.bed \
+    --output_vcf=/data/sample.dv.vcf.gz</code></pre></div>
+
+<div id="tab-wescnv" class="code-tab-content"><pre><code># WES CNV — 需要大 cohort 做 normalization (≥ 30 同 kit/run normals)
+
+# 方法 1: GATK gCNV (germline cohort mode)
+gatk PreprocessIntervals \
+    -R ref.fa \
+    -L twist_exome_v2_targets.interval_list \
+    --bin-length 0 \
+    --interval-merging-rule OVERLAPPING_ONLY \
+    -O preprocessed.interval_list
+
+# 對每個 sample 收 read counts
+gatk CollectReadCounts \
+    -I sample.dedup.bam \
+    -L preprocessed.interval_list \
+    --interval-merging-rule OVERLAPPING_ONLY \
+    -O sample.counts.hdf5
+
+# Cohort-mode CNV calling (fit 在所有 normal 上)
+gatk GermlineCNVCaller \
+    --run-mode COHORT \
+    -L preprocessed.interval_list \
+    -I sample1.counts.hdf5 -I sample2.counts.hdf5 ... \
+    --contig-ploidy-calls ploidy-calls/ \
+    --output cohort_cnv \
+    --output-prefix cohort
+
+# 方法 2: ExomeDepth (R package, 較簡便)
+# 方法 3: CNVkit (有 batch + reference 子命令)
+# 方法 4: 商業 ClinCNV / ExomeAI</code></pre></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="常見問題" data-en="FAQ">常見問題</div>
+<h2 data-zh="七、FAQ" data-en="VII. FAQ">七、FAQ</h2>
+<div class="accordion">
+<details><summary data-zh="什麼時候該選 WGS 而非 WES？" data-en="When to choose WGS over WES?">什麼時候該選 WGS 而非 WES？</summary>
+<div data-lang="zh">明確的 WGS 指證：(1) 已做 WES 但無診斷結果 (約 50-60% case 仍 negative)，需查 deep intronic / regulatory variants; (2) 重點 SV/CNV detection（如 22q11.2 microdeletion); (3) GC-rich 或 pseudogene 困擾的基因 (GBA, PMS2); (4) 需 mitochondrial / repeat expansion 一次到位; (5) 大 cohort 研究預算夠 (現在 30× WGS 約 $300-500 USD/sample，與 WES 已接近)。</div>
+<div data-lang="en">Clear WGS indications: (1) WES negative case (50–60% of WES cases remain undiagnosed) requiring deep-intronic / regulatory variant search; (2) focused SV/CNV detection (e.g., 22q11.2 microdeletion); (3) GC-rich or pseudogene-confounded genes (GBA, PMS2); (4) need mitochondrial / repeat expansion in one shot; (5) large-cohort study with budget (30× WGS now ~$300–500 USD/sample, close to WES).</div>
+</details>
+<details><summary data-zh="為什麼 WES 樣本量小不適合 VQSR？" data-en="Why isn't VQSR suitable for small WES cohorts?">為什麼 WES 樣本量小不適合 VQSR？</summary>
+<div data-lang="zh">VQSR 需要足夠的 variant 數量訓練 Gaussian mixture model：SNP &gt; 30 樣本、indel &gt; 100 樣本通常才穩定。WES 樣本太少時模型 overfitting 或無法收斂。GATK 官方 troubleshooting 指出 single-sample WES 直接用 hard filter 反而更穩。</div>
+<div data-lang="en">VQSR needs enough variants to train a Gaussian mixture model — typically &gt;30 samples for SNPs, &gt;100 for indels. With too few WES samples, the model overfits or fails to converge. GATK official troubleshooting notes that single-sample WES is more reliable with hard filters.</div>
+</details>
+<details><summary data-zh="medical exome / clinical exome 與 research exome 不一樣？" data-en="Are medical exome / clinical exome different from research exome?">medical exome / clinical exome 與 research exome 不一樣？</summary>
+<div data-lang="zh">是。"Medical exome" 通常指針對 ~5,000-7,000 個已知疾病基因的高覆蓋 enriched panel（例：Twist Comprehensive Exome、Agilent ClearSeq Inherited Disease）。target 較小 (~10-15 Mb)、coverage 更深 (≥ 100×)、含關鍵 intronic 與 promoter region。Research exome 追求廣度 (~50 Mb)，medical exome 追求關鍵基因深度與一致性。</div>
+<div data-lang="en">Yes. "Medical exome" usually refers to high-coverage enriched panels targeting ~5,000–7,000 known disease genes (e.g., Twist Comprehensive Exome, Agilent ClearSeq Inherited Disease). Target is smaller (~10–15 Mb), coverage deeper (≥100×), with key intronic and promoter regions included. Research exomes pursue breadth (~50 Mb); medical exomes pursue depth and consistency in key genes.</div>
+</details>
+<details><summary data-zh="capture kit 換版本，可以混合分析嗎？" data-en="Can samples from different capture kit versions be analyzed together?">capture kit 換版本，可以混合分析嗎？</summary>
+<div data-lang="zh">不建議。不同 kit / 同 kit 不同版本的 target intervals 與均勻度差異大，混合做 joint genotyping 會引入 batch effect（特別是 CNV 與 borderline variants）。最少要：(1) 取所有 kit 的 target 交集做 analysis; (2) 跑 PCA / sample-distance 檢查 batch separation; (3) cohort 級研究避免混 kit。Joint cohort 分析一律建議單一 kit。</div>
+<div data-lang="en">Not recommended. Target intervals and uniformity differ greatly across kits and even across versions of the same kit; joint genotyping mixed kits introduces batch effects (especially for CNVs and borderline variants). Minimum: (1) take target intersection across all kits; (2) run PCA / sample-distance to check batch separation; (3) avoid mixing kits in cohort-scale studies. Joint cohort analysis should use a single kit.</div>
+</details>
+</div>
+</section>
+
+<section class="section quiz-section">
+<div class="section-label" data-zh="自我檢測" data-en="QUIZ">自我檢測</div>
+<h2 data-zh="八、小測驗" data-en="VIII. Quiz">八、小測驗</h2>
+
+<div class="quiz-q" data-answer="2">
+<p class="quiz-question" data-zh="Q1. FOLD_80_BASE_PENALTY = 1.5 與 3.0 哪個 capture 較均勻？" data-en="Q1. FOLD_80_BASE_PENALTY = 1.5 vs 3.0 — which is more uniform?">Q1. FOLD_80_BASE_PENALTY = 1.5 與 3.0 哪個 capture 較均勻？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="3.0 比較均勻" data-en="3.0 is more uniform">3.0 比較均勻</button>
+<button class="quiz-opt" data-idx="1" data-zh="兩者一樣" data-en="They're equivalent">兩者一樣</button>
+<button class="quiz-opt" data-idx="2" data-zh="1.5 較均勻 (越接近 1.0 越好)" data-en="1.5 is more uniform (closer to 1.0 is better)">1.5 較均勻 (越接近 1.0 越好)</button>
+</div>
+<div class="quiz-feedback" id="fb1"></div>
+</div>
+
+<div class="quiz-q" data-answer="0">
+<p class="quiz-question" data-zh="Q2. 為什麼 WES 對 GBA / PMS2 等基因不可靠？" data-en="Q2. Why is WES unreliable for genes like GBA / PMS2?">Q2. 為什麼 WES 對 GBA / PMS2 等基因不可靠？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="這些基因有高度同源的 pseudogene (GBAP1, PMS2CL)，short read 無法區分，造成 mapping ambiguity" data-en="These genes have highly homologous pseudogenes (GBAP1, PMS2CL); short reads can't distinguish them, causing mapping ambiguity">這些基因有高度同源的 pseudogene (GBAP1, PMS2CL)，short read 無法區分，造成 mapping ambiguity</button>
+<button class="quiz-opt" data-idx="1" data-zh="這些基因不在標準 exome target 中" data-en="These genes aren't in standard exome targets">這些基因不在標準 exome target 中</button>
+<button class="quiz-opt" data-idx="2" data-zh="這些基因太大，超出 short-read 範圍" data-en="These genes are too long for short reads">這些基因太大，超出 short-read 範圍</button>
+</div>
+<div class="quiz-feedback" id="fb2"></div>
+</div>
+
+<div class="quiz-q" data-answer="1">
+<p class="quiz-question" data-zh="Q3. WES intervals 為什麼要 padding (~100 bp)？" data-en="Q3. Why pad WES intervals (~100 bp)?">Q3. WES intervals 為什麼要 padding (~100 bp)？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="只是慣例，沒實際差別" data-en="Just convention, no real difference">只是慣例，沒實際差別</button>
+<button class="quiz-opt" data-idx="1" data-zh="capture 會 incidentally 抓到 probe 周邊 ~50-100 bp，加 padding 才能完整 call splice site (exon-intron ±10 bp 是 splice donor/acceptor 關鍵)" data-en="Capture incidentally pulls ~50-100 bp around probes; padding ensures splice sites (exon-intron ±10 bp = splice donor/acceptor) are properly called">capture 會 incidentally 抓到 probe 周邊 ~50-100 bp，加 padding 才能完整 call splice site (exon-intron ±10 bp 是 splice donor/acceptor 關鍵)</button>
+<button class="quiz-opt" data-idx="2" data-zh="為了 call CNV" data-en="To call CNVs">為了 call CNV</button>
+</div>
+<div class="quiz-feedback" id="fb3"></div>
+</div>
+</section>
+
+<nav class="page-nav">
+<a href="structural-variants.html"><span class="nav-dir" data-zh="← 上一進階" data-en="← Previous advanced">← 上一進階</span><span class="nav-title">Advanced: SV / CNV</span></a>
+<a href="index.html"><span class="nav-dir" data-zh="返回首頁 →" data-en="Back to home →">返回首頁 →</span><span class="nav-title">Tutorial Hub</span></a>
+</nav>
+</main>
+<footer class="site-footer">© WGS/WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// Capture uniformity simulator: gamma-like distribution with FOLD_80 control
+function gauss(m,s){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return m+s*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+// build coverage histogram bins 0..max in steps
+function makeHist(mean,fold80){
+  // sigma: derive from fold80. fold80 = 1 → sigma small; fold80 = 4 → sigma large
+  // approx: relative sigma ~ fold80-1; capped
+  const relSigma = Math.max(0.05, (fold80-1)*0.6);
+  const sigma = mean * relSigma;
+  const N=2000;
+  const samples=[];
+  for(let i=0;i<N;i++){
+    let v=gauss(mean,sigma);
+    // clip negatives to small positive
+    if(v<0)v=Math.abs(v)*0.3;
+    samples.push(v);
+  }
+  // bin
+  const maxV=mean*3;
+  const nb=40;
+  const step=maxV/nb;
+  const counts=Array(nb).fill(0);
+  samples.forEach(s=>{const i=Math.min(nb-1,Math.floor(s/step));if(i>=0)counts[i]++;});
+  // pct above 30x
+  const above30=samples.filter(s=>s>=30).length/N;
+  const above100=samples.filter(s=>s>=100).length/N;
+  // p20 / p80
+  samples.sort((a,b)=>a-b);
+  const p20=samples[Math.floor(N*0.2)];
+  const p80=samples[Math.floor(N*0.8)];
+  return {counts,step,above30,above100,p20,p80};
+}
+
+const capChart=new Chart(document.getElementById('capChart'),{type:'bar',data:{labels:[],datasets:[{label:'Targets',data:[],backgroundColor:'rgba(43,79,129,0.7)',borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},annotation:{}},scales:{x:{title:{display:true,text:'Coverage (×)'},ticks:{maxTicksLimit:10}},y:{title:{display:true,text:'Target count'}}}}});
+
+function updateCap(){
+  const L=I18n.get();
+  const fold80=+document.getElementById('fold80').value/100;
+  const meanCov=+document.getElementById('meanCov').value;
+  document.getElementById('fold80Val').textContent=fold80.toFixed(1);
+  document.getElementById('meanCovVal').textContent=meanCov+'×';
+  const h=makeHist(meanCov,fold80);
+  const labels=h.counts.map((_,i)=>Math.round(i*h.step));
+  capChart.data.labels=labels;
+  capChart.data.datasets[0].data=h.counts;
+  // color bars below 30x in red
+  capChart.data.datasets[0].backgroundColor=labels.map(v=>v<30?'rgba(184,58,44,0.7)':(v>=h.p20&&v<=h.p80?'rgba(200,132,43,0.55)':'rgba(43,79,129,0.7)'));
+  capChart.update('none');
+  document.getElementById('capStats').innerHTML=
+    `<span class="sim-stat ${h.above30>=0.9?'pass':'fail'}">${L==='zh'?'≥30× 比例':'≥30× fraction'}: ${(h.above30*100).toFixed(1)}%</span>`+
+    `<span class="sim-stat ${h.above100>=0.5?'pass':'warn'}">${L==='zh'?'≥100× 比例':'≥100× fraction'}: ${(h.above100*100).toFixed(1)}%</span>`+
+    `<span class="sim-stat">P20-P80: ${h.p20.toFixed(0)}× ~ ${h.p80.toFixed(0)}×</span>`+
+    `<span class="sim-stat ${fold80<2?'pass':(fold80<3?'warn':'fail')}">FOLD_80: ${fold80.toFixed(1)}</span>`;
+}
+['fold80','meanCov'].forEach(id=>document.getElementById(id).addEventListener('input',updateCap));
+document.addEventListener('langchange',updateCap);
+updateCap();
+
+const QF={
+  zh:{q1_y:'FOLD_80 越接近 1.0 表示 80% target 達標所需 over-sequencing 倍數越低，capture 越均勻。',q1_n:'正解已標示。',q2_y:'pseudogene 干擾是 WES（甚至 WGS short-read）對某些基因不可靠的根本原因，需 long-range PCR 或 long-read 補正。',q2_n:'正解已標示。',q3_y:'Splice site 是基因 expression 的關鍵，不加 padding 會錯失 splicing 變異；GATK 預設 100 bp padding 即此故。',q3_n:'正解已標示。'},
+  en:{q1_y:'The closer FOLD_80 is to 1.0, the lower the over-sequencing multiplier for 80% of targets — more uniform capture.',q1_n:'Correct answer highlighted.',q2_y:'Pseudogene interference is the fundamental reason WES (and even short-read WGS) is unreliable for certain genes; long-range PCR or long-reads are needed to correct.',q2_n:'Correct answer highlighted.',q3_y:'Splice sites are critical for gene expression; without padding, splicing variants are missed — GATK\'s default 100-bp padding exists for this reason.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

@@ -1,0 +1,357 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Advanced: Somatic Variant Calling — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="intro.html">Intro</a></li><li><a href="fastq-qc.html">FASTQ QC</a></li><li><a href="alignment.html">Align</a></li><li><a href="post-alignment.html">PostAln</a></li><li><a href="variant-calling.html">Calling</a></li><li><a href="joint-genotyping.html">Joint</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot</a></li><li><a href="interpretation.html">Interp</a></li><li><a href="somatic.html" class="active">Somatic</a></li><li><a href="structural-variants.html">SV/CNV</a></li><li><a href="wes-considerations.html">WES</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">ADVANCED</div>
+<h1 data-zh="體細胞變異呼叫 (Somatic Calling)" data-en="Somatic Variant Calling">體細胞變異呼叫 (Somatic Calling)</h1>
+<p class="subtitle" data-lang="zh">癌症分析的核心：在 normal 背景中找出 tumor 才有的變異——VAF 不再固定 0.5，挑戰來自亞克隆、純度、與低 VAF 偵測。</p>
+<p class="subtitle" data-lang="en">The heart of cancer analysis: find tumor-only variants against normal background — VAF no longer fixed at 0.5, with challenges from subclonality, purity, and low-VAF detection.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="差異" data-en="DIFFERENCES">差異</div>
+<h2 data-zh="一、Somatic vs Germline：本質不同" data-en="I. Somatic vs Germline: Fundamentally Different">一、Somatic vs Germline：本質不同</h2>
+<div data-lang="zh">
+<p>Germline calling 假設樣本是 diploid，每個位點 genotype 是 0/0、0/1、1/1 三選一，VAF 固定接近 0、0.5、或 1。但 tumor 樣本：</p>
+<ul>
+<li><strong>樣本不純</strong>：tumor purity 通常 30-90%，剩下是混入的 normal cells、stromal cells、infiltrating immune cells</li>
+<li><strong>克隆異質性</strong>：tumor 內部本身就是混合——early clonal mutations 出現在所有 tumor cells 中，subclonal mutations 只在部分</li>
+<li><strong>VAF 是連續譜</strong>：可能 0.4（pure clonal het）、0.15（低純度 clonal）、0.05（subclonal）、甚至 0.01（深度測序看 ctDNA）</li>
+<li><strong>copy number 可能異常</strong>：CNV 區域的 VAF 不再可預期</li>
+</ul>
+<p>因此 somatic caller 不是 genotype caller，而是<strong>「在 noise 中找信號」的二元判斷</strong>：這個位點的 ALT 是真 mutation 還是 sequencing error / mapping artifact / contamination？</p>
+</div>
+<div data-lang="en">
+<p>Germline calling assumes a diploid sample with three possible genotypes (0/0, 0/1, 1/1) and VAF fixed near 0, 0.5, or 1. But tumor samples:</p>
+<ul>
+<li><strong>Impure samples</strong>: tumor purity is typically 30–90%, the rest is contaminating normal cells, stromal cells, infiltrating immune cells</li>
+<li><strong>Clonal heterogeneity</strong>: tumors are internally mixed — early clonal mutations appear in all tumor cells, subclonal mutations only in some</li>
+<li><strong>VAF is a continuum</strong>: could be 0.4 (pure clonal het), 0.15 (low-purity clonal), 0.05 (subclonal), even 0.01 (deep sequencing for ctDNA)</li>
+<li><strong>Copy number may be abnormal</strong>: VAF in CNV regions is no longer predictable</li>
+</ul>
+<p>So the somatic caller isn't a genotype caller — it's <strong>"signal hunting in noise" via binary judgment</strong>: is this site's ALT a real mutation, or a sequencing error / mapping artifact / contamination?</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
+<h2 data-zh="二、Mutect2：tumor-only vs tumor-vs-normal" data-en="II. Mutect2: tumor-only vs tumor-vs-normal">二、Mutect2：tumor-only vs tumor-vs-normal</h2>
+<div class="card-grid">
+<div class="card"><div class="card-icon">👫</div><h3 data-zh="Tumor-vs-Normal (推薦)" data-en="Tumor-vs-Normal (recommended)">Tumor-vs-Normal (推薦)</h3>
+<p data-lang="zh">同病人取 normal tissue（通常 blood）作對照。任何 normal 中也存在的變異 = germline，可直接過濾掉，剩下的就是 somatic。最乾淨、最可信。</p>
+<p data-lang="en">Use a normal tissue (usually blood) from the same patient as control. Any variant also present in normal = germline and is filtered out; what's left is somatic. Cleanest and most reliable.</p>
+</div>
+<div class="card"><div class="card-icon">🚶</div><h3 data-zh="Tumor-only" data-en="Tumor-only">Tumor-only</h3>
+<p data-lang="zh">只有 tumor 樣本（normal 不可得，如 archived FFPE）。完全依賴 PoN + gnomAD AF 過濾 germline 與 artifacts。FP 率較高，需更嚴格 downstream filter。</p>
+<p data-lang="en">Only tumor available (normal unobtainable, e.g., archived FFPE). Fully relies on PoN + gnomAD AF to filter germline and artifacts. Higher FP rate, stricter downstream filtering needed.</p>
+</div>
+</div>
+
+<div class="callout callout-info" style="margin-top:18px">
+<strong data-zh="Panel of Normals (PoN) 是什麼？" data-en="What is a Panel of Normals (PoN)?">Panel of Normals (PoN) 是什麼？</strong>
+<p data-lang="zh">用 30+ 個健康樣本（同一定序中心、同 platform、同 capture kit），各自跑 Mutect2 tumor-only 模式，再用 <code>CreateSomaticPanelOfNormals</code> 合併成 VCF。任何「重複出現在多個 normal」的位點 = sequencing/alignment artifact，從 tumor 結果中過濾掉。PoN 是 Mutect2 tumor-only 的關鍵，缺乏 PoN 會被 artifact 淹沒。</p>
+<p data-lang="en">Take 30+ healthy samples (same sequencing center, platform, and capture kit), run Mutect2 in tumor-only mode on each, then combine into a VCF with <code>CreateSomaticPanelOfNormals</code>. Any site repeatedly appearing across normals = sequencing/alignment artifact, filtered from tumor results. PoN is critical for Mutect2 tumor-only — without it, calls are drowned in artifacts.</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="三、互動模擬：tumor 內 VAF 分布" data-en="III. Interactive: Tumor VAF Distribution">三、互動模擬：tumor 內 VAF 分布</h2>
+<div data-lang="zh">
+<p>調整 tumor purity 與 subclonal fraction，看模擬的 1,000 個 somatic mutations 在 VAF 直方圖上的分布。Clonal mutations 的中位 VAF ≈ purity/2 (heterozygous in all tumor cells)；subclonal mutations 形成 VAF 較低的尾巴。</p>
+</div>
+<div data-lang="en">
+<p>Adjust tumor purity and subclonal fraction to see how 1,000 simulated somatic mutations distribute in the VAF histogram. Clonal mutations have median VAF ≈ purity/2 (heterozygous in all tumor cells); subclonal mutations form a low-VAF tail.</p>
+</div>
+
+<div class="interactive-panel">
+<div class="sim-controls">
+<label data-zh="Tumor purity:" data-en="Tumor purity:">Tumor purity:</label>
+<input type="range" id="purSlider" min="10" max="100" value="70" step="5">
+<span id="purVal" class="sim-value">70%</span>
+</div>
+<div class="sim-controls">
+<label data-zh="Subclonal fraction:" data-en="Subclonal fraction:">Subclonal fraction:</label>
+<input type="range" id="subSlider" min="0" max="80" value="30" step="5">
+<span id="subVal" class="sim-value">30%</span>
+</div>
+<div id="vafStats" class="sim-stats"></div>
+<div class="chart-wrap"><canvas id="vafChart"></canvas></div>
+<div class="sim-note" data-lang="zh">藍 = clonal mutations (出現在所有 tumor cells)；橘 = subclonal mutations。低 VAF 區的 mutations 較難偵測，需要高 coverage (≥ 100×)。</div>
+<div class="sim-note" data-lang="en">Blue = clonal mutations (in all tumor cells); Orange = subclonal mutations. Low-VAF mutations are harder to detect, requiring high coverage (≥100×).</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
+<h2 data-zh="四、Mutect2 完整 pipeline" data-en="IV. Full Mutect2 Pipeline">四、Mutect2 完整 pipeline</h2>
+<div class="comp-table-wrap">
+<table class="comp-table">
+<thead><tr><th data-zh="步驟" data-en="Step">步驟</th><th data-zh="工具" data-en="Tool">工具</th><th data-zh="目的" data-en="Purpose">目的</th></tr></thead>
+<tbody>
+<tr><td><strong>1</strong></td><td><code>Mutect2</code></td><td data-zh="呼叫候選 somatic variants (tumor + normal + PoN + germline AF)" data-en="Call candidate somatic variants (tumor + normal + PoN + germline AF)">呼叫候選 somatic variants (tumor + normal + PoN + germline AF)</td></tr>
+<tr><td><strong>2</strong></td><td><code>GetPileupSummaries</code></td><td data-zh="計算 tumor 與 normal 在 common variants 的 allele counts" data-en="Compute allele counts at common variants for tumor and normal">計算 tumor 與 normal 在 common variants 的 allele counts</td></tr>
+<tr><td><strong>3</strong></td><td><code>CalculateContamination</code></td><td data-zh="估計 cross-sample contamination 比例" data-en="Estimate cross-sample contamination fraction">估計 cross-sample contamination 比例</td></tr>
+<tr><td><strong>4</strong></td><td><code>LearnReadOrientationModel</code></td><td data-zh="學 FFPE oxidation / 8-oxoG artifact 的 read orientation bias" data-en="Learn FFPE oxidation / 8-oxoG artifact orientation bias">學 FFPE oxidation / 8-oxoG artifact 的 read orientation bias</td></tr>
+<tr><td><strong>5</strong></td><td><code>FilterMutectCalls</code></td><td data-zh="整合上述所有資訊，標記 PASS 或具體 filter 原因" data-en="Integrate all the above and mark PASS or a specific filter reason">整合上述所有資訊，標記 PASS 或具體 filter 原因</td></tr>
+<tr><td><strong>6 (選)</strong></td><td><code>FilterAlignmentArtifacts</code></td><td data-zh="重新對齊到 BWA-MEM2 + alt aware 參考，剔除 mapping artifacts" data-en="Realign to BWA-MEM2 + alt-aware reference, drop mapping artifacts">重新對齊到 BWA-MEM2 + alt aware 參考，剔除 mapping artifacts</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout callout-warn" style="margin-top:18px">
+<strong data-zh="FFPE artifact (8-oxoG) 必看" data-en="FFPE artifact (8-oxoG) — must address">FFPE artifact (8-oxoG) 必看</strong>
+<p data-lang="zh">FFPE (formalin-fixed paraffin-embedded) 樣本是病理檔案常見來源，但 formalin 會氧化 G→8-oxoG，定序時讀為 T，產生<strong>系統性 G&gt;T / C&gt;A artifact</strong>。LearnReadOrientationModel 會學出此 bias 的 strand-specific pattern，FilterMutectCalls 用 <code>--ob-priors</code> 套用，可大幅減少 FP。新鮮血液 / 凍存組織不必擔心，但 FFPE 一定要做這步。</p>
+<p data-lang="en">FFPE (formalin-fixed paraffin-embedded) samples are common from pathology archives, but formalin oxidizes G→8-oxoG, read as T during sequencing — producing <strong>systematic G>T / C>A artifacts</strong>. LearnReadOrientationModel learns this bias's strand-specific pattern; FilterMutectCalls applies it via <code>--ob-priors</code>, drastically reducing FPs. Fresh blood / frozen tissue doesn't need this, but FFPE absolutely does.</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="實務指令" data-en="CODE">實務指令</div>
+<h2 data-zh="五、Pipeline 指令範例" data-en="V. Pipeline Commands">五、Pipeline 指令範例</h2>
+<div class="code-tabs">
+<div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'tab-tn')">Tumor + Normal</button><button class="code-tab-btn" onclick="switchTab(this,'tab-to')">Tumor-only</button><button class="code-tab-btn" onclick="switchTab(this,'tab-pon')">建立 PoN</button><button class="code-tab-btn" onclick="switchTab(this,'tab-filter')">Filter</button></div>
+
+<div id="tab-tn" class="code-tab-content active"><pre><code># Mutect2 — tumor + matched normal
+gatk Mutect2 \
+    -R Homo_sapiens_assembly38.fasta \
+    -I tumor.bam \
+    -I normal.bam \
+    -tumor TUMOR_SAMPLE_ID \
+    -normal NORMAL_SAMPLE_ID \
+    --germline-resource af-only-gnomad.hg38.vcf.gz \
+    --panel-of-normals 1000g_pon.hg38.vcf.gz \
+    --f1r2-tar-gz tumor.f1r2.tar.gz \
+    -O tumor.unfiltered.vcf.gz
+
+# 重要：tumor 樣本名要與 BAM @RG SM tag 完全一致</code></pre></div>
+
+<div id="tab-to" class="code-tab-content"><pre><code># Mutect2 — tumor-only mode
+gatk Mutect2 \
+    -R Homo_sapiens_assembly38.fasta \
+    -I tumor.bam \
+    -tumor TUMOR_SAMPLE_ID \
+    --germline-resource af-only-gnomad.hg38.vcf.gz \
+    --panel-of-normals 1000g_pon.hg38.vcf.gz \
+    --f1r2-tar-gz tumor.f1r2.tar.gz \
+    -O tumor.unfiltered.vcf.gz
+
+# 注意：tumor-only 模式對 PoN 高度依賴；若無自家 PoN，
+# Broad 提供 1000G PoN 可下載 (gs://gatk-best-practices/somatic-hg38/)</code></pre></div>
+
+<div id="tab-pon" class="code-tab-content"><pre><code># 建立自家 PoN (建議用 30+ 個與 tumor 同 platform/capture 的 normals)
+
+# 1. 每個 normal 跑 Mutect2 tumor-only 模式
+for normal in normal_001 normal_002 ... normal_030; do
+  gatk Mutect2 -R ref.fa -I ${normal}.bam -tumor ${normal} \
+      --max-mnp-distance 0 \
+      -O pon/${normal}.vcf.gz
+done
+
+# 2. GenomicsDBImport
+gatk GenomicsDBImport \
+    -R ref.fa -L wgs_calling_regions.hg38.interval_list \
+    --genomicsdb-workspace-path pon_db \
+    $(for v in pon/*.vcf.gz; do echo -n "-V $v "; done)
+
+# 3. 合併為 PoN VCF
+gatk CreateSomaticPanelOfNormals \
+    -R ref.fa \
+    --germline-resource af-only-gnomad.hg38.vcf.gz \
+    -V gendb://pon_db \
+    -O my_panel_of_normals.vcf.gz</code></pre></div>
+
+<div id="tab-filter" class="code-tab-content"><pre><code># Step 1: contamination
+gatk GetPileupSummaries -I tumor.bam \
+    -V small_exac_common_3.hg38.vcf.gz \
+    -L small_exac_common_3.hg38.vcf.gz \
+    -O tumor.pileups.table
+
+gatk GetPileupSummaries -I normal.bam \
+    -V small_exac_common_3.hg38.vcf.gz \
+    -L small_exac_common_3.hg38.vcf.gz \
+    -O normal.pileups.table
+
+gatk CalculateContamination \
+    -I tumor.pileups.table \
+    -matched normal.pileups.table \
+    -O tumor.contamination.table \
+    --tumor-segmentation tumor.segments.table
+
+# Step 2: orientation bias model (if FFPE)
+gatk LearnReadOrientationModel \
+    -I tumor.f1r2.tar.gz \
+    -O tumor.read-orientation-model.tar.gz
+
+# Step 3: 整合 filter
+gatk FilterMutectCalls \
+    -R ref.fa \
+    -V tumor.unfiltered.vcf.gz \
+    --contamination-table tumor.contamination.table \
+    --tumor-segmentation tumor.segments.table \
+    --ob-priors tumor.read-orientation-model.tar.gz \
+    -O tumor.filtered.vcf.gz
+
+# 只留 PASS
+bcftools view -f PASS tumor.filtered.vcf.gz -Oz -o tumor.somatic.vcf.gz</code></pre></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
+<h2 data-zh="六、TMB 與下游應用" data-en="VI. TMB and Downstream Applications">六、TMB 與下游應用</h2>
+<div data-lang="zh">
+<p>過濾後的 somatic VCF 是癌症基因體分析的起點，常見下游：</p>
+<ul>
+<li><strong>TMB (Tumor Mutation Burden)</strong>：每 Mb 非同義 somatic mutations 數。TMB-high (typically ≥ 10 mut/Mb) 與 immunotherapy (anti-PD-1) 反應正相關，已是 FDA-approved biomarker。</li>
+<li><strong>Mutational signatures (COSMIC SBS)</strong>：deconvolute 96 trinucleotide context 計數，找出底層 mutagenesis (UV、tobacco、APOBEC、MMR-deficient)。SBS4 = tobacco, SBS7 = UV。</li>
+<li><strong>Driver gene identification</strong>：對照 COSMIC Cancer Gene Census、OncoKB；用 dN/dS、MutSig、IntOGen 識別驅動突變。</li>
+<li><strong>Actionability annotation</strong>：對照 OncoKB、CIViC、JAX-CKB 找 FDA-approved drug targets，分 AMP Tier I-IV。</li>
+</ul>
+</div>
+<div data-lang="en">
+<p>The filtered somatic VCF is the starting point for cancer genomic analysis. Common downstream uses:</p>
+<ul>
+<li><strong>TMB (Tumor Mutation Burden)</strong>: non-synonymous somatic mutations per Mb. High TMB (typically ≥10 mut/Mb) correlates with immunotherapy (anti-PD-1) response — an FDA-approved biomarker.</li>
+<li><strong>Mutational signatures (COSMIC SBS)</strong>: deconvolute 96-trinucleotide-context counts to identify underlying mutagenesis (UV, tobacco, APOBEC, MMR-deficient). SBS4 = tobacco, SBS7 = UV.</li>
+<li><strong>Driver gene identification</strong>: cross-reference COSMIC Cancer Gene Census, OncoKB; use dN/dS, MutSig, IntOGen to identify driver mutations.</li>
+<li><strong>Actionability annotation</strong>: cross-reference OncoKB, CIViC, JAX-CKB to find FDA-approved drug targets, categorized by AMP Tier I–IV.</li>
+</ul>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="常見問題" data-en="FAQ">常見問題</div>
+<h2 data-zh="七、FAQ" data-en="VII. FAQ">七、FAQ</h2>
+<div class="accordion">
+<details><summary data-zh="tumor coverage 該打多少？" data-en="What's the recommended tumor coverage?">tumor coverage 該打多少？</summary>
+<div data-lang="zh">取決於目標 VAF：clonal mutations (VAF ≥ 0.2)，30-50× 即可；subclonal (VAF 0.05-0.1)，需 100-200×；ctDNA / liquid biopsy (VAF &lt; 0.01)，需 ≥ 1000× ultra-deep + UMI 去 PCR error。Normal 通常 30× 就夠。</div>
+<div data-lang="en">Depends on target VAF: clonal mutations (VAF ≥ 0.2), 30–50× suffices; subclonal (VAF 0.05–0.1), need 100–200×; ctDNA / liquid biopsy (VAF &lt; 0.01), need ≥1000× ultra-deep + UMIs to remove PCR error. Normal typically only needs 30×.</div>
+</details>
+<details><summary data-zh="contamination 多少算嚴重？" data-en="How much contamination is too much?">contamination 多少算嚴重？</summary>
+<div data-lang="zh">CalculateContamination 的輸出 fraction &lt; 0.01 通常可忽略；0.01-0.05 可接受但建議 review；&gt; 0.05 顯著，需排查樣本交叉污染。FilterMutectCalls 會用此值動態調整 filter threshold。</div>
+<div data-lang="en">CalculateContamination output fraction &lt; 0.01 is usually negligible; 0.01–0.05 is acceptable but warrants review; &gt; 0.05 is significant — investigate cross-sample contamination. FilterMutectCalls dynamically adjusts filter thresholds based on this value.</div>
+</details>
+<details><summary data-zh="Mutect2 與 Strelka2 / VarDict / DeepVariant 比較？" data-en="Mutect2 vs Strelka2 / VarDict / DeepSomatic?">Mutect2 與 Strelka2 / VarDict / DeepVariant 比較？</summary>
+<div data-lang="zh">Mutect2 是 GATK 官方、文件最完整、PoN 與 contamination 整合最好。Strelka2 速度更快、indel 表現好。VarDict 在低 VAF 偵測 (&lt; 0.05) 表現突出。DeepSomatic (Google 2024) 是 DeepVariant 的 somatic 版本。實務常用兩個 caller 求交集（如 Mutect2 ∩ Strelka2），降低 FP。</div>
+<div data-lang="en">Mutect2 is the GATK official tool with the most complete documentation, best PoN and contamination integration. Strelka2 is faster, with strong indel performance. VarDict shines at low-VAF detection (&lt; 0.05). DeepSomatic (Google 2024) is DeepVariant's somatic counterpart. Best practice often uses two callers and takes the intersection (e.g., Mutect2 ∩ Strelka2) to reduce FPs.</div>
+</details>
+<details><summary data-zh="如果沒有 matched normal 怎麼辦？" data-en="What if there's no matched normal?">如果沒有 matched normal 怎麼辦？</summary>
+<div data-lang="zh">用 tumor-only 模式 + 嚴格的後續過濾：(1) gnomAD AF &gt; 0.0001 → 視為 likely germline; (2) 自家 PoN 過濾 artifacts; (3) 對照 COSMIC + ClinVar 才報出。FP 率仍會高於 tumor-vs-normal，臨床診斷務必標註。長期應建立 archived normal collection 或用 buccal swab 補正。</div>
+<div data-lang="en">Use tumor-only mode + strict post-filtering: (1) gnomAD AF &gt; 0.0001 → treat as likely germline; (2) PoN to filter artifacts; (3) cross-check COSMIC + ClinVar before reporting. FP rate is still higher than tumor-vs-normal; flag this in clinical reports. Long-term, build an archived normal collection or use buccal swabs.</div>
+</details>
+</div>
+</section>
+
+<section class="section quiz-section">
+<div class="section-label" data-zh="自我檢測" data-en="QUIZ">自我檢測</div>
+<h2 data-zh="八、小測驗" data-en="VIII. Quiz">八、小測驗</h2>
+
+<div class="quiz-q" data-answer="2">
+<p class="quiz-question" data-zh="Q1. 為什麼 somatic caller 不是 genotype caller？" data-en="Q1. Why isn't a somatic caller a genotype caller?">Q1. 為什麼 somatic caller 不是 genotype caller？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="因為 tumor 不是 DNA" data-en="Tumor isn't DNA">因為 tumor 不是 DNA</button>
+<button class="quiz-opt" data-idx="1" data-zh="因為 somatic 變異總是 hom alt" data-en="Somatic variants are always hom alt">因為 somatic 變異總是 hom alt</button>
+<button class="quiz-opt" data-idx="2" data-zh="tumor 是 mixed sample (purity, subclones, CNV)，VAF 是連續值，問題不再是 0/1/2 alleles 而是「這個位點有真 mutation 嗎」" data-en="Tumor is a mixed sample (purity, subclones, CNV); VAF is continuous; the question is no longer 0/1/2 alleles but \"is there a real mutation here?\"">tumor 是 mixed sample (purity, subclones, CNV)，VAF 是連續值，問題不再是 0/1/2 alleles 而是「這個位點有真 mutation 嗎」</button>
+</div>
+<div class="quiz-feedback" id="fb1"></div>
+</div>
+
+<div class="quiz-q" data-answer="0">
+<p class="quiz-question" data-zh="Q2. PoN 主要過濾掉的是？" data-en="Q2. PoN primarily filters out:">Q2. PoN 主要過濾掉的是？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="重複出現在多個 normal 的 sequencing/alignment artifacts" data-en="Sequencing/alignment artifacts recurring in multiple normals">重複出現在多個 normal 的 sequencing/alignment artifacts</button>
+<button class="quiz-opt" data-idx="1" data-zh="所有 germline variants" data-en="All germline variants">所有 germline variants</button>
+<button class="quiz-opt" data-idx="2" data-zh="所有低 VAF mutations" data-en="All low-VAF mutations">所有低 VAF mutations</button>
+</div>
+<div class="quiz-feedback" id="fb2"></div>
+</div>
+
+<div class="quiz-q" data-answer="1">
+<p class="quiz-question" data-zh="Q3. FFPE 樣本的特徵性 artifact 是？" data-en="Q3. The characteristic artifact in FFPE samples is:">Q3. FFPE 樣本的特徵性 artifact 是？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="C&gt;G transversion" data-en="C>G transversions">C&gt;G transversion</button>
+<button class="quiz-opt" data-idx="1" data-zh="G→T / C→A (8-oxoG 氧化造成)" data-en="G→T / C→A (caused by 8-oxoG oxidation)">G→T / C→A (8-oxoG 氧化造成)</button>
+<button class="quiz-opt" data-idx="2" data-zh="A&gt;G transitions" data-en="A>G transitions">A&gt;G transitions</button>
+</div>
+<div class="quiz-feedback" id="fb3"></div>
+</div>
+</section>
+
+<nav class="page-nav">
+<a href="interpretation.html"><span class="nav-dir" data-zh="← 返回核心" data-en="← Back to core">← 返回核心</span><span class="nav-title">Step 9: Interpretation</span></a>
+<a href="structural-variants.html"><span class="nav-dir" data-zh="下一進階 →" data-en="Next advanced →">下一進階 →</span><span class="nav-title">Advanced: SV / CNV</span></a>
+</nav>
+</main>
+<footer class="site-footer">© WGS/WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// VAF distribution: 1000 mutations
+function gauss(m,s){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return m+s*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const bins=Array.from({length:50},(_,i)=>i*0.02);  // 0 to 1 in 0.02 steps
+const binLabels=bins.map(b=>(b+0.01).toFixed(2));
+
+const vafChart=new Chart(document.getElementById('vafChart'),{type:'bar',data:{labels:binLabels,datasets:[
+  {label:'Clonal',data:Array(50).fill(0),backgroundColor:'rgba(43,79,129,0.7)',borderWidth:0},
+  {label:'Subclonal',data:Array(50).fill(0),backgroundColor:'rgba(200,132,43,0.7)',borderWidth:0}
+]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},scales:{x:{title:{display:true,text:'VAF'},stacked:true,ticks:{maxTicksLimit:11,callback:(v,i)=>i%5===0?binLabels[i]:''}},y:{title:{display:true,text:'Mutation count'},stacked:true}}}});
+
+function updateVAF(){
+  const L=I18n.get();
+  const purity=+document.getElementById('purSlider').value/100;
+  const subFrac=+document.getElementById('subSlider').value/100;
+  document.getElementById('purVal').textContent=Math.round(purity*100)+'%';
+  document.getElementById('subVal').textContent=Math.round(subFrac*100)+'%';
+  // 1000 mutations: subFrac × subclonal, rest clonal
+  const N=1000;
+  const Nsub=Math.round(N*subFrac);
+  const Ncl=N-Nsub;
+  const clonalCounts=Array(50).fill(0);
+  const subCounts=Array(50).fill(0);
+  // Clonal mutations: VAF ~ purity/2 with binomial noise
+  for(let i=0;i<Ncl;i++){
+    const v=Math.max(0,Math.min(0.99,gauss(purity/2,0.04)));
+    const idx=Math.min(49,Math.floor(v/0.02));
+    clonalCounts[idx]++;
+  }
+  // Subclonal: VAF uniform in (0, purity/2)
+  for(let i=0;i<Nsub;i++){
+    const v=Math.max(0.01,Math.min(0.99,Math.random()*(purity/2)*0.9));
+    const idx=Math.min(49,Math.floor(v/0.02));
+    subCounts[idx]++;
+  }
+  const meanClonal=(purity/2).toFixed(2);
+  const detectable=clonalCounts.slice(2).reduce((a,b)=>a+b,0)+subCounts.slice(2).reduce((a,b)=>a+b,0); // VAF ≥ 0.04
+  document.getElementById('vafStats').innerHTML=
+    `<span class="sim-stat">${L==='zh'?'Clonal 中位 VAF':'Clonal median VAF'}: ~${meanClonal}</span>`+
+    `<span class="sim-stat pass">${L==='zh'?'可偵測 (VAF≥0.04)':'Detectable (VAF≥0.04)'}: ${detectable}/${N}</span>`+
+    `<span class="sim-stat warn">${L==='zh'?'Subclonal':'Subclonal'}: ${Nsub}</span>`;
+  vafChart.data.datasets[0].data=clonalCounts;
+  vafChart.data.datasets[1].data=subCounts;
+  vafChart.data.datasets[0].label=L==='zh'?'Clonal':'Clonal';
+  vafChart.data.datasets[1].label=L==='zh'?'Subclonal':'Subclonal';
+  vafChart.update('none');
+}
+['purSlider','subSlider'].forEach(id=>document.getElementById(id).addEventListener('input',updateVAF));
+document.addEventListener('langchange',updateVAF);
+updateVAF();
+
+const QF={
+  zh:{q1_y:'tumor 的 mixed nature 把問題從 genotype 改為 signal-vs-noise，這是 somatic caller 設計的根本不同。',q1_n:'正解已標示。',q2_y:'PoN 鎖定的是「跨樣本可重現的技術 artifact」，不是 germline (germline 由 normal 或 gnomAD 處理)。',q2_n:'正解已標示。',q3_y:'8-oxoG 是 FFPE 的招牌 artifact，特徵是 strand-specific G&gt;T / C&gt;A。',q3_n:'正解已標示。'},
+  en:{q1_y:'The mixed nature of tumor reframes the question from genotype to signal-vs-noise — a fundamental design difference in somatic callers.',q1_n:'Correct answer highlighted.',q2_y:'PoN targets cross-sample reproducible technical artifacts — not germline (germline is handled by normal or gnomAD).',q2_n:'Correct answer highlighted.',q3_y:'8-oxoG is the signature FFPE artifact, characterized by strand-specific G>T / C>A.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

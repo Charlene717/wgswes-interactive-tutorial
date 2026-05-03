@@ -1,0 +1,50 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>WGS / WES Interactive Tutorial</title>
+<meta name="description" content="Bilingual whole-genome (WGS) and whole-exome (WES) sequencing analysis interactive tutorial.">
+<link rel="stylesheet" href="styles.css"></head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="intro.html">Intro</a></li>
+    <li><a href="fastq-qc.html">FASTQ QC</a></li>
+    <li><a href="alignment.html">Align</a></li>
+    <li><a href="post-alignment.html">PostAln</a></li>
+    <li><a href="variant-calling.html">Calling</a></li>
+    <li><a href="joint-genotyping.html">Joint</a></li>
+    <li><a href="filtering.html">Filter</a></li>
+    <li><a href="annotation.html">Annot</a></li>
+    <li><a href="interpretation.html">Interp</a></li>
+    <li><a href="somatic.html">Somatic</a></li>
+    <li><a href="structural-variants.html">SV/CNV</a></li>
+    <li><a href="wes-considerations.html">WES</a></li>
+  </ul>
+</div></nav>
+<header class="hub-hero"><div style="position:relative;z-index:1;">
+<h1 data-zh="WGS / WES 互動式教學" data-en="WGS / WES Interactive Tutorial">WGS / WES 互動式教學</h1>
+<p data-lang="zh">從 FASTQ 到臨床解讀——12 個步驟掌握 全基因組 (WGS) 與 全外顯子 (WES) 變異分析流程，搭配互動模擬與 GATK 程式碼範例。</p>
+<p data-lang="en">From FASTQ to clinical interpretation — master Whole Genome (WGS) and Whole Exome (WES) variant analysis in 12 steps, with interactive simulations and GATK code examples.</p>
+</div></header>
+
+<h2 class="hub-section-title"><span>01</span> <span data-zh="核心分析流程" data-en="Core Analysis Pipeline">核心分析流程</span></h2>
+<div class="hub-steps-grid">
+  <a href="intro.html" class="hub-card"><div class="hub-emoji">🧭</div><span class="step-num">Step 1</span><h3 data-zh="入門：WGS vs WES" data-en="Intro: WGS vs WES">入門：WGS vs WES</h3><p data-lang="zh">理解兩種定序策略的覆蓋範圍、成本、適用情境，並選擇正確的方法。</p><p data-lang="en">Understand coverage, cost, and use cases of both strategies. Choose the right approach.</p></a>
+  <a href="fastq-qc.html" class="hub-card"><div class="hub-emoji">🧪</div><span class="step-num">Step 2</span><h3 data-zh="FASTQ 品質管控" data-en="FASTQ Quality Control">FASTQ 品質管控</h3><p data-lang="zh">用 FastQC、fastp 評估 Phred 分數、adapter 含量，並進行 trimming。</p><p data-lang="en">Assess Phred scores and adapter content with FastQC/fastp, then trim reads.</p></a>
+  <a href="alignment.html" class="hub-card"><div class="hub-emoji">🎯</div><span class="step-num">Step 3</span><h3 data-zh="序列比對 (Alignment)" data-en="Read Alignment">序列比對</h3><p data-lang="zh">用 BWA-MEM/MEM2 將 reads 比對到參考基因組，產出 BAM 檔。</p><p data-lang="en">Align reads to the reference genome with BWA-MEM/MEM2, producing BAM files.</p></a>
+  <a href="post-alignment.html" class="hub-card"><div class="hub-emoji">🛠️</div><span class="step-num">Step 4</span><h3 data-zh="比對後處理" data-en="Post-Alignment Processing">比對後處理</h3><p data-lang="zh">MarkDuplicates 標記 PCR 重複，BQSR 校正鹼基品質分數。</p><p data-lang="en">Mark PCR duplicates and recalibrate base quality scores (BQSR).</p></a>
+  <a href="variant-calling.html" class="hub-card"><div class="hub-emoji">📢</div><span class="step-num">Step 5</span><h3 data-zh="變異呼叫 (Calling)" data-en="Variant Calling">變異呼叫</h3><p data-lang="zh">HaplotypeCaller、DeepVariant、DRAGEN 比較與 GVCF 模式。</p><p data-lang="en">Compare HaplotypeCaller, DeepVariant, DRAGEN, and the GVCF workflow.</p></a>
+  <a href="joint-genotyping.html" class="hub-card"><div class="hub-emoji">👥</div><span class="step-num">Step 6</span><h3 data-zh="聯合基因分型" data-en="Joint Genotyping">聯合基因分型</h3><p data-lang="zh">GenomicsDBImport + GenotypeGVCFs：跨樣本提升 rare variant 召回率。</p><p data-lang="en">GenomicsDBImport + GenotypeGVCFs: boost rare-variant recall across cohorts.</p></a>
+  <a href="filtering.html" class="hub-card"><div class="hub-emoji">🧹</div><span class="step-num">Step 7</span><h3 data-zh="變異過濾" data-en="Variant Filtering">變異過濾</h3><p data-lang="zh">VQSR 機器學習過濾 vs 硬性閾值 (Hard Filtering)，何時用哪個？</p><p data-lang="en">VQSR machine-learning filtering vs hard thresholds — when to use each.</p></a>
+  <a href="annotation.html" class="hub-card"><div class="hub-emoji">🏷️</div><span class="step-num">Step 8</span><h3 data-zh="變異註釋" data-en="Variant Annotation">變異註釋</h3><p data-lang="zh">VEP、ANNOVAR、SnpEff 比較，加入 gnomAD、ClinVar 等族群與臨床資料庫。</p><p data-lang="en">Compare VEP, ANNOVAR, SnpEff. Layer in gnomAD, ClinVar, and population databases.</p></a>
+  <a href="interpretation.html" class="hub-card"><div class="hub-emoji">⚖️</div><span class="step-num">Step 9</span><h3 data-zh="變異解讀 (ACMG)" data-en="Interpretation (ACMG)">變異解讀</h3><p data-lang="zh">用 ACMG/AMP 五級分類系統 (Pathogenic ↔ Benign) 評估臨床意義。</p><p data-lang="en">Use the ACMG/AMP 5-tier system (Pathogenic ↔ Benign) to assess clinical significance.</p></a>
+</div>
+
+<h2 class="hub-section-title"><span>02</span> <span data-zh="進階分析主題" data-en="Advanced Topics">進階分析主題</span></h2>
+<div class="hub-steps-grid">
+  <a href="somatic.html" class="hub-card"><div class="hub-emoji">🧬</div><span class="step-num">Advanced</span><h3 data-zh="體細胞變異 (癌症)" data-en="Somatic Variants (Cancer)">體細胞變異</h3><p data-lang="zh">Mutect2 tumor-vs-normal 分析、Panel of Normals、低 VAF 突變偵測。</p><p data-lang="en">Mutect2 tumor-vs-normal analysis, Panel of Normals, low-VAF mutation detection.</p></a>
+  <a href="structural-variants.html" class="hub-card"><div class="hub-emoji">🧩</div><span class="step-num">Advanced</span><h3 data-zh="結構變異 / CNV" data-en="Structural Variants / CNV">結構變異 / CNV</h3><p data-lang="zh">用 Manta、Delly、CNVnator 偵測 &gt;50bp 的 deletions、duplications、translocations。</p><p data-lang="en">Detect &gt;50bp deletions, duplications, and translocations with Manta, Delly, CNVnator.</p></a>
+  <a href="wes-considerations.html" class="hub-card"><div class="hub-emoji">🎯</div><span class="step-num">Advanced</span><h3 data-zh="WES 專屬考量" data-en="WES-specific Considerations">WES 專屬考量</h3><p data-lang="zh">target enrichment、capture kit 選擇、coverage uniformity、外顯子盲區。</p><p data-lang="en">Target enrichment, capture kit choice, coverage uniformity, exome blind spots.</p></a>
+</div>
+<div style="height:60px"></div>
+<footer class="site-footer">© WGS/WES Interactive Tutorial — <span data-zh="基於 GATK Best Practices 與當代基因體學文獻" data-en="Based on GATK Best Practices and current genomics literature">基於 GATK Best Practices 與當代基因體學文獻</span></footer>
+<script src="i18n.js"></script>
+</body></html>

@@ -1,0 +1,331 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Advanced: Structural Variants & CNV — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="intro.html">Intro</a></li><li><a href="fastq-qc.html">FASTQ QC</a></li><li><a href="alignment.html">Align</a></li><li><a href="post-alignment.html">PostAln</a></li><li><a href="variant-calling.html">Calling</a></li><li><a href="joint-genotyping.html">Joint</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot</a></li><li><a href="interpretation.html">Interp</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="structural-variants.html" class="active">SV/CNV</a></li><li><a href="wes-considerations.html">WES</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">ADVANCED</div>
+<h1 data-zh="結構變異與 CNV (SV / CNV)" data-en="Structural Variants & CNV">結構變異與 CNV (SV / CNV)</h1>
+<p class="subtitle" data-lang="zh">大尺度變異（≥ 50 bp）的偵測：deletion、duplication、inversion、translocation——short-read 的技術極限挑戰。</p>
+<p class="subtitle" data-lang="en">Detection of large-scale variants (≥50 bp): deletions, duplications, inversions, translocations — the technical limit of short reads.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="為什麼" data-en="WHY">為什麼</div>
+<h2 data-zh="一、為什麼 SV/CNV 是另一個世界？" data-en="I. Why are SV/CNV a different world?">一、為什麼 SV/CNV 是另一個世界？</h2>
+<div data-lang="zh">
+<p>前面 8 個章節討論的 SNV 與 small indel (1-50 bp)，short reads (150 bp) 都能直接「跨越」變異位點，比對 + alignment 即可看見。但 ≥ 50 bp 的變異就麻煩了：</p>
+<ul>
+<li><strong>無法用 single read 跨越</strong>：例如 1000 bp deletion，沒有 read 能完整覆蓋兩個 breakpoint</li>
+<li><strong>必須從間接證據推斷</strong>：依靠 paired-end orientation、split reads、read depth、local assembly 等多重線索</li>
+<li><strong>repeat 區域是地獄</strong>：人類基因組約 50% 是 repeat，short read 無法區分 repeat 內位置，SV breakpoint 常落在這些區</li>
+</ul>
+<p>因此 SV calling 的 sensitivity / precision 都遠不如 SNV——典型 short-read pipeline 的 SV recall 只有 60-80%。Long-read（PacBio HiFi、ONT R10.4）可達 95%+，但成本仍較高。</p>
+</div>
+<div data-lang="en">
+<p>The previous 8 chapters discussed SNVs and small indels (1–50 bp), where short reads (150 bp) can span the variant directly — alignment shows them. But variants ≥50 bp are trouble:</p>
+<ul>
+<li><strong>No single read can span them</strong>: e.g., a 1000-bp deletion — no read fully covers both breakpoints</li>
+<li><strong>Must infer from indirect evidence</strong>: paired-end orientation, split reads, read depth, local assembly — multiple complementary clues</li>
+<li><strong>Repeat regions are hell</strong>: ~50% of the human genome is repeats; short reads can't disambiguate within them, and SV breakpoints often fall in these regions</li>
+</ul>
+<p>So SV calling sensitivity/precision lags far behind SNVs — typical short-read pipelines achieve only 60–80% SV recall. Long-read (PacBio HiFi, ONT R10.4) reaches 95%+, but at higher cost.</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
+<h2 data-zh="二、SV 分類" data-en="II. SV Types">二、SV 分類</h2>
+<div class="card-grid">
+<div class="card"><h3>DEL (Deletion)</h3>
+<p data-lang="zh">參考基因組的某段在樣本中缺失。Discordant paired-end 的 insert size 變大、跨越區段 read depth 下降一半（het）或歸零（hom）。VCF SVTYPE=DEL。</p>
+<p data-lang="en">A segment of reference is missing in the sample. Discordant paired-end insert size grows; read depth across the region halves (het) or drops to zero (hom). VCF SVTYPE=DEL.</p>
+</div>
+<div class="card"><h3>DUP (Duplication)</h3>
+<p data-lang="zh">某段被複製出現多份。Tandem dup 容易（discordant pair + depth 上升），dispersed dup 較難。SVTYPE=DUP, CN=3 等。</p>
+<p data-lang="en">A segment appears multiple times. Tandem dup is easier (discordant pairs + depth rises); dispersed dup is harder. SVTYPE=DUP, CN=3, etc.</p>
+</div>
+<div class="card"><h3>INV (Inversion)</h3>
+<p data-lang="zh">某段方向倒置。Discordant pair 方向異常（FF 或 RR 而非 FR）。對 read depth 沒影響，純靠 paired-end / split-read 偵測。</p>
+<p data-lang="en">A segment is flipped. Discordant pair orientation becomes abnormal (FF or RR instead of FR). No depth change; relies purely on paired-end / split-read detection.</p>
+</div>
+<div class="card"><h3>INS (Insertion)</h3>
+<p data-lang="zh">參考中沒有的新序列插入。短 INS (&lt; 100 bp) 從 split read 拼出；長 INS (&gt; 500 bp) short-read 幾乎抓不到，是 long-read 的專長。</p>
+<p data-lang="en">A novel sequence inserted (not in reference). Short INS (&lt;100 bp) reconstructed from split reads; long INS (&gt;500 bp) is nearly invisible to short reads — a long-read specialty.</p>
+</div>
+<div class="card"><h3>BND / Translocation</h3>
+<p data-lang="zh">不同染色體間的接合（如 BCR-ABL t(9;22)）。VCF 用 BND (breakend) 記錄，每個 breakpoint 一條。癌症 driver fusion 的關鍵類型。</p>
+<p data-lang="en">Inter-chromosomal junctions (e.g., BCR-ABL t(9;22)). VCF uses BND (breakend) records — one per breakpoint. A key category for cancer driver fusions.</p>
+</div>
+<div class="card"><h3>CNV</h3>
+<p data-lang="zh">概括稱呼 DEL + DUP，常用於 chromosome 級的 large variants 與癌症 copy-number profiling。GATK gCNV, CNVkit, CNVnator 等工具產出。</p>
+<p data-lang="en">Umbrella term for DEL + DUP, commonly used for chromosome-scale variants and cancer copy-number profiling. Tools: GATK gCNV, CNVkit, CNVnator, etc.</p>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
+<h2 data-zh="三、SV caller 三大訊號類型" data-en="III. The Three Signal Types">三、SV caller 三大訊號類型</h2>
+<div data-lang="zh">
+<p>不同 caller 倚重不同的證據來源，理解這點才能理性選擇 / 組合工具：</p>
+</div>
+<div data-lang="en">
+<p>Different callers rely on different evidence sources. Understanding this enables rational tool selection / combination:</p>
+</div>
+
+<div class="comp-table-wrap">
+<table class="comp-table">
+<thead><tr><th data-zh="訊號" data-en="Signal">訊號</th><th data-zh="原理" data-en="Principle">原理</th><th data-zh="擅長" data-en="Best for">擅長</th><th data-zh="代表工具" data-en="Tools">代表工具</th></tr></thead>
+<tbody>
+<tr><td data-zh="Paired-end (discordant)" data-en="Paired-end (discordant)">Paired-end (discordant)</td><td data-zh="paired reads 的 insert size / orientation 異於預期" data-en="Paired reads with abnormal insert size / orientation">paired reads 的 insert size / orientation 異於預期</td><td data-zh="中-大型 SV、translocation" data-en="Medium-to-large SVs, translocations">中-大型 SV、translocation</td><td><strong>Delly</strong>, <strong>Lumpy</strong></td></tr>
+<tr><td data-zh="Split-read" data-en="Split-read">Split-read</td><td data-zh="同一 read 的兩段被 split 對到不同位置 → 推斷 breakpoint" data-en="Two halves of one read split-mapping to different positions → infers breakpoint">同一 read 的兩段被 split 對到不同位置 → 推斷 breakpoint</td><td data-zh="精確 breakpoint 解析度" data-en="Precise breakpoint resolution">精確 breakpoint 解析度</td><td><strong>Manta</strong>, <strong>GRIDSS</strong>, <strong>SvABA</strong></td></tr>
+<tr><td data-zh="Read-depth" data-en="Read-depth">Read-depth</td><td data-zh="某區段 coverage 顯著高/低於背景" data-en="Region coverage significantly higher/lower than background">某區段 coverage 顯著高/低於背景</td><td data-zh="大型 CNV、低 mappability 區" data-en="Large CNVs, low-mappability regions">大型 CNV、低 mappability 區</td><td><strong>CNVnator</strong>, <strong>ERDS</strong>, <strong>GATK gCNV</strong></td></tr>
+<tr><td data-zh="Local assembly" data-en="Local assembly">Local assembly</td><td data-zh="把可疑區的 reads 重新 de novo assemble，找出非 reference 序列" data-en="De-novo reassemble reads from suspect regions, identifying non-reference sequence">把可疑區的 reads 重新 de novo assemble，找出非 reference 序列</td><td data-zh="複雜 SV、insertion、breakpoint 序列" data-en="Complex SVs, insertions, breakpoint sequence">複雜 SV、insertion、breakpoint 序列</td><td><strong>Manta</strong>, <strong>GRIDSS</strong>, <strong>SvABA</strong></td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout callout-info" style="margin-top:18px">
+<strong data-zh="為什麼推薦多 caller 組合？" data-en="Why combine multiple callers?">為什麼推薦多 caller 組合？</strong>
+<p data-lang="zh">大型 benchmark（如 Cameron et al. 2019, GIAB SV truth set）顯示單一 SV caller 的 recall 通常不到 70%，但不同 caller 抓到的 false negatives 重疊度低。實務常用 4 個 caller 組合（如 <strong>Manta + Delly + ERDS + CNVnator</strong>），用 SURVIVOR / Jasmine 合併取交集（嚴格）或多數決（寬鬆），可把 recall 推到 90%+。</p>
+<p data-lang="en">Large benchmarks (Cameron et al. 2019, GIAB SV truth set) show single-caller recall is usually under 70%, but different callers' false negatives overlap little. Best practice combines 4 callers (e.g., <strong>Manta + Delly + ERDS + CNVnator</strong>), merged via SURVIVOR / Jasmine using intersection (strict) or majority vote (lenient), pushing recall to 90%+.</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="四、互動模擬：SV 三訊號示意" data-en="IV. Interactive: Three SV Signals">四、互動模擬：SV 三訊號示意</h2>
+<div data-lang="zh">
+<p>選擇不同 SV 類型，觀察三種訊號 (paired-end discordant, split-read, read-depth) 在該 SV 上的訊號強度。設計 caller 時就是依據這三條曲線的組合來識別不同類型。</p>
+</div>
+<div data-lang="en">
+<p>Pick an SV type to see the three signal strengths (paired-end discordant, split-read, read-depth) for it. Caller design uses combinations of these three to identify each type.</p>
+</div>
+
+<div class="interactive-panel">
+<div class="sim-controls">
+<label data-zh="選擇 SV 類型:" data-en="Pick an SV type:">選擇 SV 類型:</label>
+<select id="svSelect" class="sim-select">
+<option value="0">DEL — Deletion (1 kb)</option>
+<option value="1">DUP — Tandem Duplication (1 kb)</option>
+<option value="2">INV — Inversion (5 kb)</option>
+<option value="3">INS — Insertion (300 bp novel)</option>
+<option value="4">BND — Translocation</option>
+<option value="5">CNV — Large copy gain (50 kb)</option>
+</select>
+</div>
+<div id="svStats" class="sim-stats"></div>
+<div class="chart-wrap"><canvas id="svChart"></canvas></div>
+<div class="sim-note" data-lang="zh">分數 0-10 為示意值。可看到不同 SV 類型「依賴」不同訊號——例如 INV 完全靠 paired-end，DEL 三項都強。caller 的算法都是用這些訊號的組合來偵測。</div>
+<div class="sim-note" data-lang="en">Scores 0–10 are illustrative. Different SV types rely on different signals — INV depends entirely on paired-end, DEL has all three strong. Caller algorithms detect via combinations of these signals.</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
+<h2 data-zh="五、特殊類別：mobile element insertion (MEI)" data-en="V. Special Category: Mobile Element Insertions (MEI)">五、特殊類別：mobile element insertion (MEI)</h2>
+<div data-lang="zh">
+<p>人類基因組中約 ~17% 是 LINE-1 (L1)，~11% 是 Alu，~3% 是 SVA。這些 retrotransposon 偶爾會跳到新位置，產生 <strong>MEI (mobile element insertion)</strong>。雖然數量不多（每人約 100-200 個 polymorphic MEI），但已知會造成多種疾病（如 hemophilia、Duchenne MD、neurofibromatosis）。</p>
+<p>普通 SV caller 對 MEI 不靈敏，因為新插入的序列就是 repeat element 自己，普通 split-read 會 ambiguously map 到全基因組數萬份 copies。專用工具：</p>
+<ul>
+<li><strong>MELT (Mobile Element Locator Tool)</strong>：針對 ALU / L1 / SVA 三大家族，1000 Genomes Project 的標準工具</li>
+<li><strong>Mobster</strong>：類似 MELT，含 graphical pipeline</li>
+<li><strong>xTea</strong>：支援 short-read + long-read，2021 後較新工具</li>
+</ul>
+</div>
+<div data-lang="en">
+<p>The human genome is ~17% LINE-1 (L1), ~11% Alu, ~3% SVA. These retrotransposons occasionally jump to new locations, creating <strong>MEIs (mobile element insertions)</strong>. Though not numerous (~100–200 polymorphic MEIs per person), they cause several diseases (hemophilia, Duchenne MD, neurofibromatosis).</p>
+<p>Generic SV callers are insensitive to MEIs because the inserted sequence is a repeat element itself — normal split-reads ambiguously map to tens of thousands of genome-wide copies. Specialized tools:</p>
+<ul>
+<li><strong>MELT (Mobile Element Locator Tool)</strong>: targets the ALU / L1 / SVA families — 1000 Genomes Project's standard tool</li>
+<li><strong>Mobster</strong>: similar to MELT, with graphical pipeline</li>
+<li><strong>xTea</strong>: supports short-read + long-read, a newer (post-2021) tool</li>
+</ul>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="實務指令" data-en="CODE">實務指令</div>
+<h2 data-zh="六、Pipeline 指令範例" data-en="VI. Pipeline Commands">六、Pipeline 指令範例</h2>
+<div class="code-tabs">
+<div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'tab-manta')">Manta</button><button class="code-tab-btn" onclick="switchTab(this,'tab-delly')">Delly</button><button class="code-tab-btn" onclick="switchTab(this,'tab-cnv')">CNVnator</button><button class="code-tab-btn" onclick="switchTab(this,'tab-merge')">合併 / 註解</button></div>
+
+<div id="tab-manta" class="code-tab-content active"><pre><code># Manta — 適用 germline / somatic / 跨樣本
+# Germline mode (single sample)
+configManta.py \
+    --bam dedup.bam \
+    --referenceFasta ref.fa \
+    --runDir manta_germline
+
+manta_germline/runWorkflow.py -j 16
+
+# 結果在 manta_germline/results/variants/
+#   diploidSV.vcf.gz       — germline SVs
+#   candidateSV.vcf.gz     — 候選 (含未過濾 small SV)
+#   candidateSmallIndels.vcf.gz</code></pre></div>
+
+<div id="tab-delly" class="code-tab-content"><pre><code># Delly — paired-end + split-read combined
+# 一次只能 call 一種 SV type
+for sv in DEL DUP INV TRA INS; do
+  delly call -t $sv -g ref.fa -o sample.${sv}.bcf dedup.bam &amp;
+done; wait
+
+# 合併
+bcftools concat sample.DEL.bcf sample.DUP.bcf sample.INV.bcf sample.TRA.bcf sample.INS.bcf \
+    -Oz -o sample.delly.vcf.gz
+tabix -p vcf sample.delly.vcf.gz
+
+# 過濾 (Delly 有自家 quality 標籤)
+bcftools view -f PASS sample.delly.vcf.gz -Oz -o sample.delly.pass.vcf.gz</code></pre></div>
+
+<div id="tab-cnv" class="code-tab-content"><pre><code># CNVnator — read-depth based CNV (germline)
+# 1. extract 每 100 bp 的 depth
+cnvnator -root sample.root -tree dedup.bam
+
+# 2. 設 bin size (WGS 100, WES 1000)
+cnvnator -root sample.root -his 100 -d ref_chrs/
+
+# 3. 計算統計
+cnvnator -root sample.root -stat 100
+
+# 4. 分割 region
+cnvnator -root sample.root -partition 100
+
+# 5. 呼叫 CNV
+cnvnator -root sample.root -call 100 &gt; sample.cnv.txt
+
+# 轉為 VCF
+cnvnator2VCF.pl sample.cnv.txt &gt; sample.cnv.vcf</code></pre></div>
+
+<div id="tab-merge" class="code-tab-content"><pre><code># 用 SURVIVOR 合併多 caller 結果
+ls sample.manta.vcf sample.delly.vcf sample.lumpy.vcf sample.cnvnator.vcf &gt; vcf_list.txt
+
+# 合併條件: 距離 ≤ 500 bp, 同 SV type, 至少 2 個 caller 支持
+SURVIVOR merge vcf_list.txt 500 2 1 1 0 30 sample.merged.vcf
+
+# AnnotSV 註解 (gene context, OMIM, dbVar)
+AnnotSV \
+    -SVinputFile sample.merged.vcf \
+    -outputFile sample.annotsv.tsv \
+    -genomeBuild GRCh38
+
+# 看高 ranking 候選
+awk -F'\t' '$NF == "5" || $NF == "4"' sample.annotsv.tsv | less</code></pre></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="常見問題" data-en="FAQ">常見問題</div>
+<h2 data-zh="七、FAQ" data-en="VII. FAQ">七、FAQ</h2>
+<div class="accordion">
+<details><summary data-zh="為什麼 WES 不適合做 SV/CNV？" data-en="Why isn't WES suitable for SV/CNV?">為什麼 WES 不適合做 SV/CNV？</summary>
+<div data-lang="zh">WES 的 capture 是斷續的 exon islands，read depth 受 capture 效率影響極大（同 exon 在不同樣本可能差 5-10 倍）。read-depth 訊號難以區分「真 CNV」與「capture 偏差」。intronic / intergenic breakpoint 完全看不到。WES CNV 偵測需 EXCAVATOR2 / CoNIFER / CLAMMS 等專用工具，且需要大 cohort 才能 normalize 偏差。研究 SV 還是 PCR-free WGS 為佳。</div>
+<div data-lang="en">WES capture is discontinuous exon islands; read depth is heavily affected by capture efficiency (the same exon can vary 5–10× across samples). Read-depth signals can't distinguish real CNVs from capture bias. Intronic/intergenic breakpoints are invisible. WES CNV detection requires specialized tools (EXCAVATOR2, CoNIFER, CLAMMS) and large cohorts to normalize bias. For SVs, PCR-free WGS remains preferable.</div>
+</details>
+<details><summary data-zh="long-read 真的能解決所有 SV 問題嗎？" data-en="Do long-reads really solve all SV problems?">long-read 真的能解決所有 SV 問題嗎？</summary>
+<div data-lang="zh">大幅改善但非萬能。PacBio HiFi (15-20 kb, Q30+) 與 ONT R10.4 (Q20+) 對 SV 的 recall 可達 95%+，能直接看到 long INS、resolve 複雜 rearrangement。但成本仍 3-10× short-read，且對某些工作流程（如 amplicon、UMI consensus）不適合。實務漸成「short-read 為主 + 重點 case 補 long-read」混合模式。</div>
+<div data-lang="en">Greatly improves but isn't universal. PacBio HiFi (15–20 kb, Q30+) and ONT R10.4 (Q20+) reach 95%+ SV recall and can directly see long INS or resolve complex rearrangements. But cost is still 3–10× short-read, and some workflows (amplicons, UMI consensus) don't fit. Practice is shifting toward "short-read primary + long-read for key cases."</div>
+</details>
+<details><summary data-zh="SV 的 ACMG 判讀有獨立指引嗎？" data-en="Does SV have its own ACMG guideline?">SV 的 ACMG 判讀有獨立指引嗎？</summary>
+<div data-lang="zh">有。<strong>ACMG/ClinGen 2020 CNV interpretation guideline</strong>（Riggs et al., Genetics in Medicine）為 copy-number gain/loss 提供 5-tier classification 與專屬證據碼，與 SNV ACMG 2015 互補。AnnotSV 工具會自動套用此指引給 CNV ranking 1-5。</div>
+<div data-lang="en">Yes. The <strong>ACMG/ClinGen 2020 CNV interpretation guideline</strong> (Riggs et al., Genetics in Medicine) provides a 5-tier classification and dedicated evidence codes for copy-number gains/losses, complementing the SNV ACMG 2015. AnnotSV automatically applies this guideline to give CNVs a ranking of 1–5.</div>
+</details>
+<details><summary data-zh="GIAB SV truth set 有哪些版本？" data-en="What versions exist for the GIAB SV truth set?">GIAB SV truth set 有哪些版本？</summary>
+<div data-lang="zh">GIAB (Genome in a Bottle) HG002 (Ashkenazi son) 是 SV benchmark 的事實標準。v0.6 (2019) 約 12,000 high-confidence SVs；v1.0 (2024) 升級到 long-read assembly 為基礎，~50,000 SVs，含 MEI、tandem repeat 與複雜 rearrangement。新工具發表必須在這上面 benchmark。</div>
+<div data-lang="en">GIAB (Genome in a Bottle) HG002 (Ashkenazi son) is the de facto SV benchmark. v0.6 (2019) had ~12,000 high-confidence SVs; v1.0 (2024) upgraded to long-read-assembly-based with ~50,000 SVs including MEIs, tandem repeats, and complex rearrangements. New tools must benchmark on this.</div>
+</details>
+</div>
+</section>
+
+<section class="section quiz-section">
+<div class="section-label" data-zh="自我檢測" data-en="QUIZ">自我檢測</div>
+<h2 data-zh="八、小測驗" data-en="VIII. Quiz">八、小測驗</h2>
+
+<div class="quiz-q" data-answer="1">
+<p class="quiz-question" data-zh="Q1. 一個純粹的 inversion 可由哪些訊號偵測？" data-en="Q1. A pure inversion is detected by which signals?">Q1. 一個純粹的 inversion 可由哪些訊號偵測？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="Read-depth 顯著上升或下降" data-en="Major read-depth increase or decrease">Read-depth 顯著上升或下降</button>
+<button class="quiz-opt" data-idx="1" data-zh="Paired-end 方向異常 (FF / RR) + 在 breakpoint 的 split read" data-en="Abnormal paired-end orientation (FF/RR) + split reads at breakpoint">Paired-end 方向異常 (FF / RR) + 在 breakpoint 的 split read</button>
+<button class="quiz-opt" data-idx="2" data-zh="只能用 long-read 偵測" data-en="Only detectable by long-read">只能用 long-read 偵測</button>
+</div>
+<div class="quiz-feedback" id="fb1"></div>
+</div>
+
+<div class="quiz-q" data-answer="0">
+<p class="quiz-question" data-zh="Q2. 為什麼推薦多 caller 組合？" data-en="Q2. Why combine multiple callers?">Q2. 為什麼推薦多 caller 組合？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="不同 caller 倚重不同訊號，各自 false negative 重疊度低，組合可顯著提升 recall" data-en="Different callers rely on different signals, with low FN overlap; combining markedly improves recall">不同 caller 倚重不同訊號，各自 false negative 重疊度低，組合可顯著提升 recall</button>
+<button class="quiz-opt" data-idx="1" data-zh="多 caller 一定減少 false positive" data-en="More callers always reduce FP">多 caller 一定減少 false positive</button>
+<button class="quiz-opt" data-idx="2" data-zh="法規規定" data-en="Regulatory requirement">法規規定</button>
+</div>
+<div class="quiz-feedback" id="fb2"></div>
+</div>
+
+<div class="quiz-q" data-answer="2">
+<p class="quiz-question" data-zh="Q3. WES 偵測 CNV 的最大障礙？" data-en="Q3. The biggest obstacle to WES CNV detection?">Q3. WES 偵測 CNV 的最大障礙？</p>
+<div class="quiz-opts">
+<button class="quiz-opt" data-idx="0" data-zh="WES 不能跑 CNV caller" data-en="CNV callers don't work on WES">WES 不能跑 CNV caller</button>
+<button class="quiz-opt" data-idx="1" data-zh="WES 的 read length 太短" data-en="WES read length is too short">WES 的 read length 太短</button>
+<button class="quiz-opt" data-idx="2" data-zh="exon island 是不連續的，capture 效率不均，read-depth 訊號難以與 capture 偏差區分" data-en="Exon islands are discontinuous, capture efficiency is uneven, and read-depth signal can't be distinguished from capture bias">exon island 是不連續的，capture 效率不均，read-depth 訊號難以與 capture 偏差區分</button>
+</div>
+<div class="quiz-feedback" id="fb3"></div>
+</div>
+</section>
+
+<nav class="page-nav">
+<a href="somatic.html"><span class="nav-dir" data-zh="← 上一進階" data-en="← Previous advanced">← 上一進階</span><span class="nav-title">Advanced: Somatic</span></a>
+<a href="wes-considerations.html"><span class="nav-dir" data-zh="下一進階 →" data-en="Next advanced →">下一進階 →</span><span class="nav-title">Advanced: WES Considerations</span></a>
+</nav>
+</main>
+<footer class="site-footer">© WGS/WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// SV signal strength simulator
+const SV_TYPES=[
+  {name:'DEL',pe:9,sr:8,rd:9,desc_zh:'paired-end insert size 變大、read depth 跨區下降、breakpoint 有 split read',desc_en:'paired-end insert size grows, depth drops across region, split reads at breakpoint'},
+  {name:'DUP (tandem)',pe:8,sr:7,rd:9,desc_zh:'paired-end 方向異常 (RF)、read depth 上升、tandem 接點 split read',desc_en:'paired-end abnormal orientation (RF), depth rises, split read at tandem junction'},
+  {name:'INV',pe:9,sr:7,rd:1,desc_zh:'paired-end 方向 (FF/RR)、breakpoint split read；對 read depth 無影響',desc_en:'paired-end orientation (FF/RR), breakpoint split reads; no depth effect'},
+  {name:'INS (300bp)',pe:5,sr:9,rd:1,desc_zh:'split read 為主訊號（部分 read 對到 reference，部分對到 insertion）；對 depth 無影響',desc_en:'split reads dominate (part maps to reference, part to insertion); no depth effect'},
+  {name:'BND/Translocation',pe:9,sr:9,rd:1,desc_zh:'paired-end 對到不同染色體、breakpoint 有 split read',desc_en:'paired-end mates on different chromosomes, breakpoint split reads'},
+  {name:'CNV (large gain)',pe:3,sr:2,rd:10,desc_zh:'read depth 是主訊號（區段持續上升）；paired-end / split read 可能無',desc_en:'depth is the main signal (sustained elevation); paired-end / split reads may be absent'}
+];
+
+const svChart=new Chart(document.getElementById('svChart'),{type:'radar',data:{labels:['Paired-end discordant','Split-read','Read-depth'],datasets:[{label:'Signal strength',data:[0,0,0],backgroundColor:'rgba(43,79,129,0.2)',borderColor:'rgba(43,79,129,1)',borderWidth:2,pointBackgroundColor:'rgba(200,132,43,1)',pointBorderColor:'#fff',pointHoverRadius:6,pointRadius:5}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{r:{min:0,max:10,ticks:{stepSize:2}}}}});
+
+function updateSV(){
+  const L=I18n.get();
+  const idx=+document.getElementById('svSelect').value;
+  const sv=SV_TYPES[idx];
+  document.getElementById('svStats').innerHTML=
+    `<span class="sim-stat pass">PE: ${sv.pe}/10</span>`+
+    `<span class="sim-stat pass">SR: ${sv.sr}/10</span>`+
+    `<span class="sim-stat pass">RD: ${sv.rd}/10</span>`+
+    `<span class="sim-stat">${L==='zh'?sv.desc_zh:sv.desc_en}</span>`;
+  svChart.data.datasets[0].data=[sv.pe,sv.sr,sv.rd];
+  svChart.data.datasets[0].label=`${sv.name}`;
+  if(L==='zh'){svChart.data.labels=['Paired-end 異常','Split-read','Read-depth'];}
+  else{svChart.data.labels=['Paired-end discordant','Split-read','Read-depth'];}
+  svChart.update('none');
+}
+document.getElementById('svSelect').addEventListener('change',updateSV);
+document.addEventListener('langchange',updateSV);
+updateSV();
+
+const QF={
+  zh:{q1_y:'INV 不改變區段長度，read depth 完全不變，必須完全靠 paired-end orientation 與 split read 偵測。',q1_n:'正解已標示。',q2_y:'這是 SV calling 的核心經驗：4 個 caller 組合 (Manta + Delly + ERDS + CNVnator) 可達 90%+ recall。',q2_n:'正解已標示。',q3_y:'capture 效率不均是 WES read-depth 訊號最大的混淆來源，需大 cohort 與專用工具才能緩解。',q3_n:'正解已標示。'},
+  en:{q1_y:'INV doesn\'t change segment length, leaves depth unchanged — must rely entirely on paired-end orientation and split reads.',q1_n:'Correct answer highlighted.',q2_y:'This is core SV calling experience: 4-caller combo (Manta + Delly + ERDS + CNVnator) reaches 90%+ recall.',q2_n:'Correct answer highlighted.',q3_y:'Uneven capture efficiency is the dominant confounder for WES read-depth signals; only large cohorts and specialized tools mitigate it.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>
