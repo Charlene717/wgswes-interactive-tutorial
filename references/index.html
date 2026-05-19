@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>WGS / WES 參考資料 · References</title>
+<meta name="description" content="WGS / WES Interactive Tutorial 16 章節的學術論文、官方文件、Best Practices 與變異資料庫來源整理。">
+<link rel="stylesheet" href="../styles.css">
+<style>
+/* References-specific styling */
+.ref-list{list-style:none;padding:0;margin:14px 0 0}
+.ref-list li{padding:14px 16px;background:var(--c-surface-alt);border:1px solid var(--c-border-light);border-radius:var(--radius);margin-bottom:10px;font-size:.92rem;line-height:1.65}
+.ref-list li:hover{background:var(--c-surface);border-color:var(--c-border)}
+.ref-tag{display:inline-block;font-family:var(--font-mono);font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:6px;margin-right:8px;letter-spacing:.5px}
+.ref-tag.paper{background:var(--c-accent-light);color:var(--c-accent-dark)}
+.ref-tag.doc{background:#e3f2fd;color:#1565c0}
+.ref-tag.bench{background:#fff3e0;color:#e65100}
+.ref-tag.db{background:#fce4ec;color:#ad1457}
+.ref-tag.book{background:#f3e5f5;color:#6a1b9a}
+.ref-tag.bestp{background:var(--c-highlight-light);color:#a06a00;border:1px solid var(--c-highlight)}
+.ref-author{color:var(--c-ink);font-weight:600}
+.ref-title{color:var(--c-ink);font-weight:500}
+.ref-meta{color:var(--c-ink-muted);font-size:.85rem;margin-top:4px;display:block}
+.ref-list a{color:var(--c-accent);text-decoration:none;border-bottom:1px dotted var(--c-accent)}
+.ref-list a:hover{color:var(--c-accent-dark);border-bottom-style:solid}
+.errata{background:#fef3c7;border-left:4px solid #d97706;border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:18px 22px;margin:18px 0;font-size:.9rem}
+.errata h4{margin:0 0 8px;color:#92400e;font-family:var(--font-display);font-size:1.05rem}
+.errata p{color:#78350f;margin-bottom:8px}
+.errata p:last-child{margin-bottom:0}
+.toc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin:18px 0}
+.toc-grid a{padding:10px 14px;background:var(--c-surface);border:1px solid var(--c-border-light);border-radius:var(--radius);text-decoration:none;color:var(--c-ink);font-size:.88rem;transition:var(--transition);display:flex;align-items:center;gap:8px}
+.toc-grid a:hover{border-color:var(--c-accent);background:var(--c-accent-light);color:var(--c-accent-dark)}
+.toc-grid a .step-tag{font-family:var(--font-mono);font-size:.72rem;color:var(--c-accent);font-weight:600}
+.section-anchor{scroll-margin-top:80px}
+</style>
+</head>
+<body>
+
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="../index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="../intro.html">Intro</a></li>
+    <li><a href="../qc.html">QC</a></li>
+    <li><a href="../trimming.html">Trim</a></li>
+    <li><a href="../alignment.html">Align</a></li>
+    <li><a href="../markdup-bqsr.html">MarkDup/BQSR</a></li>
+    <li><a href="../coverage.html">Coverage</a></li>
+    <li><a href="../germline-calling.html">Germline VC</a></li>
+    <li><a href="../joint-genotyping.html">Joint GT</a></li>
+    <li><a href="../filtering.html">Filter</a></li>
+    <li><a href="../annotation.html">Annot.</a></li>
+    <li><a href="../cnv-sv.html">CNV/SV</a></li>
+    <li><a href="../somatic.html">Somatic</a></li>
+    <li><a href="../long-read.html">Long-read</a></li>
+    <li><a href="../acmg.html">ACMG</a></li>
+    <li><a href="../clinical-report.html">Report</a></li>
+    <li><a href="../cohort.html">Cohort</a></li>
+    <li><a href="index.html" class="active" style="font-weight:700" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li>
+  </ul>
+</div></nav>
+
+<header class="page-hero">
+<div class="step-badge" data-zh="參考資料 · REFERENCES" data-en="REFERENCES">REFERENCES</div>
+<h1 data-zh="WGS / WES 參考資料 · References" data-en="WGS / WES References Index">WGS / WES 參考資料 · References</h1>
+<p class="subtitle" data-lang="zh">為 WGS / WES Interactive Tutorial 16 章節提供原始論文、官方文件、Best Practices 綜述、變異資料庫與 ACMG 指引的完整佐證。</p>
+<p class="subtitle" data-lang="en">References, citations, and sources for the WGS / WES Interactive Tutorial — papers, official docs, benchmarks, variant databases, and ACMG guidelines with DOI / URL links.</p>
+</header>
+
+<main class="content-wrap">
+
+<!-- Overview -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="如何使用這份資料？" data-en="How to use this page">如何使用這份資料？</h2>
+<p data-lang="zh">本頁針對 WGS/WES 流程中每個工具、演算法、臨床指引與變異資料庫，整理學術出處供讀者深入查閱。引用標籤含義：</p>
+<p data-lang="en">For every tool, algorithm, clinical guideline, and variant database in the WGS/WES workflow, this page collects academic sources for deeper reading. Citation tag meanings:</p>
+<div class="card-grid cols-3">
+  <div class="card"><div class="card-icon" style="background:var(--c-accent-light)">📄</div><h4>Paper</h4><p data-lang="zh">原始論文 · 含 DOI / PubMed</p><p data-lang="en">Original papers with DOI / PubMed</p></div>
+  <div class="card"><div class="card-icon" style="background:#e3f2fd">📘</div><h4>Doc</h4><p data-lang="zh">官方文件、vignette、tutorial</p><p data-lang="en">Official documentation, vignettes, tutorials</p></div>
+  <div class="card"><div class="card-icon" style="background:var(--c-highlight-light)">⭐</div><h4>Best Practice</h4><p data-lang="zh">系統性綜述或 community 推薦</p><p data-lang="en">Systematic reviews and community recommendations</p></div>
+  <div class="card"><div class="card-icon" style="background:#fff3e0">📊</div><h4>Benchmark</h4><p data-lang="zh">方法評比 / 獨立 benchmarking</p><p data-lang="en">Method comparisons and independent benchmarks</p></div>
+  <div class="card"><div class="card-icon" style="background:#fce4ec">🗄️</div><h4>Database</h4><p data-lang="zh">變異 / 族群頻率 / 臨床資料庫</p><p data-lang="en">Variant / population / clinical databases</p></div>
+  <div class="card"><div class="card-icon" style="background:#f3e5f5">📚</div><h4>Book</h4><p data-lang="zh">線上免費書籍與綜合教材</p><p data-lang="en">Free online books and comprehensive textbooks</p></div>
+</div>
+
+<h3 data-zh="本頁目錄" data-en="Table of contents">本頁目錄</h3>
+<div class="toc-grid">
+  <a href="#bestpractices"><span class="step-tag">★</span><span data-zh="Best Practices" data-en="Best Practices">Best Practices</span></a>
+  <a href="#frameworks"><span class="step-tag">★</span><span data-zh="核心框架" data-en="Core Frameworks">核心框架</span></a>
+  <a href="#intro"><span class="step-tag">Step 1</span><span data-zh="WGS/WES 簡介" data-en="WGS/WES Intro">WGS/WES 簡介</span></a>
+  <a href="#qc"><span class="step-tag">Step 2</span><span data-zh="FASTQ QC" data-en="FASTQ QC">FASTQ QC</span></a>
+  <a href="#trimming"><span class="step-tag">Step 3</span><span data-zh="Trimming" data-en="Trimming">Trimming</span></a>
+  <a href="#alignment"><span class="step-tag">Step 4</span><span data-zh="Alignment" data-en="Alignment">Alignment</span></a>
+  <a href="#markdup"><span class="step-tag">Step 5</span><span data-zh="MarkDup / BQSR" data-en="MarkDup / BQSR">MarkDup / BQSR</span></a>
+  <a href="#coverage"><span class="step-tag">Step 6</span><span data-zh="Coverage" data-en="Coverage">Coverage</span></a>
+  <a href="#germline"><span class="step-tag">Step 7</span><span data-zh="Germline Calling" data-en="Germline Calling">Germline Calling</span></a>
+  <a href="#joint"><span class="step-tag">Step 8</span><span data-zh="Joint Genotyping" data-en="Joint Genotyping">Joint Genotyping</span></a>
+  <a href="#filtering"><span class="step-tag">Step 9</span><span data-zh="VQSR / Filter" data-en="VQSR / Filter">VQSR / Filter</span></a>
+  <a href="#annotation"><span class="step-tag">Step 10</span><span data-zh="Annotation" data-en="Annotation">Annotation</span></a>
+  <a href="#cnvsv"><span class="step-tag">Step 11</span><span data-zh="CNV / SV" data-en="CNV / SV">CNV / SV</span></a>
+  <a href="#somatic"><span class="step-tag">Step 12</span><span data-zh="Somatic" data-en="Somatic">Somatic</span></a>
+  <a href="#longread"><span class="step-tag">Step 13</span><span data-zh="Long-read" data-en="Long-read">Long-read</span></a>
+  <a href="#acmg"><span class="step-tag">Step 14</span><span data-zh="ACMG Classification" data-en="ACMG Classification">ACMG Classification</span></a>
+  <a href="#clinical"><span class="step-tag">Step 15</span><span data-zh="Clinical Report" data-en="Clinical Report">Clinical Report</span></a>
+  <a href="#cohort"><span class="step-tag">Step 16</span><span data-zh="Cohort / GWAS" data-en="Cohort / GWAS">Cohort / GWAS</span></a>
+  <a href="#databases"><span class="step-tag">DB</span><span data-zh="變異資料庫" data-en="Variant Databases">變異資料庫</span></a>
+  <a href="#errata"><span class="step-tag">!</span><span data-zh="教學註記與細節" data-en="Tutorial Notes & Details">教學註記與細節</span></a>
+</div>
+</section>
+
+<!-- ===================== Best Practices ===================== -->
+<section class="section section-anchor" id="bestpractices">
+<div class="section-label" data-zh="綜論" data-en="REVIEWS">綜論</div>
+<h2 data-zh="⭐ Best Practices 與社群共識" data-en="⭐ Best Practices & Community Consensus">⭐ Best Practices 與社群共識</h2>
+<p data-lang="zh">WGS/WES 變異呼叫的權威性最佳實踐文件與綜述。建議從 GATK Best Practices、Precision FDA Truth Challenge、GA4GH benchmarking 起步建立全景觀。</p>
+<p data-lang="en">Authoritative best-practice documents and reviews for WGS/WES variant calling. Start with GATK Best Practices, Precision FDA Truth Challenges, and GA4GH benchmarking to build a panoramic view.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag bestp">★ BEST</span>
+    <span class="ref-author">Van der Auwera GA, Carneiro MO, Hartl C, et al.</span>
+    <span class="ref-title"> From FastQ data to high confidence variant calls: the Genome Analysis Toolkit best practices pipeline. </span>
+    <em>Curr Protoc Bioinformatics</em> 43:11.10.1–11.10.33 (2013).
+    <span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1002/0471250953.bi1110s43" target="_blank" rel="noopener">10.1002/0471250953.bi1110s43</a> · 線上文件 <a href="https://gatk.broadinstitute.org/hc/en-us/sections/360007226651-Best-Practices-Workflows" target="_blank" rel="noopener">GATK Best Practices</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1002/0471250953.bi1110s43" target="_blank" rel="noopener">10.1002/0471250953.bi1110s43</a> · Online <a href="https://gatk.broadinstitute.org/hc/en-us/sections/360007226651-Best-Practices-Workflows" target="_blank" rel="noopener">GATK Best Practices</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag bestp">★ BEST</span>
+    <span class="ref-author">Van der Auwera GA, O'Connor BD.</span>
+    <span class="ref-title"> Genomics in the Cloud: Using Docker, GATK, and WDL in Terra. </span>
+    <em>O'Reilly Media</em> (2020). ISBN 9781491975190.
+    <span class="ref-meta"><span data-lang="zh">官方書籍：實作 GATK4 流程的完整教材 <a href="https://www.oreilly.com/library/view/genomics-in-the/9781491975185/" target="_blank" rel="noopener">O'Reilly</a></span><span data-lang="en">Official book — full hands-on guide to GATK4 workflows <a href="https://www.oreilly.com/library/view/genomics-in-the/9781491975185/" target="_blank" rel="noopener">O'Reilly</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag bestp">★ BEST</span>
+    <span class="ref-author">Olson ND, Wagner J, McDaniel J, et al.</span>
+    <span class="ref-title"> PrecisionFDA Truth Challenge V2: Calling variants from short and long reads in difficult-to-map regions. </span>
+    <em>Cell Genomics</em> 2(5):100129 (2022).
+    <span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1016/j.xgen.2022.100129" target="_blank" rel="noopener">10.1016/j.xgen.2022.100129</a> · Truth set 為 GIAB HG002 trio</span><span data-lang="en">DOI: <a href="https://doi.org/10.1016/j.xgen.2022.100129" target="_blank" rel="noopener">10.1016/j.xgen.2022.100129</a> · Truth set is GIAB HG002 trio</span></span>
+  </li>
+  <li>
+    <span class="ref-tag bestp">★ BEST</span>
+    <span class="ref-author">Krusche P, Trigg L, Boutros PC, et al.</span>
+    <span class="ref-title"> Best practices for benchmarking germline small-variant calls in human genomes. </span>
+    <em>Nat Biotechnol</em> 37:555–560 (2019).
+    <span class="ref-meta"><span data-lang="zh">GA4GH Benchmarking Team 標準。DOI: <a href="https://doi.org/10.1038/s41587-019-0054-x" target="_blank" rel="noopener">10.1038/s41587-019-0054-x</a></span><span data-lang="en">GA4GH Benchmarking Team standards. DOI: <a href="https://doi.org/10.1038/s41587-019-0054-x" target="_blank" rel="noopener">10.1038/s41587-019-0054-x</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag bestp">★ BEST</span>
+    <span class="ref-author">Zook JM, McDaniel J, Olson ND, et al.</span>
+    <span class="ref-title"> An open resource for accurately benchmarking small variant and reference calls. </span>
+    <em>Nat Biotechnol</em> 37:561–566 (2019).
+    <span class="ref-meta"><span data-lang="zh">GIAB (Genome In A Bottle) truth set 介紹。DOI: <a href="https://doi.org/10.1038/s41587-019-0074-6" target="_blank" rel="noopener">10.1038/s41587-019-0074-6</a></span><span data-lang="en">GIAB (Genome In A Bottle) truth-set release. DOI: <a href="https://doi.org/10.1038/s41587-019-0074-6" target="_blank" rel="noopener">10.1038/s41587-019-0074-6</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="GATK Best Practices Workflows 線上文件（Broad Institute）。" data-en="GATK Best Practices Workflows online documentation (Broad Institute).">GATK Best Practices Workflows 線上文件（Broad Institute）。</span>
+    <span class="ref-meta"><span data-lang="zh"><a href="https://gatk.broadinstitute.org/hc/en-us/sections/360007226651" target="_blank" rel="noopener">gatk.broadinstitute.org</a> · WDL pipelines on <a href="https://github.com/broadinstitute/warp" target="_blank" rel="noopener">broadinstitute/warp</a></span><span data-lang="en"><a href="https://gatk.broadinstitute.org/hc/en-us/sections/360007226651" target="_blank" rel="noopener">gatk.broadinstitute.org</a> · WDL pipelines on <a href="https://github.com/broadinstitute/warp" target="_blank" rel="noopener">broadinstitute/warp</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Frameworks ===================== -->
+<section class="section section-anchor" id="frameworks">
+<div class="section-label" data-zh="核心框架" data-en="CORE FRAMEWORKS">核心框架</div>
+<h2 data-zh="🧰 核心分析框架" data-en="🧰 Core Analysis Frameworks">🧰 核心分析框架</h2>
+<p data-lang="zh">主流 WGS/WES 框架：GATK (Java/Spark)、DRAGEN (FPGA/onPrem/cloud)、DeepVariant (TensorFlow)、bcftools (純 C 速成)。</p>
+<p data-lang="en">Mainstream WGS/WES frameworks: GATK (Java/Spark), DRAGEN (FPGA/onPrem/cloud), DeepVariant (TensorFlow), bcftools (lean C toolkit).</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">McKenna A, Hanna M, Banks E, et al.</span>
+    <span class="ref-title"> The Genome Analysis Toolkit: a MapReduce framework for analyzing next-generation DNA sequencing data. </span>
+    <em>Genome Res</em> 20(9):1297–1303 (2010).
+    <span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1101/gr.107524.110" target="_blank" rel="noopener">10.1101/gr.107524.110</a> · GATK 初代</span><span data-lang="en">DOI: <a href="https://doi.org/10.1101/gr.107524.110" target="_blank" rel="noopener">10.1101/gr.107524.110</a> · Original GATK</span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">DePristo MA, Banks E, Poplin R, et al.</span>
+    <span class="ref-title"> A framework for variation discovery and genotyping using next-generation DNA sequencing data. </span>
+    <em>Nat Genet</em> 43(5):491–498 (2011).
+    <span class="ref-meta"><span data-lang="zh">奠定 GATK Best Practices 雛形。DOI: <a href="https://doi.org/10.1038/ng.806" target="_blank" rel="noopener">10.1038/ng.806</a></span><span data-lang="en">Established the GATK Best Practices framework. DOI: <a href="https://doi.org/10.1038/ng.806" target="_blank" rel="noopener">10.1038/ng.806</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Poplin R, Chang PC, Alexander D, et al.</span>
+    <span class="ref-title"> A universal SNP and small-indel variant caller using deep neural networks. </span>
+    <em>Nat Biotechnol</em> 36:983–987 (2018).
+    <span class="ref-meta"><span data-lang="zh">DeepVariant 原始論文。DOI: <a href="https://doi.org/10.1038/nbt.4235" target="_blank" rel="noopener">10.1038/nbt.4235</a> · GitHub <a href="https://github.com/google/deepvariant" target="_blank" rel="noopener">google/deepvariant</a></span><span data-lang="en">Original DeepVariant paper. DOI: <a href="https://doi.org/10.1038/nbt.4235" target="_blank" rel="noopener">10.1038/nbt.4235</a> · GitHub <a href="https://github.com/google/deepvariant" target="_blank" rel="noopener">google/deepvariant</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Danecek P, Bonfield JK, Liddle J, et al.</span>
+    <span class="ref-title"> Twelve years of SAMtools and BCFtools. </span>
+    <em>GigaScience</em> 10(2):giab008 (2021).
+    <span class="ref-meta"><span data-lang="zh">SAMtools/BCFtools 通用版本。DOI: <a href="https://doi.org/10.1093/gigascience/giab008" target="_blank" rel="noopener">10.1093/gigascience/giab008</a></span><span data-lang="en">Definitive SAMtools/BCFtools citation. DOI: <a href="https://doi.org/10.1093/gigascience/giab008" target="_blank" rel="noopener">10.1093/gigascience/giab008</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="Illumina DRAGEN Bio-IT Platform 官方文件。" data-en="Illumina DRAGEN Bio-IT Platform official documentation.">Illumina DRAGEN Bio-IT Platform 官方文件。</span>
+    <span class="ref-meta"><span data-lang="zh">FPGA 加速 + ML model；DRAGEN-GATK 合作版本。<a href="https://www.illumina.com/products/by-type/informatics-products/dragen-bio-it-platform.html" target="_blank" rel="noopener">illumina.com/DRAGEN</a></span><span data-lang="en">FPGA-accelerated + ML; DRAGEN-GATK joint mode. <a href="https://www.illumina.com/products/by-type/informatics-products/dragen-bio-it-platform.html" target="_blank" rel="noopener">illumina.com/DRAGEN</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="Sentieon DNAseq / TNseq 官方文件。" data-en="Sentieon DNAseq / TNseq official documentation.">Sentieon DNAseq / TNseq 官方文件。</span>
+    <span class="ref-meta"><span data-lang="zh">數學等價於 GATK 但速度顯著加快。<a href="https://www.sentieon.com/products/" target="_blank" rel="noopener">sentieon.com</a></span><span data-lang="en">Mathematically equivalent to GATK but markedly faster. <a href="https://www.sentieon.com/products/" target="_blank" rel="noopener">sentieon.com</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 1: Intro ===================== -->
+<section class="section section-anchor" id="intro">
+<div class="section-label" data-zh="Step 1" data-en="Step 1">Step 1</div>
+<h2 data-zh="🧬 WGS / WES 簡介與歷史" data-en="🧬 WGS / WES History & Basics">🧬 WGS / WES 簡介與歷史</h2>
+<p data-lang="zh">人類基因組計畫、定序成本下降史、WES vs WGS 設計取捨。</p>
+<p data-lang="en">The Human Genome Project, the cost-per-genome curve, and WES vs WGS design tradeoffs.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Lander ES, Linton LM, Birren B, et al.</span>
+    <span class="ref-title"> Initial sequencing and analysis of the human genome. </span>
+    <em>Nature</em> 409:860–921 (2001).
+    <span class="ref-meta"><span data-lang="zh">人類基因組計畫公開草圖。DOI: <a href="https://doi.org/10.1038/35057062" target="_blank" rel="noopener">10.1038/35057062</a></span><span data-lang="en">Public-consortium draft of the human genome. DOI: <a href="https://doi.org/10.1038/35057062" target="_blank" rel="noopener">10.1038/35057062</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Nurk S, Koren S, Rhie A, et al.</span>
+    <span class="ref-title"> The complete sequence of a human genome. </span>
+    <em>Science</em> 376(6588):44–53 (2022).
+    <span class="ref-meta"><span data-lang="zh">T2T-CHM13 完整 telomere-to-telomere 基因組。DOI: <a href="https://doi.org/10.1126/science.abj6987" target="_blank" rel="noopener">10.1126/science.abj6987</a></span><span data-lang="en">T2T-CHM13 telomere-to-telomere genome. DOI: <a href="https://doi.org/10.1126/science.abj6987" target="_blank" rel="noopener">10.1126/science.abj6987</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Liao WW, Asri M, Ebler J, et al.</span>
+    <span class="ref-title"> A draft human pangenome reference. </span>
+    <em>Nature</em> 617:312–324 (2023).
+    <span class="ref-meta"><span data-lang="zh">HPRC 首份 pangenome；GRCh38 線性參考的後繼。DOI: <a href="https://doi.org/10.1038/s41586-023-05896-x" target="_blank" rel="noopener">10.1038/s41586-023-05896-x</a></span><span data-lang="en">HPRC first pangenome — successor to GRCh38 linear reference. DOI: <a href="https://doi.org/10.1038/s41586-023-05896-x" target="_blank" rel="noopener">10.1038/s41586-023-05896-x</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="NHGRI Genome Sequencing Cost — 每基因組定序成本曲線。" data-en="NHGRI Genome Sequencing Cost — cost-per-genome curve.">NHGRI Genome Sequencing Cost — 每基因組定序成本曲線。</span>
+    <span class="ref-meta"><span data-lang="zh">2001 ~$100M → 2022 &lt;$200 (Illumina NovaSeq X)。<a href="https://www.genome.gov/about-genomics/fact-sheets/Sequencing-Human-Genome-cost" target="_blank" rel="noopener">genome.gov</a></span><span data-lang="en">2001 ~$100M → 2022 &lt;$200 (Illumina NovaSeq X). <a href="https://www.genome.gov/about-genomics/fact-sheets/Sequencing-Human-Genome-cost" target="_blank" rel="noopener">genome.gov</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 2: QC ===================== -->
+<section class="section section-anchor" id="qc">
+<div class="section-label" data-zh="Step 2" data-en="Step 2">Step 2</div>
+<h2 data-zh="🧪 FASTQ QC：FastQC, MultiQC, fastp" data-en="🧪 FASTQ QC: FastQC, MultiQC, fastp">🧪 FASTQ QC：FastQC, MultiQC, fastp</h2>
+<p data-lang="zh">原始 FASTQ 的每樣本 / 多樣本品質檢查；fastp 一站式 QC+trim。</p>
+<p data-lang="en">Per-sample and multi-sample QC of raw FASTQ; fastp as one-step QC+trim.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-author">Andrews S.</span>
+    <span class="ref-title"> FastQC: A Quality Control Tool for High Throughput Sequence Data. </span>
+    <em>Babraham Bioinformatics</em> (2010).
+    <span class="ref-meta"><span data-lang="zh">非論文發表；事實上的單樣本 FASTQ QC 標準。<a href="https://www.bioinformatics.babraham.ac.uk/projects/fastqc/" target="_blank" rel="noopener">bioinformatics.babraham.ac.uk/fastqc</a></span><span data-lang="en">Not peer-reviewed; de-facto per-sample FASTQ QC standard. <a href="https://www.bioinformatics.babraham.ac.uk/projects/fastqc/" target="_blank" rel="noopener">bioinformatics.babraham.ac.uk/fastqc</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Ewels P, Magnusson M, Lundin S, Käller M.</span>
+    <span class="ref-title"> MultiQC: summarize analysis results for multiple tools and samples in a single report. </span>
+    <em>Bioinformatics</em> 32(19):3047–3048 (2016).
+    <span class="ref-meta"><span data-lang="zh">多工具報告彙整。DOI: <a href="https://doi.org/10.1093/bioinformatics/btw354" target="_blank" rel="noopener">10.1093/bioinformatics/btw354</a></span><span data-lang="en">Cross-tool report aggregation. DOI: <a href="https://doi.org/10.1093/bioinformatics/btw354" target="_blank" rel="noopener">10.1093/bioinformatics/btw354</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Chen S, Zhou Y, Chen Y, Gu J.</span>
+    <span class="ref-title"> fastp: an ultra-fast all-in-one FASTQ preprocessor. </span>
+    <em>Bioinformatics</em> 34(17):i884–i890 (2018).
+    <span class="ref-meta"><span data-lang="zh">QC + adapter trim + quality trim 三合一。DOI: <a href="https://doi.org/10.1093/bioinformatics/bty560" target="_blank" rel="noopener">10.1093/bioinformatics/bty560</a></span><span data-lang="en">QC + adapter trim + quality trim in one pass. DOI: <a href="https://doi.org/10.1093/bioinformatics/bty560" target="_blank" rel="noopener">10.1093/bioinformatics/bty560</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Wood DE, Lu J, Langmead B.</span>
+    <span class="ref-title"> Improved metagenomic analysis with Kraken 2. </span>
+    <em>Genome Biol</em> 20:257 (2019).
+    <span class="ref-meta"><span data-lang="zh">物種污染篩查。DOI: <a href="https://doi.org/10.1186/s13059-019-1891-0" target="_blank" rel="noopener">10.1186/s13059-019-1891-0</a></span><span data-lang="en">Species contamination screening. DOI: <a href="https://doi.org/10.1186/s13059-019-1891-0" target="_blank" rel="noopener">10.1186/s13059-019-1891-0</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 3: Trimming ===================== -->
+<section class="section section-anchor" id="trimming">
+<div class="section-label" data-zh="Step 3" data-en="Step 3">Step 3</div>
+<h2 data-zh="✂️ Trimming：Trimmomatic, cutadapt, BBDuk, fastp" data-en="✂️ Trimming: Trimmomatic, cutadapt, BBDuk, fastp">✂️ Trimming：Trimmomatic, cutadapt, BBDuk, fastp</h2>
+<p data-lang="zh">Adapter / 低品質 base / poly-G tail（NextSeq/NovaSeq）移除工具。</p>
+<p data-lang="en">Tools for adapter / low-quality base / poly-G tail (NextSeq/NovaSeq) trimming.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Bolger AM, Lohse M, Usadel B.</span>
+    <span class="ref-title"> Trimmomatic: a flexible trimmer for Illumina sequence data. </span>
+    <em>Bioinformatics</em> 30(15):2114–2120 (2014).
+    <span class="ref-meta"><span data-lang="zh">Illumina paired-end 慣用 trim 工具。DOI: <a href="https://doi.org/10.1093/bioinformatics/btu170" target="_blank" rel="noopener">10.1093/bioinformatics/btu170</a></span><span data-lang="en">Mainstream Illumina paired-end trimmer. DOI: <a href="https://doi.org/10.1093/bioinformatics/btu170" target="_blank" rel="noopener">10.1093/bioinformatics/btu170</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Martin M.</span>
+    <span class="ref-title"> Cutadapt removes adapter sequences from high-throughput sequencing reads. </span>
+    <em>EMBnet J</em> 17(1):10–12 (2011).
+    <span class="ref-meta"><span data-lang="zh">最早的通用 adapter trimmer。DOI: <a href="https://doi.org/10.14806/ej.17.1.200" target="_blank" rel="noopener">10.14806/ej.17.1.200</a></span><span data-lang="en">Earliest general-purpose adapter trimmer. DOI: <a href="https://doi.org/10.14806/ej.17.1.200" target="_blank" rel="noopener">10.14806/ej.17.1.200</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="BBDuk / BBTools — JGI / Bushnell B 開發的 k-mer 基底 trim/filter 工具。" data-en="BBDuk / BBTools — k-mer-based trim/filter suite by Bushnell B (JGI).">BBDuk / BBTools — JGI / Bushnell B 開發的 k-mer 基底 trim/filter 工具。</span>
+    <span class="ref-meta"><span data-lang="zh">處理 PhiX spike-in 與 adapter 速度極快。<a href="https://jgi.doe.gov/data-and-tools/software-tools/bbtools/" target="_blank" rel="noopener">jgi.doe.gov/bbtools</a></span><span data-lang="en">Very fast for PhiX spike-in and adapter removal. <a href="https://jgi.doe.gov/data-and-tools/software-tools/bbtools/" target="_blank" rel="noopener">jgi.doe.gov/bbtools</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag bench">BENCH</span>
+    <span class="ref-author">Del Fabbro C, Scalabrin S, Morgante M, Giorgi FM.</span>
+    <span class="ref-title"> An extensive evaluation of read trimming effects on Illumina NGS data analysis. </span>
+    <em>PLOS ONE</em> 8(12):e85024 (2013).
+    <span class="ref-meta"><span data-lang="zh">經典 over-trim 警告 benchmark。DOI: <a href="https://doi.org/10.1371/journal.pone.0085024" target="_blank" rel="noopener">10.1371/journal.pone.0085024</a></span><span data-lang="en">Classic over-trimming caution benchmark. DOI: <a href="https://doi.org/10.1371/journal.pone.0085024" target="_blank" rel="noopener">10.1371/journal.pone.0085024</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 4: Alignment ===================== -->
+<section class="section section-anchor" id="alignment">
+<div class="section-label" data-zh="Step 4" data-en="Step 4">Step 4</div>
+<h2 data-zh="🧭 Alignment：BWA-MEM2, minimap2, T2T-CHM13" data-en="🧭 Alignment: BWA-MEM2, minimap2, T2T-CHM13">🧭 Alignment：BWA-MEM2, minimap2, T2T-CHM13</h2>
+<p data-lang="zh">短讀比對到 GRCh38 / T2T-CHM13；長讀使用 minimap2；pangenome 比對。</p>
+<p data-lang="en">Short-read alignment to GRCh38 / T2T-CHM13; long reads with minimap2; pangenome alignment.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Li H, Durbin R.</span>
+    <span class="ref-title"> Fast and accurate short read alignment with Burrows-Wheeler transform. </span>
+    <em>Bioinformatics</em> 25(14):1754–1760 (2009).
+    <span class="ref-meta"><span data-lang="zh">BWA 原作。DOI: <a href="https://doi.org/10.1093/bioinformatics/btp324" target="_blank" rel="noopener">10.1093/bioinformatics/btp324</a></span><span data-lang="en">Original BWA paper. DOI: <a href="https://doi.org/10.1093/bioinformatics/btp324" target="_blank" rel="noopener">10.1093/bioinformatics/btp324</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Vasimuddin M, Misra S, Li H, Aluru S.</span>
+    <span class="ref-title"> Efficient architecture-aware acceleration of BWA-MEM for multicore systems. </span>
+    <em>IEEE IPDPS</em> 314–324 (2019).
+    <span class="ref-meta"><span data-lang="zh">BWA-MEM2 加速版（~2× 短讀 mapping 速度）。DOI: <a href="https://doi.org/10.1109/IPDPS.2019.00041" target="_blank" rel="noopener">10.1109/IPDPS.2019.00041</a> · GitHub <a href="https://github.com/bwa-mem2/bwa-mem2" target="_blank" rel="noopener">bwa-mem2/bwa-mem2</a></span><span data-lang="en">BWA-MEM2 (~2× speedup over BWA-MEM). DOI: <a href="https://doi.org/10.1109/IPDPS.2019.00041" target="_blank" rel="noopener">10.1109/IPDPS.2019.00041</a> · GitHub <a href="https://github.com/bwa-mem2/bwa-mem2" target="_blank" rel="noopener">bwa-mem2/bwa-mem2</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Li H.</span>
+    <span class="ref-title"> Minimap2: pairwise alignment for nucleotide sequences. </span>
+    <em>Bioinformatics</em> 34(18):3094–3100 (2018).
+    <span class="ref-meta"><span data-lang="zh">PacBio/ONT 長讀 + spliced RNA 通用比對器。DOI: <a href="https://doi.org/10.1093/bioinformatics/bty191" target="_blank" rel="noopener">10.1093/bioinformatics/bty191</a></span><span data-lang="en">PacBio/ONT long reads + spliced RNA universal aligner. DOI: <a href="https://doi.org/10.1093/bioinformatics/bty191" target="_blank" rel="noopener">10.1093/bioinformatics/bty191</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Aganezov S, Yan SM, Soto DC, et al.</span>
+    <span class="ref-title"> A complete reference genome improves analysis of human genetic variation. </span>
+    <em>Science</em> 376(6588):eabl3533 (2022).
+    <span class="ref-meta"><span data-lang="zh">T2T-CHM13 對變異呼叫 sensitivity 的影響；新增 ~2 Gbp 序列。DOI: <a href="https://doi.org/10.1126/science.abl3533" target="_blank" rel="noopener">10.1126/science.abl3533</a></span><span data-lang="en">Effect of T2T-CHM13 on variant-calling sensitivity; ~2 Gbp new sequence. DOI: <a href="https://doi.org/10.1126/science.abl3533" target="_blank" rel="noopener">10.1126/science.abl3533</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Sirén J, Monlong J, Chang X, et al.</span>
+    <span class="ref-title"> Pangenomics enables genotyping of known structural variants in 5202 diverse genomes. </span>
+    <em>Science</em> 374(6574):abg8871 (2021).
+    <span class="ref-meta"><span data-lang="zh">vg 與 GIRAFFE pangenome aligner。DOI: <a href="https://doi.org/10.1126/science.abg8871" target="_blank" rel="noopener">10.1126/science.abg8871</a></span><span data-lang="en">vg / GIRAFFE pangenome aligner. DOI: <a href="https://doi.org/10.1126/science.abg8871" target="_blank" rel="noopener">10.1126/science.abg8871</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="GRCh38 / hs38DH alt-aware 參考基因組與 alt-contig 處理。" data-en="GRCh38 / hs38DH alt-aware reference and alt-contig handling.">GRCh38 / hs38DH alt-aware 參考基因組與 alt-contig 處理。</span>
+    <span class="ref-meta"><span data-lang="zh">Heng Li 解釋 GRCh38 alt-aware mapping。<a href="https://lh3.github.io/2017/11/13/which-human-reference-genome-to-use" target="_blank" rel="noopener">lh3.github.io</a></span><span data-lang="en">Heng Li on alt-aware mapping. <a href="https://lh3.github.io/2017/11/13/which-human-reference-genome-to-use" target="_blank" rel="noopener">lh3.github.io</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 5: MarkDup / BQSR ===================== -->
+<section class="section section-anchor" id="markdup">
+<div class="section-label" data-zh="Step 5" data-en="Step 5">Step 5</div>
+<h2 data-zh="🔁 Mark Duplicates 與 BQSR" data-en="🔁 Mark Duplicates & BQSR">🔁 Mark Duplicates 與 BQSR</h2>
+<p data-lang="zh">移除 PCR / optical duplicate；Base Quality Score Recalibration 校正系統性 base error。</p>
+<p data-lang="en">Remove PCR / optical duplicates; Base Quality Score Recalibration corrects systematic base error.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="Picard / GATK MarkDuplicates 官方文件。" data-en="Picard / GATK MarkDuplicates official documentation.">Picard / GATK MarkDuplicates 官方文件。</span>
+    <span class="ref-meta"><span data-lang="zh">Broad Institute Picard suite，事實上的標準。<a href="https://broadinstitute.github.io/picard/" target="_blank" rel="noopener">broadinstitute.github.io/picard</a></span><span data-lang="en">Broad Institute Picard suite, de-facto standard. <a href="https://broadinstitute.github.io/picard/" target="_blank" rel="noopener">broadinstitute.github.io/picard</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Tischler G, Leonard S.</span>
+    <span class="ref-title"> biobambam: tools for read pair collation based algorithms on BAM files. </span>
+    <em>Source Code for Biology and Medicine</em> 9:13 (2014).
+    <span class="ref-meta"><span data-lang="zh">biobambam2 markdup 替代 Picard；速度更快。DOI: <a href="https://doi.org/10.1186/1751-0473-9-13" target="_blank" rel="noopener">10.1186/1751-0473-9-13</a></span><span data-lang="en">biobambam2 markdup as a faster Picard alternative. DOI: <a href="https://doi.org/10.1186/1751-0473-9-13" target="_blank" rel="noopener">10.1186/1751-0473-9-13</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="GATK BaseRecalibrator / ApplyBQSR 官方文件。" data-en="GATK BaseRecalibrator / ApplyBQSR official documentation.">GATK BaseRecalibrator / ApplyBQSR 官方文件。</span>
+    <span class="ref-meta"><span data-lang="zh">基於 known-sites VCF 校正系統性 Q error。<a href="https://gatk.broadinstitute.org/hc/en-us/articles/360035890531" target="_blank" rel="noopener">GATK BQSR Tutorial</a></span><span data-lang="en">Calibrates systematic Q error using known-sites VCF. <a href="https://gatk.broadinstitute.org/hc/en-us/articles/360035890531" target="_blank" rel="noopener">GATK BQSR Tutorial</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="DRAGEN-GATK Pipeline — Illumina 與 Broad 合作之硬體加速 best-practices。" data-en="DRAGEN-GATK Pipeline — hardware-accelerated best practices by Illumina + Broad.">DRAGEN-GATK Pipeline — Illumina 與 Broad 合作之硬體加速 best-practices。</span>
+    <span class="ref-meta"><span data-lang="zh">PrecisionFDA v2 冠軍 baseline。<a href="https://gatk.broadinstitute.org/hc/en-us/articles/4407897446939" target="_blank" rel="noopener">gatk.broadinstitute.org/DRAGEN-GATK</a></span><span data-lang="en">PrecisionFDA v2 winning baseline. <a href="https://gatk.broadinstitute.org/hc/en-us/articles/4407897446939" target="_blank" rel="noopener">gatk.broadinstitute.org/DRAGEN-GATK</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 6: Coverage ===================== -->
+<section class="section section-anchor" id="coverage">
+<div class="section-label" data-zh="Step 6" data-en="Step 6">Step 6</div>
+<h2 data-zh="📏 Coverage：CollectMetrics, mosdepth, Qualimap" data-en="📏 Coverage: CollectMetrics, mosdepth, Qualimap">📏 Coverage：CollectMetrics, mosdepth, Qualimap</h2>
+<p data-lang="zh">深度均勻性、on-target rate、insert size、20×/30× breadth。</p>
+<p data-lang="en">Depth uniformity, on-target rate, insert size, 20×/30× breadth.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Pedersen BS, Quinlan AR.</span>
+    <span class="ref-title"> mosdepth: quick coverage calculation for genomes and exomes. </span>
+    <em>Bioinformatics</em> 34(5):867–868 (2018).
+    <span class="ref-meta"><span data-lang="zh">最快的 per-base / per-region depth 工具。DOI: <a href="https://doi.org/10.1093/bioinformatics/btx699" target="_blank" rel="noopener">10.1093/bioinformatics/btx699</a></span><span data-lang="en">Fastest per-base / per-region depth tool. DOI: <a href="https://doi.org/10.1093/bioinformatics/btx699" target="_blank" rel="noopener">10.1093/bioinformatics/btx699</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Okonechnikov K, Conesa A, García-Alcalde F.</span>
+    <span class="ref-title"> Qualimap 2: advanced multi-sample quality control for high-throughput sequencing data. </span>
+    <em>Bioinformatics</em> 32(2):292–294 (2016).
+    <span class="ref-meta"><span data-lang="zh">BAM 視覺化 QC，含 GC bias 圖。DOI: <a href="https://doi.org/10.1093/bioinformatics/btv566" target="_blank" rel="noopener">10.1093/bioinformatics/btv566</a></span><span data-lang="en">BAM visual QC including GC bias plots. DOI: <a href="https://doi.org/10.1093/bioinformatics/btv566" target="_blank" rel="noopener">10.1093/bioinformatics/btv566</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="Picard CollectHsMetrics / CollectWgsMetrics — 官方 metric 定義。" data-en="Picard CollectHsMetrics / CollectWgsMetrics — official metric definitions.">Picard CollectHsMetrics / CollectWgsMetrics — 官方 metric 定義。</span>
+    <span class="ref-meta"><span data-lang="zh">PCT_OFF_BAIT、HS_PENALTY、MEAN_TARGET_COVERAGE 等核心指標。<a href="https://broadinstitute.github.io/picard/picard-metric-definitions.html" target="_blank" rel="noopener">picard metric-definitions</a></span><span data-lang="en">Defines PCT_OFF_BAIT, HS_PENALTY, MEAN_TARGET_COVERAGE, etc. <a href="https://broadinstitute.github.io/picard/picard-metric-definitions.html" target="_blank" rel="noopener">picard metric-definitions</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Sims D, Sudbery I, Ilott NE, Heger A, Ponting CP.</span>
+    <span class="ref-title"> Sequencing depth and coverage: key considerations in genomic analyses. </span>
+    <em>Nat Rev Genet</em> 15:121–132 (2014).
+    <span class="ref-meta"><span data-lang="zh">深度設計的經典綜述。DOI: <a href="https://doi.org/10.1038/nrg3642" target="_blank" rel="noopener">10.1038/nrg3642</a></span><span data-lang="en">Classic review on coverage-design tradeoffs. DOI: <a href="https://doi.org/10.1038/nrg3642" target="_blank" rel="noopener">10.1038/nrg3642</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 7: Germline Calling ===================== -->
+<section class="section section-anchor" id="germline">
+<div class="section-label" data-zh="Step 7" data-en="Step 7">Step 7</div>
+<h2 data-zh="🧬 Germline 變異呼叫" data-en="🧬 Germline Variant Calling">🧬 Germline 變異呼叫</h2>
+<p data-lang="zh">HaplotypeCaller、DeepVariant、Strelka2、Octopus、Clair3 等主流 caller。</p>
+<p data-lang="en">HaplotypeCaller, DeepVariant, Strelka2, Octopus, Clair3 — the mainstream callers.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Poplin R, Ruano-Rubio V, DePristo MA, et al.</span>
+    <span class="ref-title"> Scaling accurate genetic variant discovery to tens of thousands of samples. </span>
+    <em>bioRxiv</em> 201178 (2018).
+    <span class="ref-meta"><span data-lang="zh">GATK HaplotypeCaller + joint-genotyping 大規模實作。DOI: <a href="https://doi.org/10.1101/201178" target="_blank" rel="noopener">10.1101/201178</a></span><span data-lang="en">GATK HaplotypeCaller + joint genotyping at scale. DOI: <a href="https://doi.org/10.1101/201178" target="_blank" rel="noopener">10.1101/201178</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Poplin R, Chang PC, Alexander D, et al.</span>
+    <span class="ref-title"> A universal SNP and small-indel variant caller using deep neural networks (DeepVariant). </span>
+    <em>Nat Biotechnol</em> 36:983–987 (2018).
+    <span class="ref-meta"><span data-lang="zh">DeepVariant CNN-based caller。DOI: <a href="https://doi.org/10.1038/nbt.4235" target="_blank" rel="noopener">10.1038/nbt.4235</a></span><span data-lang="en">DeepVariant CNN-based caller. DOI: <a href="https://doi.org/10.1038/nbt.4235" target="_blank" rel="noopener">10.1038/nbt.4235</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Kim S, Scheffler K, Halpern AL, et al.</span>
+    <span class="ref-title"> Strelka2: fast and accurate calling of germline and somatic variants. </span>
+    <em>Nat Methods</em> 15:591–594 (2018).
+    <span class="ref-meta"><span data-lang="zh">Illumina Strelka2 germline + somatic。DOI: <a href="https://doi.org/10.1038/s41592-018-0051-x" target="_blank" rel="noopener">10.1038/s41592-018-0051-x</a></span><span data-lang="en">Illumina Strelka2 germline + somatic. DOI: <a href="https://doi.org/10.1038/s41592-018-0051-x" target="_blank" rel="noopener">10.1038/s41592-018-0051-x</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Cooke DP, Wedge DC, Lunter G.</span>
+    <span class="ref-title"> A unified haplotype-based method for accurate and comprehensive variant calling (Octopus). </span>
+    <em>Nat Biotechnol</em> 39:885–892 (2021).
+    <span class="ref-meta"><span data-lang="zh">Octopus haplotype-aware caller。DOI: <a href="https://doi.org/10.1038/s41587-021-00861-3" target="_blank" rel="noopener">10.1038/s41587-021-00861-3</a></span><span data-lang="en">Octopus haplotype-aware caller. DOI: <a href="https://doi.org/10.1038/s41587-021-00861-3" target="_blank" rel="noopener">10.1038/s41587-021-00861-3</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag bench">BENCH</span>
+    <span class="ref-author">Supernat A, Vidarsson OV, Steen VM, Stokowy T.</span>
+    <span class="ref-title"> Comparison of three variant callers for human whole genome sequencing. </span>
+    <em>Sci Rep</em> 8:17851 (2018).
+    <span class="ref-meta"><span data-lang="zh">GATK / DeepVariant / Strelka2 比較。DOI: <a href="https://doi.org/10.1038/s41598-018-36177-7" target="_blank" rel="noopener">10.1038/s41598-018-36177-7</a></span><span data-lang="en">GATK / DeepVariant / Strelka2 head-to-head. DOI: <a href="https://doi.org/10.1038/s41598-018-36177-7" target="_blank" rel="noopener">10.1038/s41598-018-36177-7</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="GATK HaplotypeCaller 官方文件與 GVCF workflow。" data-en="GATK HaplotypeCaller official documentation and GVCF workflow.">GATK HaplotypeCaller 官方文件與 GVCF workflow。</span>
+    <span class="ref-meta"><span data-lang="zh">PairHMM、active region、reassembly 原理。<a href="https://gatk.broadinstitute.org/hc/en-us/articles/360037225632" target="_blank" rel="noopener">GATK HaplotypeCaller docs</a></span><span data-lang="en">PairHMM, active region, local reassembly. <a href="https://gatk.broadinstitute.org/hc/en-us/articles/360037225632" target="_blank" rel="noopener">GATK HaplotypeCaller docs</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 8: Joint Genotyping ===================== -->
+<section class="section section-anchor" id="joint">
+<div class="section-label" data-zh="Step 8" data-en="Step 8">Step 8</div>
+<h2 data-zh="🎯 Joint Genotyping：GVCF → GenomicsDB → GLnexus" data-en="🎯 Joint Genotyping: GVCF → GenomicsDB → GLnexus">🎯 Joint Genotyping：GVCF → GenomicsDB → GLnexus</h2>
+<p data-lang="zh">N+1 問題、cohort-scale joint genotyping、GenomicsDB / GLnexus 後端。</p>
+<p data-lang="en">The N+1 problem, cohort-scale joint genotyping, GenomicsDB / GLnexus backends.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="GATK GenomicsDBImport + GenotypeGVCFs 官方流程。" data-en="GATK GenomicsDBImport + GenotypeGVCFs official workflow.">GATK GenomicsDBImport + GenotypeGVCFs 官方流程。</span>
+    <span class="ref-meta"><span data-lang="zh">取代 CombineGVCFs；支援百萬樣本。<a href="https://gatk.broadinstitute.org/hc/en-us/articles/360035890411" target="_blank" rel="noopener">GATK joint-calling docs</a></span><span data-lang="en">Replaces CombineGVCFs; scales to millions. <a href="https://gatk.broadinstitute.org/hc/en-us/articles/360035890411" target="_blank" rel="noopener">GATK joint-calling docs</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Yun T, Li H, Chang PC, et al.</span>
+    <span class="ref-title"> Accurate, scalable cohort variant calls using DeepVariant and GLnexus. </span>
+    <em>Bioinformatics</em> 36(24):5582–5589 (2020).
+    <span class="ref-meta"><span data-lang="zh">DeepVariant + GLnexus 大規模 joint。DOI: <a href="https://doi.org/10.1093/bioinformatics/btaa1081" target="_blank" rel="noopener">10.1093/bioinformatics/btaa1081</a></span><span data-lang="en">DeepVariant + GLnexus cohort-scale joint calls. DOI: <a href="https://doi.org/10.1093/bioinformatics/btaa1081" target="_blank" rel="noopener">10.1093/bioinformatics/btaa1081</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="GLnexus GitHub — scalable gVCF merging and joint genotyping。" data-en="GLnexus GitHub — scalable gVCF merging and joint genotyping.">GLnexus GitHub — scalable gVCF merging and joint genotyping。</span>
+    <span class="ref-meta"><span data-lang="zh"><a href="https://github.com/dnanexus-rnd/GLnexus" target="_blank" rel="noopener">dnanexus-rnd/GLnexus</a></span><span data-lang="en"><a href="https://github.com/dnanexus-rnd/GLnexus" target="_blank" rel="noopener">dnanexus-rnd/GLnexus</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Backman JD, Li AH, Marcketta A, et al.</span>
+    <span class="ref-title"> Exome sequencing and analysis of 454,787 UK Biobank participants. </span>
+    <em>Nature</em> 599:628–634 (2021).
+    <span class="ref-meta"><span data-lang="zh">UKBB 50 萬 WES 規模 joint-calling 案例。DOI: <a href="https://doi.org/10.1038/s41586-021-04103-z" target="_blank" rel="noopener">10.1038/s41586-021-04103-z</a></span><span data-lang="en">UKBB 500K WES joint-calling case study. DOI: <a href="https://doi.org/10.1038/s41586-021-04103-z" target="_blank" rel="noopener">10.1038/s41586-021-04103-z</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 9: Filtering ===================== -->
+<section class="section section-anchor" id="filtering">
+<div class="section-label" data-zh="Step 9" data-en="Step 9">Step 9</div>
+<h2 data-zh="🪜 Variant Filtering：VQSR、Hard filter、CNN" data-en="🪜 Variant Filtering: VQSR, Hard filter, CNN">🪜 Variant Filtering：VQSR、Hard filter、CNN</h2>
+<p data-lang="zh">VQSR (GMM)、CNNScoreVariants、hard filter 規則（GATK 4.x 建議）。</p>
+<p data-lang="en">VQSR (GMM), CNNScoreVariants, hard-filter rules (GATK 4.x recommendations).</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="GATK VariantRecalibrator (VQSR) 官方文件。" data-en="GATK VariantRecalibrator (VQSR) official documentation.">GATK VariantRecalibrator (VQSR) 官方文件。</span>
+    <span class="ref-meta"><span data-lang="zh">GMM 模型在 known-sites 上學習 truth/false 邊界。<a href="https://gatk.broadinstitute.org/hc/en-us/articles/360035531112" target="_blank" rel="noopener">VQSR docs</a></span><span data-lang="en">GMM model learns truth/false boundary on known sites. <a href="https://gatk.broadinstitute.org/hc/en-us/articles/360035531112" target="_blank" rel="noopener">VQSR docs</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="GATK Hard Filter germline 建議（QD / FS / SOR / MQ / MQRankSum / ReadPosRankSum）。" data-en="GATK germline hard-filter recommendations (QD / FS / SOR / MQ / MQRankSum / ReadPosRankSum).">GATK Hard Filter germline 建議（QD / FS / SOR / MQ / MQRankSum / ReadPosRankSum）。</span>
+    <span class="ref-meta"><span data-lang="zh">VQSR 不可行時的後備方案（small cohorts）。<a href="https://gatk.broadinstitute.org/hc/en-us/articles/360035531112--How-to-Filter-variants-either-with-VQSR-or-by-hard-filtering" target="_blank" rel="noopener">GATK hard-filter docs</a></span><span data-lang="en">Fallback for VQSR-incompatible cohorts. <a href="https://gatk.broadinstitute.org/hc/en-us/articles/360035531112--How-to-Filter-variants-either-with-VQSR-or-by-hard-filtering" target="_blank" rel="noopener">GATK hard-filter docs</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="GATK CNNScoreVariants — single-sample CNN 取代 VQSR。" data-en="GATK CNNScoreVariants — single-sample CNN replacement for VQSR.">GATK CNNScoreVariants — single-sample CNN 取代 VQSR。</span>
+    <span class="ref-meta"><span data-lang="zh">解決單樣本 WGS 無法跑 VQSR 的問題。<a href="https://gatk.broadinstitute.org/hc/en-us/articles/360035531092" target="_blank" rel="noopener">CNNScoreVariants docs</a></span><span data-lang="en">Solves the single-sample VQSR problem. <a href="https://gatk.broadinstitute.org/hc/en-us/articles/360035531092" target="_blank" rel="noopener">CNNScoreVariants docs</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Friedman S, Gauthier L, Farjoun Y, Banks E.</span>
+    <span class="ref-title"> Lean and deep models for more accurate filtering of SNP and INDEL variant calls. </span>
+    <em>Bioinformatics</em> 36(7):2060–2067 (2020).
+    <span class="ref-meta"><span data-lang="zh">CNNScoreVariants 模型原始論文。DOI: <a href="https://doi.org/10.1093/bioinformatics/btz901" target="_blank" rel="noopener">10.1093/bioinformatics/btz901</a></span><span data-lang="en">Original CNNScoreVariants paper. DOI: <a href="https://doi.org/10.1093/bioinformatics/btz901" target="_blank" rel="noopener">10.1093/bioinformatics/btz901</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 10: Annotation ===================== -->
+<section class="section section-anchor" id="annotation">
+<div class="section-label" data-zh="Step 10" data-en="Step 10">Step 10</div>
+<h2 data-zh="🏷️ Annotation：VEP, SnpEff, ANNOVAR, dbNSFP, SpliceAI, AlphaMissense, REVEL, CADD" data-en="🏷️ Annotation: VEP, SnpEff, ANNOVAR, dbNSFP, SpliceAI, AlphaMissense, REVEL, CADD">🏷️ Annotation：VEP, SnpEff, ANNOVAR, dbNSFP, SpliceAI, AlphaMissense, REVEL, CADD</h2>
+<p data-lang="zh">變異效應預測、MANE Select 轉錄本選擇、in-silico 致病性評分。</p>
+<p data-lang="en">Variant effect prediction, MANE Select transcript choice, in-silico pathogenicity scores.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">McLaren W, Gil L, Hunt SE, et al.</span>
+    <span class="ref-title"> The Ensembl Variant Effect Predictor (VEP). </span>
+    <em>Genome Biol</em> 17:122 (2016).
+    <span class="ref-meta"><span data-lang="zh">Ensembl/EMBL-EBI 旗艦工具。DOI: <a href="https://doi.org/10.1186/s13059-016-0974-4" target="_blank" rel="noopener">10.1186/s13059-016-0974-4</a></span><span data-lang="en">Ensembl/EMBL-EBI flagship tool. DOI: <a href="https://doi.org/10.1186/s13059-016-0974-4" target="_blank" rel="noopener">10.1186/s13059-016-0974-4</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Cingolani P, Platts A, Wang LL, et al.</span>
+    <span class="ref-title"> A program for annotating and predicting the effects of single nucleotide polymorphisms, SnpEff. </span>
+    <em>Fly</em> 6(2):80–92 (2012).
+    <span class="ref-meta"><span data-lang="zh">SnpEff 原始論文。DOI: <a href="https://doi.org/10.4161/fly.19695" target="_blank" rel="noopener">10.4161/fly.19695</a></span><span data-lang="en">Original SnpEff paper. DOI: <a href="https://doi.org/10.4161/fly.19695" target="_blank" rel="noopener">10.4161/fly.19695</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Wang K, Li M, Hakonarson H.</span>
+    <span class="ref-title"> ANNOVAR: functional annotation of genetic variants from high-throughput sequencing data. </span>
+    <em>Nucleic Acids Res</em> 38(16):e164 (2010).
+    <span class="ref-meta"><span data-lang="zh">ANNOVAR (含 wANNOVAR 線上介面)。DOI: <a href="https://doi.org/10.1093/nar/gkq603" target="_blank" rel="noopener">10.1093/nar/gkq603</a></span><span data-lang="en">ANNOVAR (includes wANNOVAR web UI). DOI: <a href="https://doi.org/10.1093/nar/gkq603" target="_blank" rel="noopener">10.1093/nar/gkq603</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Morales J, Pujar S, Loveland JE, et al.</span>
+    <span class="ref-title"> A joint NCBI and EMBL-EBI transcript set for clinical genomics and research (MANE). </span>
+    <em>Nature</em> 604:310–315 (2022).
+    <span class="ref-meta"><span data-lang="zh">MANE Select / Plus Clinical 統一轉錄本標準。DOI: <a href="https://doi.org/10.1038/s41586-022-04558-8" target="_blank" rel="noopener">10.1038/s41586-022-04558-8</a></span><span data-lang="en">MANE Select / Plus Clinical unified transcript standard. DOI: <a href="https://doi.org/10.1038/s41586-022-04558-8" target="_blank" rel="noopener">10.1038/s41586-022-04558-8</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Liu X, Li C, Mou C, Dong Y, Tu Y.</span>
+    <span class="ref-title"> dbNSFP v4: a comprehensive database of transcript-specific functional predictions and annotations for human nonsynonymous and splice-site SNVs. </span>
+    <em>Genome Med</em> 12:103 (2020).
+    <span class="ref-meta"><span data-lang="zh">整合 30+ 預測工具與 score。DOI: <a href="https://doi.org/10.1186/s13073-020-00803-9" target="_blank" rel="noopener">10.1186/s13073-020-00803-9</a></span><span data-lang="en">Aggregates 30+ predictor tools / scores. DOI: <a href="https://doi.org/10.1186/s13073-020-00803-9" target="_blank" rel="noopener">10.1186/s13073-020-00803-9</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Jaganathan K, Kyriazopoulou Panagiotopoulou S, McRae JF, et al.</span>
+    <span class="ref-title"> Predicting splicing from primary sequence with deep learning (SpliceAI). </span>
+    <em>Cell</em> 176(3):535–548.e24 (2019).
+    <span class="ref-meta"><span data-lang="zh">Illumina SpliceAI；剪接位點預測 SOTA。DOI: <a href="https://doi.org/10.1016/j.cell.2018.12.015" target="_blank" rel="noopener">10.1016/j.cell.2018.12.015</a></span><span data-lang="en">Illumina SpliceAI; splice-site prediction SOTA. DOI: <a href="https://doi.org/10.1016/j.cell.2018.12.015" target="_blank" rel="noopener">10.1016/j.cell.2018.12.015</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Cheng J, Novati G, Pan J, et al.</span>
+    <span class="ref-title"> Accurate proteome-wide missense variant effect prediction with AlphaMissense. </span>
+    <em>Science</em> 381(6664):eadg7492 (2023).
+    <span class="ref-meta"><span data-lang="zh">DeepMind AlphaMissense (用 AlphaFold backbone)。DOI: <a href="https://doi.org/10.1126/science.adg7492" target="_blank" rel="noopener">10.1126/science.adg7492</a></span><span data-lang="en">DeepMind AlphaMissense (AlphaFold backbone). DOI: <a href="https://doi.org/10.1126/science.adg7492" target="_blank" rel="noopener">10.1126/science.adg7492</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Ioannidis NM, Rothstein JH, Pejaver V, et al.</span>
+    <span class="ref-title"> REVEL: an ensemble method for predicting the pathogenicity of rare missense variants. </span>
+    <em>Am J Hum Genet</em> 99(4):877–885 (2016).
+    <span class="ref-meta"><span data-lang="zh">REVEL ensemble missense predictor。DOI: <a href="https://doi.org/10.1016/j.ajhg.2016.08.016" target="_blank" rel="noopener">10.1016/j.ajhg.2016.08.016</a></span><span data-lang="en">REVEL ensemble missense predictor. DOI: <a href="https://doi.org/10.1016/j.ajhg.2016.08.016" target="_blank" rel="noopener">10.1016/j.ajhg.2016.08.016</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Rentzsch P, Witten D, Cooper GM, Shendure J, Kircher M.</span>
+    <span class="ref-title"> CADD: predicting the deleteriousness of variants throughout the human genome. </span>
+    <em>Nucleic Acids Res</em> 47(D1):D886–D894 (2019).
+    <span class="ref-meta"><span data-lang="zh">CADD v1.4 genome-wide deleteriousness score。DOI: <a href="https://doi.org/10.1093/nar/gky1016" target="_blank" rel="noopener">10.1093/nar/gky1016</a></span><span data-lang="en">CADD v1.4 genome-wide deleteriousness score. DOI: <a href="https://doi.org/10.1093/nar/gky1016" target="_blank" rel="noopener">10.1093/nar/gky1016</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Pejaver V, Byrne AB, Feng BJ, et al.</span>
+    <span class="ref-title"> Calibration of computational tools for missense variant pathogenicity classification and ClinGen recommendations. </span>
+    <em>Am J Hum Genet</em> 109(12):2163–2177 (2022).
+    <span class="ref-meta"><span data-lang="zh">ClinGen SVI 推薦 REVEL ≥0.773 為 PP3-strong。DOI: <a href="https://doi.org/10.1016/j.ajhg.2022.10.013" target="_blank" rel="noopener">10.1016/j.ajhg.2022.10.013</a></span><span data-lang="en">ClinGen SVI recommends REVEL ≥0.773 as PP3-strong. DOI: <a href="https://doi.org/10.1016/j.ajhg.2022.10.013" target="_blank" rel="noopener">10.1016/j.ajhg.2022.10.013</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 11: CNV / SV ===================== -->
+<section class="section section-anchor" id="cnvsv">
+<div class="section-label" data-zh="Step 11" data-en="Step 11">Step 11</div>
+<h2 data-zh="🧬 CNV / Structural Variants" data-en="🧬 CNV / Structural Variants">🧬 CNV / Structural Variants</h2>
+<p data-lang="zh">Manta、DELLY、CNVkit、GATK gCNV（短讀）；Sniffles2、cuteSV（長讀）。</p>
+<p data-lang="en">Manta, DELLY, CNVkit, GATK gCNV (short read); Sniffles2, cuteSV (long read).</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Chen X, Schulz-Trieglaff O, Shaw R, et al.</span>
+    <span class="ref-title"> Manta: rapid detection of structural variants and indels for germline and cancer sequencing applications. </span>
+    <em>Bioinformatics</em> 32(8):1220–1222 (2016).
+    <span class="ref-meta"><span data-lang="zh">Illumina Manta SV caller (split + paired-end)。DOI: <a href="https://doi.org/10.1093/bioinformatics/btv710" target="_blank" rel="noopener">10.1093/bioinformatics/btv710</a></span><span data-lang="en">Illumina Manta SV caller (split + paired-end). DOI: <a href="https://doi.org/10.1093/bioinformatics/btv710" target="_blank" rel="noopener">10.1093/bioinformatics/btv710</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Rausch T, Zichner T, Schlattl A, et al.</span>
+    <span class="ref-title"> DELLY: structural variant discovery by integrated paired-end and split-read analysis. </span>
+    <em>Bioinformatics</em> 28(18):i333–i339 (2012).
+    <span class="ref-meta"><span data-lang="zh">DELLY DEL/DUP/INV/TRA/INS。DOI: <a href="https://doi.org/10.1093/bioinformatics/bts378" target="_blank" rel="noopener">10.1093/bioinformatics/bts378</a></span><span data-lang="en">DELLY DEL/DUP/INV/TRA/INS. DOI: <a href="https://doi.org/10.1093/bioinformatics/bts378" target="_blank" rel="noopener">10.1093/bioinformatics/bts378</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Talevich E, Shain AH, Botton T, Bastian BC.</span>
+    <span class="ref-title"> CNVkit: genome-wide copy number detection and visualization from targeted DNA sequencing. </span>
+    <em>PLOS Comput Biol</em> 12(4):e1004873 (2016).
+    <span class="ref-meta"><span data-lang="zh">CNVkit WES CNV 標準工具。DOI: <a href="https://doi.org/10.1371/journal.pcbi.1004873" target="_blank" rel="noopener">10.1371/journal.pcbi.1004873</a></span><span data-lang="en">CNVkit standard for WES CNV. DOI: <a href="https://doi.org/10.1371/journal.pcbi.1004873" target="_blank" rel="noopener">10.1371/journal.pcbi.1004873</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Babadi M, Fu JM, Lee SK, et al.</span>
+    <span class="ref-title"> GATK-gCNV enables the discovery of rare copy number variants from exome sequencing data. </span>
+    <em>Nat Genet</em> 55:1589–1597 (2023).
+    <span class="ref-meta"><span data-lang="zh">GATK gCNV HMM 模型。DOI: <a href="https://doi.org/10.1038/s41588-023-01449-0" target="_blank" rel="noopener">10.1038/s41588-023-01449-0</a></span><span data-lang="en">GATK gCNV HMM model. DOI: <a href="https://doi.org/10.1038/s41588-023-01449-0" target="_blank" rel="noopener">10.1038/s41588-023-01449-0</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Smolka M, Paulin LF, Grochowski CM, et al.</span>
+    <span class="ref-title"> Detection of mosaic and population-level structural variants with Sniffles2. </span>
+    <em>Nat Biotechnol</em> 42:1571–1580 (2024).
+    <span class="ref-meta"><span data-lang="zh">Sniffles2 長讀 SV + 鑲嵌變異。DOI: <a href="https://doi.org/10.1038/s41587-023-02024-y" target="_blank" rel="noopener">10.1038/s41587-023-02024-y</a></span><span data-lang="en">Sniffles2 long-read SV + mosaic detection. DOI: <a href="https://doi.org/10.1038/s41587-023-02024-y" target="_blank" rel="noopener">10.1038/s41587-023-02024-y</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Jiang T, Liu Y, Jiang Y, et al.</span>
+    <span class="ref-title"> Long-read-based human genomic structural variation detection with cuteSV. </span>
+    <em>Genome Biol</em> 21:189 (2020).
+    <span class="ref-meta"><span data-lang="zh">cuteSV 長讀 SV。DOI: <a href="https://doi.org/10.1186/s13059-020-02107-y" target="_blank" rel="noopener">10.1186/s13059-020-02107-y</a></span><span data-lang="en">cuteSV long-read SV. DOI: <a href="https://doi.org/10.1186/s13059-020-02107-y" target="_blank" rel="noopener">10.1186/s13059-020-02107-y</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 12: Somatic ===================== -->
+<section class="section section-anchor" id="somatic">
+<div class="section-label" data-zh="Step 12" data-en="Step 12">Step 12</div>
+<h2 data-zh="🧬 Somatic：Mutect2, Strelka2 somatic, ContEst" data-en="🧬 Somatic: Mutect2, Strelka2 somatic, ContEst">🧬 Somatic：Mutect2, Strelka2 somatic, ContEst</h2>
+<p data-lang="zh">腫瘤/正常配對、低頻 subclonal 變異、PoN (panel of normals)、汙染估計。</p>
+<p data-lang="en">Tumor/normal pair, low-frequency subclonal variants, PoN (panel of normals), contamination estimation.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Benjamin D, Sato T, Cibulskis K, et al.</span>
+    <span class="ref-title"> Calling Somatic SNVs and Indels with Mutect2. </span>
+    <em>bioRxiv</em> 861054 (2019).
+    <span class="ref-meta"><span data-lang="zh">GATK Mutect2 流程說明（與 Cibulskis 2013 互補）。DOI: <a href="https://doi.org/10.1101/861054" target="_blank" rel="noopener">10.1101/861054</a></span><span data-lang="en">GATK Mutect2 documentation paper (companion to Cibulskis 2013). DOI: <a href="https://doi.org/10.1101/861054" target="_blank" rel="noopener">10.1101/861054</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Cibulskis K, Lawrence MS, Carter SL, et al.</span>
+    <span class="ref-title"> Sensitive detection of somatic point mutations in impure and heterogeneous cancer samples (MuTect). </span>
+    <em>Nat Biotechnol</em> 31:213–219 (2013).
+    <span class="ref-meta"><span data-lang="zh">MuTect 原始論文。DOI: <a href="https://doi.org/10.1038/nbt.2514" target="_blank" rel="noopener">10.1038/nbt.2514</a></span><span data-lang="en">Original MuTect paper. DOI: <a href="https://doi.org/10.1038/nbt.2514" target="_blank" rel="noopener">10.1038/nbt.2514</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Cibulskis K, McKenna A, Fennell T, Banks E, DePristo M, Getz G.</span>
+    <span class="ref-title"> ContEst: estimating cross-contamination of human samples in next-generation sequencing data. </span>
+    <em>Bioinformatics</em> 27(18):2601–2602 (2011).
+    <span class="ref-meta"><span data-lang="zh">樣本污染估計。DOI: <a href="https://doi.org/10.1093/bioinformatics/btr446" target="_blank" rel="noopener">10.1093/bioinformatics/btr446</a></span><span data-lang="en">Sample contamination estimation. DOI: <a href="https://doi.org/10.1093/bioinformatics/btr446" target="_blank" rel="noopener">10.1093/bioinformatics/btr446</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="GATK Somatic Best Practices — Mutect2 + PoN + GetPileupSummaries + CalculateContamination + FilterMutectCalls。" data-en="GATK Somatic Best Practices — Mutect2 + PoN + GetPileupSummaries + CalculateContamination + FilterMutectCalls.">GATK Somatic Best Practices — Mutect2 + PoN + 汙染估計 + Filter。</span>
+    <span class="ref-meta"><span data-lang="zh"><a href="https://gatk.broadinstitute.org/hc/en-us/articles/360035531132" target="_blank" rel="noopener">GATK Somatic SNV/Indel docs</a></span><span data-lang="en"><a href="https://gatk.broadinstitute.org/hc/en-us/articles/360035531132" target="_blank" rel="noopener">GATK Somatic SNV/Indel docs</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag bench">BENCH</span>
+    <span class="ref-author">Xu C.</span>
+    <span class="ref-title"> A review of somatic single nucleotide variant calling algorithms for next-generation sequencing data. </span>
+    <em>Comput Struct Biotechnol J</em> 16:15–24 (2018).
+    <span class="ref-meta"><span data-lang="zh">10+ 種 somatic caller 比較。DOI: <a href="https://doi.org/10.1016/j.csbj.2018.01.003" target="_blank" rel="noopener">10.1016/j.csbj.2018.01.003</a></span><span data-lang="en">10+ somatic caller comparison. DOI: <a href="https://doi.org/10.1016/j.csbj.2018.01.003" target="_blank" rel="noopener">10.1016/j.csbj.2018.01.003</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 13: Long-read ===================== -->
+<section class="section section-anchor" id="longread">
+<div class="section-label" data-zh="Step 13" data-en="Step 13">Step 13</div>
+<h2 data-zh="🧬 Long-read：PacBio HiFi, ONT Dorado, Clair3, PEPPER-MDV" data-en="🧬 Long-read: PacBio HiFi, ONT Dorado, Clair3, PEPPER-MDV">🧬 Long-read：PacBio HiFi, ONT Dorado, Clair3, PEPPER-MDV</h2>
+<p data-lang="zh">PacBio HiFi (CCS) Q&gt;30 長讀、ONT R10.4.1、Clair3 / PEPPER-Margin-DeepVariant。</p>
+<p data-lang="en">PacBio HiFi (CCS) Q&gt;30 long reads, ONT R10.4.1, Clair3 / PEPPER-Margin-DeepVariant.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Wenger AM, Peluso P, Rowell WJ, et al.</span>
+    <span class="ref-title"> Accurate circular consensus long-read sequencing improves variant detection and assembly of a human genome. </span>
+    <em>Nat Biotechnol</em> 37:1155–1162 (2019).
+    <span class="ref-meta"><span data-lang="zh">PacBio HiFi (CCS) Q&gt;30 長讀。DOI: <a href="https://doi.org/10.1038/s41587-019-0217-9" target="_blank" rel="noopener">10.1038/s41587-019-0217-9</a></span><span data-lang="en">PacBio HiFi (CCS) Q&gt;30 long reads. DOI: <a href="https://doi.org/10.1038/s41587-019-0217-9" target="_blank" rel="noopener">10.1038/s41587-019-0217-9</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Zheng Z, Li S, Su J, Leung AWS, Lam TW, Luo R.</span>
+    <span class="ref-title"> Symphonizing pileup and full-alignment for deep learning-based long-read variant calling (Clair3). </span>
+    <em>Brief Bioinform</em> 23(6):bbac461 (2022).
+    <span class="ref-meta"><span data-lang="zh">Clair3 — ONT / HiFi 通用 caller。DOI: <a href="https://doi.org/10.1093/bib/bbac461" target="_blank" rel="noopener">10.1093/bib/bbac461</a></span><span data-lang="en">Clair3 — universal ONT / HiFi caller. DOI: <a href="https://doi.org/10.1093/bib/bbac461" target="_blank" rel="noopener">10.1093/bib/bbac461</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Shafin K, Pesout T, Chang PC, et al.</span>
+    <span class="ref-title"> Haplotype-aware variant calling with PEPPER-Margin-DeepVariant enables high accuracy in nanopore long-reads. </span>
+    <em>Nat Methods</em> 18:1322–1332 (2021).
+    <span class="ref-meta"><span data-lang="zh">PEPPER-Margin-DeepVariant ONT 流程。DOI: <a href="https://doi.org/10.1038/s41592-021-01299-w" target="_blank" rel="noopener">10.1038/s41592-021-01299-w</a></span><span data-lang="en">PEPPER-Margin-DeepVariant ONT pipeline. DOI: <a href="https://doi.org/10.1038/s41592-021-01299-w" target="_blank" rel="noopener">10.1038/s41592-021-01299-w</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="Oxford Nanopore Dorado basecaller — 取代 Guppy 的官方 GPU basecaller。" data-en="Oxford Nanopore Dorado basecaller — official GPU basecaller (replaces Guppy).">Oxford Nanopore Dorado basecaller — 取代 Guppy 的官方 GPU basecaller。</span>
+    <span class="ref-meta"><span data-lang="zh">支援 R10.4.1 / R10.4.2、5mC/6mA modification。<a href="https://github.com/nanoporetech/dorado" target="_blank" rel="noopener">nanoporetech/dorado</a></span><span data-lang="en">Supports R10.4.1 / R10.4.2 and 5mC/6mA modifications. <a href="https://github.com/nanoporetech/dorado" target="_blank" rel="noopener">nanoporetech/dorado</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Cheng H, Concepcion GT, Feng X, Zhang H, Li H.</span>
+    <span class="ref-title"> Haplotype-resolved de novo assembly using phased assembly graphs with hifiasm. </span>
+    <em>Nat Methods</em> 18:170–175 (2021).
+    <span class="ref-meta"><span data-lang="zh">hifiasm — PacBio HiFi 主流 assembler。DOI: <a href="https://doi.org/10.1038/s41592-020-01056-5" target="_blank" rel="noopener">10.1038/s41592-020-01056-5</a></span><span data-lang="en">hifiasm — mainstream PacBio HiFi assembler. DOI: <a href="https://doi.org/10.1038/s41592-020-01056-5" target="_blank" rel="noopener">10.1038/s41592-020-01056-5</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Logsdon GA, Vollger MR, Eichler EE.</span>
+    <span class="ref-title"> Long-read human genome sequencing and its applications. </span>
+    <em>Nat Rev Genet</em> 21:597–614 (2020).
+    <span class="ref-meta"><span data-lang="zh">長讀技術綜述。DOI: <a href="https://doi.org/10.1038/s41576-020-0236-x" target="_blank" rel="noopener">10.1038/s41576-020-0236-x</a></span><span data-lang="en">Long-read technology review. DOI: <a href="https://doi.org/10.1038/s41576-020-0236-x" target="_blank" rel="noopener">10.1038/s41576-020-0236-x</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 14: ACMG ===================== -->
+<section class="section section-anchor" id="acmg">
+<div class="section-label" data-zh="Step 14" data-en="Step 14">Step 14</div>
+<h2 data-zh="⚖️ ACMG/AMP 變異分類：2015 Standards + ClinGen SVI 修訂" data-en="⚖️ ACMG/AMP Variant Classification: 2015 Standards + ClinGen SVI Refinements">⚖️ ACMG/AMP 變異分類</h2>
+<p data-lang="zh">2015 Richards 5 級分類；ClinGen SVI 自 2018 起一系列 criterion-level 修訂；2023 點數系統提案。</p>
+<p data-lang="en">2015 Richards 5-tier classification; ClinGen SVI criterion-level refinements since 2018; 2023 point-based proposal.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag bestp">★ GUIDE</span>
+    <span class="ref-author">Richards S, Aziz N, Bale S, et al.</span>
+    <span class="ref-title"> Standards and guidelines for the interpretation of sequence variants (ACMG/AMP). </span>
+    <em>Genet Med</em> 17:405–424 (2015).
+    <span class="ref-meta"><span data-lang="zh">奠基性 ACMG/AMP 五級分類。DOI: <a href="https://doi.org/10.1038/gim.2015.30" target="_blank" rel="noopener">10.1038/gim.2015.30</a></span><span data-lang="en">Foundational ACMG/AMP 5-tier framework. DOI: <a href="https://doi.org/10.1038/gim.2015.30" target="_blank" rel="noopener">10.1038/gim.2015.30</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Abou Tayoun AN, Pesaran T, DiStefano MT, et al.</span>
+    <span class="ref-title"> Recommendations for interpreting the loss of function PVS1 ACMG/AMP variant criterion. </span>
+    <em>Hum Mutat</em> 39(11):1517–1524 (2018).
+    <span class="ref-meta"><span data-lang="zh">ClinGen SVI PVS1 決策樹。DOI: <a href="https://doi.org/10.1002/humu.23626" target="_blank" rel="noopener">10.1002/humu.23626</a></span><span data-lang="en">ClinGen SVI PVS1 decision tree. DOI: <a href="https://doi.org/10.1002/humu.23626" target="_blank" rel="noopener">10.1002/humu.23626</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Biesecker LG, Harrison SM; ClinGen Sequence Variant Interpretation Working Group.</span>
+    <span class="ref-title"> The ACMG/AMP reputable source criteria for the interpretation of sequence variants. </span>
+    <em>Genet Med</em> 20(12):1687–1688 (2018).
+    <span class="ref-meta"><span data-lang="zh">SVI 修訂 PP5/BP6。DOI: <a href="https://doi.org/10.1038/gim.2018.42" target="_blank" rel="noopener">10.1038/gim.2018.42</a></span><span data-lang="en">SVI revision of PP5/BP6. DOI: <a href="https://doi.org/10.1038/gim.2018.42" target="_blank" rel="noopener">10.1038/gim.2018.42</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Tavtigian SV, Greenblatt MS, Harrison SM, et al.</span>
+    <span class="ref-title"> Modeling the ACMG/AMP variant classification guidelines as a Bayesian classification framework. </span>
+    <em>Genet Med</em> 20(9):1054–1060 (2018).
+    <span class="ref-meta"><span data-lang="zh">Bayesian 點數模型；2023 點數系統的基礎。DOI: <a href="https://doi.org/10.1038/gim.2017.210" target="_blank" rel="noopener">10.1038/gim.2017.210</a></span><span data-lang="en">Bayesian point model; basis of the 2023 point system. DOI: <a href="https://doi.org/10.1038/gim.2017.210" target="_blank" rel="noopener">10.1038/gim.2017.210</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Li Q, Wang K.</span>
+    <span class="ref-title"> InterVar: clinical interpretation of genetic variants by the 2015 ACMG-AMP guidelines. </span>
+    <em>Am J Hum Genet</em> 100(2):267–280 (2017).
+    <span class="ref-meta"><span data-lang="zh">InterVar 自動化 ACMG 分類。DOI: <a href="https://doi.org/10.1016/j.ajhg.2017.01.004" target="_blank" rel="noopener">10.1016/j.ajhg.2017.01.004</a></span><span data-lang="en">InterVar automated ACMG classifier. DOI: <a href="https://doi.org/10.1016/j.ajhg.2017.01.004" target="_blank" rel="noopener">10.1016/j.ajhg.2017.01.004</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="VarSome / Franklin / Cancer Genome Interpreter — 商業化 ACMG 自動分類平台。" data-en="VarSome / Franklin / Cancer Genome Interpreter — commercial ACMG auto-classification platforms.">VarSome / Franklin / Cancer Genome Interpreter — 商業化 ACMG 自動分類平台。</span>
+    <span class="ref-meta"><span data-lang="zh">VarSome <a href="https://varsome.com" target="_blank" rel="noopener">varsome.com</a>；Franklin <a href="https://franklin.genoox.com" target="_blank" rel="noopener">franklin.genoox.com</a></span><span data-lang="en">VarSome <a href="https://varsome.com" target="_blank" rel="noopener">varsome.com</a>; Franklin <a href="https://franklin.genoox.com" target="_blank" rel="noopener">franklin.genoox.com</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 15: Clinical Report ===================== -->
+<section class="section section-anchor" id="clinical">
+<div class="section-label" data-zh="Step 15" data-en="Step 15">Step 15</div>
+<h2 data-zh="🏥 臨床報告：ClinVar, OMIM, gnomAD v4, ACMG SF, HGVS" data-en="🏥 Clinical Report: ClinVar, OMIM, gnomAD v4, ACMG SF, HGVS">🏥 臨床報告：ClinVar, OMIM, gnomAD v4, ACMG SF, HGVS</h2>
+<p data-lang="zh">變異與表型對應、族群頻率過濾、附帶發現 (secondary findings)、HGVS 命名規範。</p>
+<p data-lang="en">Variant–phenotype mapping, population-frequency filtering, secondary findings, HGVS naming.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Landrum MJ, Lee JM, Benson M, et al.</span>
+    <span class="ref-title"> ClinVar: improving access to variant interpretations and supporting evidence. </span>
+    <em>Nucleic Acids Res</em> 46(D1):D1062–D1067 (2018).
+    <span class="ref-meta"><span data-lang="zh">NCBI ClinVar 臨床變異主檔。DOI: <a href="https://doi.org/10.1093/nar/gkx1153" target="_blank" rel="noopener">10.1093/nar/gkx1153</a></span><span data-lang="en">NCBI ClinVar primary clinical variant DB. DOI: <a href="https://doi.org/10.1093/nar/gkx1153" target="_blank" rel="noopener">10.1093/nar/gkx1153</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Chen S, Francioli LC, Goodrich JK, et al.</span>
+    <span class="ref-title"> A genomic mutational constraint map using variation in 76,156 human genomes (gnomAD v4). </span>
+    <em>Nature</em> 625:92–100 (2024).
+    <span class="ref-meta"><span data-lang="zh">gnomAD v4 — 76,156 WGS + 730K WES。DOI: <a href="https://doi.org/10.1038/s41586-023-06045-0" target="_blank" rel="noopener">10.1038/s41586-023-06045-0</a></span><span data-lang="en">gnomAD v4 — 76,156 WGS + 730K WES. DOI: <a href="https://doi.org/10.1038/s41586-023-06045-0" target="_blank" rel="noopener">10.1038/s41586-023-06045-0</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Miller DT, Lee K, Abul-Husn NS, et al.</span>
+    <span class="ref-title"> ACMG SF v3.2 list for reporting of secondary findings in clinical exome and genome sequencing. </span>
+    <em>Genet Med</em> 25(8):100866 (2023).
+    <span class="ref-meta"><span data-lang="zh">ACMG 附帶發現 v3.2（83 基因）。DOI: <a href="https://doi.org/10.1016/j.gim.2023.100866" target="_blank" rel="noopener">10.1016/j.gim.2023.100866</a></span><span data-lang="en">ACMG SF v3.2 (83 genes). DOI: <a href="https://doi.org/10.1016/j.gim.2023.100866" target="_blank" rel="noopener">10.1016/j.gim.2023.100866</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">den Dunnen JT, Dalgleish R, Maglott DR, et al.</span>
+    <span class="ref-title"> HGVS recommendations for the description of sequence variants: 2016 update. </span>
+    <em>Hum Mutat</em> 37(6):564–569 (2016).
+    <span class="ref-meta"><span data-lang="zh">HGVS 命名規範（c./p./g.）。DOI: <a href="https://doi.org/10.1002/humu.22981" target="_blank" rel="noopener">10.1002/humu.22981</a></span><span data-lang="en">HGVS naming nomenclature (c./p./g.). DOI: <a href="https://doi.org/10.1002/humu.22981" target="_blank" rel="noopener">10.1002/humu.22981</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag db">DB</span>
+    <span class="ref-title" data-zh="OMIM — Online Mendelian Inheritance in Man（Hopkins）。" data-en="OMIM — Online Mendelian Inheritance in Man (Hopkins).">OMIM — Online Mendelian Inheritance in Man（Hopkins）。</span>
+    <span class="ref-meta"><span data-lang="zh">Mendelian disorder–gene 對應主檔。<a href="https://omim.org/" target="_blank" rel="noopener">omim.org</a></span><span data-lang="en">Primary Mendelian disorder–gene catalog. <a href="https://omim.org/" target="_blank" rel="noopener">omim.org</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag db">DB</span>
+    <span class="ref-title" data-zh="HPO — Human Phenotype Ontology（Robinson 2008+）。" data-en="HPO — Human Phenotype Ontology (Robinson 2008+).">HPO — Human Phenotype Ontology（Robinson 2008+）。</span>
+    <span class="ref-meta"><span data-lang="zh">標準化表型詞彙；Exomiser / LIRICAL 必要輸入。<a href="https://hpo.jax.org/" target="_blank" rel="noopener">hpo.jax.org</a></span><span data-lang="en">Standardized phenotype vocabulary; required by Exomiser / LIRICAL. <a href="https://hpo.jax.org/" target="_blank" rel="noopener">hpo.jax.org</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Step 16: Cohort / GWAS ===================== -->
+<section class="section section-anchor" id="cohort">
+<div class="section-label" data-zh="Step 16" data-en="Step 16">Step 16</div>
+<h2 data-zh="🌐 Cohort / GWAS：UKBB, All of Us, Hail, REGENIE, SKAT" data-en="🌐 Cohort / GWAS: UKBB, All of Us, Hail, REGENIE, SKAT">🌐 Cohort / GWAS：UKBB, All of Us, Hail, REGENIE, SKAT</h2>
+<p data-lang="zh">大規模佇列、稀有變異 burden test、混合模型 GWAS、Hail scalable framework。</p>
+<p data-lang="en">Large cohorts, rare-variant burden tests, mixed-model GWAS, Hail scalable framework.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Bycroft C, Freeman C, Petkova D, et al.</span>
+    <span class="ref-title"> The UK Biobank resource with deep phenotyping and genomic data. </span>
+    <em>Nature</em> 562:203–209 (2018).
+    <span class="ref-meta"><span data-lang="zh">UKBB 50 萬人佇列資源論文。DOI: <a href="https://doi.org/10.1038/s41586-018-0579-z" target="_blank" rel="noopener">10.1038/s41586-018-0579-z</a></span><span data-lang="en">UKBB 500K cohort resource paper. DOI: <a href="https://doi.org/10.1038/s41586-018-0579-z" target="_blank" rel="noopener">10.1038/s41586-018-0579-z</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">All of Us Research Program Investigators.</span>
+    <span class="ref-title"> The "All of Us" Research Program. </span>
+    <em>N Engl J Med</em> 381:668–676 (2019).
+    <span class="ref-meta"><span data-lang="zh">NIH All of Us — 強調代表性多元族群。DOI: <a href="https://doi.org/10.1056/NEJMsr1809937" target="_blank" rel="noopener">10.1056/NEJMsr1809937</a></span><span data-lang="en">NIH All of Us — emphasises diverse representation. DOI: <a href="https://doi.org/10.1056/NEJMsr1809937" target="_blank" rel="noopener">10.1056/NEJMsr1809937</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Mbatchou J, Barnard L, Backman J, et al.</span>
+    <span class="ref-title"> Computationally efficient whole-genome regression for quantitative and binary traits (REGENIE). </span>
+    <em>Nat Genet</em> 53:1097–1103 (2021).
+    <span class="ref-meta"><span data-lang="zh">REGENIE 取代 BOLT-LMM；UKBB 旗艦 GWAS。DOI: <a href="https://doi.org/10.1038/s41588-021-00870-7" target="_blank" rel="noopener">10.1038/s41588-021-00870-7</a></span><span data-lang="en">REGENIE replaces BOLT-LMM for UKBB-scale GWAS. DOI: <a href="https://doi.org/10.1038/s41588-021-00870-7" target="_blank" rel="noopener">10.1038/s41588-021-00870-7</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Wu MC, Lee S, Cai T, Li Y, Boehnke M, Lin X.</span>
+    <span class="ref-title"> Rare-variant association testing for sequencing data with the sequence kernel association test (SKAT). </span>
+    <em>Am J Hum Genet</em> 89(1):82–93 (2011).
+    <span class="ref-meta"><span data-lang="zh">SKAT / SKAT-O 稀有變異 burden test。DOI: <a href="https://doi.org/10.1016/j.ajhg.2011.05.029" target="_blank" rel="noopener">10.1016/j.ajhg.2011.05.029</a></span><span data-lang="en">SKAT / SKAT-O rare-variant burden test. DOI: <a href="https://doi.org/10.1016/j.ajhg.2011.05.029" target="_blank" rel="noopener">10.1016/j.ajhg.2011.05.029</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag doc">DOC</span>
+    <span class="ref-title" data-zh="Hail — scalable framework for cohort-scale variant analysis (Broad)。" data-en="Hail — scalable framework for cohort-scale variant analysis (Broad).">Hail — scalable framework for cohort-scale variant analysis (Broad)。</span>
+    <span class="ref-meta"><span data-lang="zh">Spark-backed；gnomAD 後端。<a href="https://hail.is/" target="_blank" rel="noopener">hail.is</a> · GitHub <a href="https://github.com/hail-is/hail" target="_blank" rel="noopener">hail-is/hail</a></span><span data-lang="en">Spark-backed; gnomAD backend. <a href="https://hail.is/" target="_blank" rel="noopener">hail.is</a> · GitHub <a href="https://github.com/hail-is/hail" target="_blank" rel="noopener">hail-is/hail</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">Loh PR, Tucker G, Bulik-Sullivan BK, et al.</span>
+    <span class="ref-title"> Efficient Bayesian mixed-model analysis increases association power in large cohorts (BOLT-LMM). </span>
+    <em>Nat Genet</em> 47:284–290 (2015).
+    <span class="ref-meta"><span data-lang="zh">混合模型 GWAS 標竿。DOI: <a href="https://doi.org/10.1038/ng.3190" target="_blank" rel="noopener">10.1038/ng.3190</a></span><span data-lang="en">Mixed-model GWAS benchmark. DOI: <a href="https://doi.org/10.1038/ng.3190" target="_blank" rel="noopener">10.1038/ng.3190</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Variant Databases ===================== -->
+<section class="section section-anchor" id="databases">
+<div class="section-label" data-zh="變異資料庫" data-en="VARIANT DATABASES">變異資料庫</div>
+<h2 data-zh="🗄️ 變異 / 族群 / 臨床資料庫" data-en="🗄️ Variant / Population / Clinical Databases">🗄️ 變異 / 族群 / 臨床資料庫</h2>
+<p data-lang="zh">關鍵公開資料庫整理；除 gnomAD/ClinVar/OMIM 外，新增 HGMD/LOVD/DECIPHER/dbSNP。</p>
+<p data-lang="en">Key public databases beyond gnomAD/ClinVar/OMIM — HGMD, LOVD, DECIPHER, dbSNP.</p>
+<ul class="ref-list">
+  <li>
+    <span class="ref-tag db">DB</span>
+    <span class="ref-author">Sherry ST, Ward MH, Kholodov M, et al.</span>
+    <span class="ref-title"> dbSNP: the NCBI database of genetic variation. </span>
+    <em>Nucleic Acids Res</em> 29(1):308–311 (2001).
+    <span class="ref-meta"><span data-lang="zh">最古老的人類變異 ID 系統 (rs#)。DOI: <a href="https://doi.org/10.1093/nar/29.1.308" target="_blank" rel="noopener">10.1093/nar/29.1.308</a></span><span data-lang="en">Oldest human variant ID system (rs#). DOI: <a href="https://doi.org/10.1093/nar/29.1.308" target="_blank" rel="noopener">10.1093/nar/29.1.308</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag db">DB</span>
+    <span class="ref-author">Stenson PD, Mort M, Ball EV, et al.</span>
+    <span class="ref-title"> The Human Gene Mutation Database (HGMD®): 2020 update. </span>
+    <em>Hum Genet</em> 139:1197–1207 (2020).
+    <span class="ref-meta"><span data-lang="zh">HGMD 商業版 (Cardiff Univ. / QIAGEN)。DOI: <a href="https://doi.org/10.1007/s00439-020-02199-3" target="_blank" rel="noopener">10.1007/s00439-020-02199-3</a></span><span data-lang="en">HGMD commercial (Cardiff Univ. / QIAGEN). DOI: <a href="https://doi.org/10.1007/s00439-020-02199-3" target="_blank" rel="noopener">10.1007/s00439-020-02199-3</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag db">DB</span>
+    <span class="ref-author">Fokkema IFAC, Taschner PE, Schaafsma GC, Celli J, Laros JF, den Dunnen JT.</span>
+    <span class="ref-title"> LOVD v.2.0: the next generation in gene variant databases. </span>
+    <em>Hum Mutat</em> 32(5):557–563 (2011).
+    <span class="ref-meta"><span data-lang="zh">LOVD locus-specific databases (LSDBs)。DOI: <a href="https://doi.org/10.1002/humu.21438" target="_blank" rel="noopener">10.1002/humu.21438</a> · <a href="https://www.lovd.nl/" target="_blank" rel="noopener">lovd.nl</a></span><span data-lang="en">LOVD locus-specific databases (LSDBs). DOI: <a href="https://doi.org/10.1002/humu.21438" target="_blank" rel="noopener">10.1002/humu.21438</a> · <a href="https://www.lovd.nl/" target="_blank" rel="noopener">lovd.nl</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag db">DB</span>
+    <span class="ref-author">Firth HV, Richards SM, Bevan AP, et al.</span>
+    <span class="ref-title"> DECIPHER: Database of Chromosomal Imbalance and Phenotype in Humans using Ensembl Resources. </span>
+    <em>Am J Hum Genet</em> 84(4):524–533 (2009).
+    <span class="ref-meta"><span data-lang="zh">DECIPHER — CNV/SV 與表型資料庫 (Sanger)。DOI: <a href="https://doi.org/10.1016/j.ajhg.2009.03.010" target="_blank" rel="noopener">10.1016/j.ajhg.2009.03.010</a> · <a href="https://www.deciphergenomics.org/" target="_blank" rel="noopener">deciphergenomics.org</a></span><span data-lang="en">DECIPHER — CNV/SV + phenotype DB (Sanger). DOI: <a href="https://doi.org/10.1016/j.ajhg.2009.03.010" target="_blank" rel="noopener">10.1016/j.ajhg.2009.03.010</a> · <a href="https://www.deciphergenomics.org/" target="_blank" rel="noopener">deciphergenomics.org</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag db">DB</span>
+    <span class="ref-author">Karczewski KJ, Francioli LC, Tiao G, et al.</span>
+    <span class="ref-title"> The mutational constraint spectrum quantified from variation in 141,456 humans (gnomAD v2). </span>
+    <em>Nature</em> 581:434–443 (2020).
+    <span class="ref-meta"><span data-lang="zh">gnomAD v2 constraint metrics (pLI / o/e)。DOI: <a href="https://doi.org/10.1038/s41586-020-2308-7" target="_blank" rel="noopener">10.1038/s41586-020-2308-7</a></span><span data-lang="en">gnomAD v2 constraint metrics (pLI / o/e). DOI: <a href="https://doi.org/10.1038/s41586-020-2308-7" target="_blank" rel="noopener">10.1038/s41586-020-2308-7</a></span></span>
+  </li>
+  <li>
+    <span class="ref-tag paper">PAPER</span>
+    <span class="ref-author">1000 Genomes Project Consortium.</span>
+    <span class="ref-title"> A global reference for human genetic variation. </span>
+    <em>Nature</em> 526:68–74 (2015).
+    <span class="ref-meta"><span data-lang="zh">1000 Genomes Phase 3 — 2,504 個體。DOI: <a href="https://doi.org/10.1038/nature15393" target="_blank" rel="noopener">10.1038/nature15393</a></span><span data-lang="en">1000 Genomes Phase 3 — 2,504 individuals. DOI: <a href="https://doi.org/10.1038/nature15393" target="_blank" rel="noopener">10.1038/nature15393</a></span></span>
+  </li>
+</ul>
+</section>
+
+<!-- ===================== Errata / Notes ===================== -->
+<section class="section section-anchor" id="errata">
+<div class="section-label" data-zh="教學註記" data-en="TUTORIAL NOTES">教學註記</div>
+<h2 data-zh="📝 教學註記與細節" data-en="📝 Tutorial Notes & Details">📝 教學註記與細節</h2>
+<p data-lang="zh">列出本 WGS/WES 教學容易誤解的細節、社群演進與避免的舊習。</p>
+<p data-lang="en">Common misunderstandings, community evolutions, and practices to avoid in WGS/WES tutorials.</p>
+
+<div class="errata">
+  <span class="errata-label" data-zh="補充說明" data-en="Notes" style="display:inline-block;background:#e0e7ff;color:#3730a3;padding:2px 10px;border-radius:4px;font-size:.72rem;font-weight:700;letter-spacing:.5px;margin-bottom:8px">補充說明 · Notes</span>
+  <h4 data-zh="GATK Best Practices 不再「唯一最佳」：DRAGEN-GATK / DeepVariant / Sentieon 已普遍超越預設 GATK4" data-en="GATK Best Practices is no longer 'the' best: DRAGEN-GATK / DeepVariant / Sentieon routinely outperform default GATK4">GATK 4.x「Best Practices」一名已成歷史包袱</h4>
+  <p data-lang="zh">教學若預設「GATK4 Best Practices = 最佳實踐」需更新：自 2020 起 <strong>PrecisionFDA Truth Challenge V2</strong> (Olson et al. 2022, Cell Genomics) 起，<strong>DRAGEN-GATK</strong>（Illumina+Broad 合作版）與 <strong>DeepVariant</strong> 在 F1、indel sensitivity、difficult region (low-mappability / homopolymer) 皆系統性超越 default GATK4 HaplotypeCaller+VQSR。Sentieon DNAseq 雖數學等價於 GATK 但速度顯著加快，常用於商業臨床 pipeline。實務原則：(1) 教學應 <strong>同時介紹 GATK4 + DeepVariant + DRAGEN-GATK 三條主流線</strong>，而非單推 GATK4；(2) <strong>VQSR</strong> 在小樣本 (n &lt; 30 WGS or n &lt; 1 WES) 無法穩定訓練，需改用 hard filter 或 CNNScoreVariants；(3) 報告必須列出 caller 版本、reference build (GRCh38 vs T2T-CHM13)、filter strategy；(4) GIAB HG002 truth set 為公認 benchmark baseline。</p>
+  <p data-lang="en">If the tutorial defaults to 'GATK4 Best Practices = gold standard', update: since the 2020+ <strong>PrecisionFDA Truth Challenge V2</strong> (Olson et al. 2022, Cell Genomics), <strong>DRAGEN-GATK</strong> (Illumina+Broad joint) and <strong>DeepVariant</strong> systematically beat default GATK4 HaplotypeCaller+VQSR on F1, indel sensitivity, and difficult regions (low-mappability / homopolymer). Sentieon DNAseq is mathematically equivalent to GATK but markedly faster — common in commercial clinical pipelines. Rules: (1) the tutorial should introduce <strong>three mainstream lines — GATK4 + DeepVariant + DRAGEN-GATK</strong> in parallel, not GATK4 alone; (2) <strong>VQSR</strong> cannot train stably on small cohorts (n &lt; 30 WGS or n &lt; 1 WES) — switch to hard filter or CNNScoreVariants; (3) reports must list caller version, reference build (GRCh38 vs T2T-CHM13), and filter strategy; (4) GIAB HG002 truth set is the agreed benchmark baseline.</p>
+  <p data-lang="zh"><strong>Sources:</strong> Olson ND et al. (2022) PrecisionFDA Truth Challenge V2, <em>Cell Genomics</em> 2:100129. DOI: <a href="https://doi.org/10.1016/j.xgen.2022.100129" target="_blank" rel="noopener">10.1016/j.xgen.2022.100129</a>; Krusche P et al. (2019) <em>Nat Biotechnol</em> 37:555; Poplin R et al. (2018) DeepVariant, <em>Nat Biotechnol</em> 36:983.</p>
+</div>
+
+<div class="errata">
+  <span class="errata-label" data-zh="補充說明" data-en="Notes" style="display:inline-block;background:#e0e7ff;color:#3730a3;padding:2px 10px;border-radius:4px;font-size:.72rem;font-weight:700;letter-spacing:.5px;margin-bottom:8px">補充說明 · Notes</span>
+  <h4 data-zh="ACMG 2023 點數系統提案尚未取代 2015 Richards 框架" data-en="The 2023 ACMG point system proposal has not replaced the 2015 Richards framework">ACMG 2023 點數系統：尚未成為臨床標準</h4>
+  <p data-lang="zh">教學若以「ACMG 2023 點數系統取代 2015 五級分類」描述，需澄清：自 Tavtigian 等 2018 年提出 <strong>Bayesian 點數模型</strong>（將 PVS/PS/PM/PP 與 BA/BS/BP 映射為 +8/+4/+2/+1 與 -8/-4/-1 點），<strong>ClinGen SVI 工作小組</strong>近年發布逐項 criterion 修訂（PVS1、PP1、PP3/BP4、PM2、BS2 等），並推動 <strong>2023 點數系統取代「規則計數」</strong>。然而：(1) <strong>截至 2026 年，2015 Richards 5-tier 仍為 ACMG 官方核心框架</strong>，臨床 lab 報告（ACGS UK 2020/2023 best practice、CAP/CLIA 認證實驗室）仍預設使用 2015 規則；(2) 點數系統在 ClinGen Variant Curation Interface (VCI) 與部分 expert panel 中作為「進階模式」可用，但 <strong>非強制</strong>；(3) VarSome / Franklin / InterVar 提供 2015 與點數雙模式。實務原則：(a) 教學應同時呈現兩種框架；(b) 報告須註明採用版本（如「ACMG/AMP 2015 with ClinGen SVI 2018–2023 refinements」）；(c) 商業平台（VarSome v11+, Franklin 2024）顯示的「P/LP」結論可能因採用不同框架而不一致，需人工 reconcile。</p>
+  <p data-lang="en">If the tutorial states 'the 2023 ACMG point system replaces the 2015 5-tier classification', clarify: Tavtigian et al. (2018) proposed a <strong>Bayesian point model</strong> mapping PVS/PS/PM/PP and BA/BS/BP to +8/+4/+2/+1 and -8/-4/-1; <strong>ClinGen SVI</strong> has since refined individual criteria (PVS1, PP1, PP3/BP4, PM2, BS2) and pushed a <strong>2023 point system replacing rule-counting</strong>. However: (1) <strong>as of 2026, the 2015 Richards 5-tier remains the official ACMG core framework</strong>; ACGS UK 2020/2023 best-practice and CAP/CLIA labs default to the 2015 rules; (2) the point system is available as an 'advanced mode' in ClinGen VCI and some expert panels but <strong>is not mandated</strong>; (3) VarSome / Franklin / InterVar offer dual modes. Rules: (a) present both frameworks; (b) reports must state the version used (e.g. 'ACMG/AMP 2015 with ClinGen SVI 2018–2023 refinements'); (c) commercial platforms (VarSome v11+, Franklin 2024) may show different P/LP labels under different frameworks — manually reconcile.</p>
+  <p data-lang="zh"><strong>Sources:</strong> Richards S et al. (2015) <em>Genet Med</em> 17:405. DOI: <a href="https://doi.org/10.1038/gim.2015.30" target="_blank" rel="noopener">10.1038/gim.2015.30</a>; Tavtigian SV et al. (2018) <em>Genet Med</em> 20:1054. DOI: <a href="https://doi.org/10.1038/gim.2017.210" target="_blank" rel="noopener">10.1038/gim.2017.210</a>; Pejaver V et al. (2022) <em>AJHG</em> 109:2163.</p>
+</div>
+
+<div class="errata">
+  <span class="errata-label" data-zh="補充說明" data-en="Notes" style="display:inline-block;background:#e0e7ff;color:#3730a3;padding:2px 10px;border-radius:4px;font-size:.72rem;font-weight:700;letter-spacing:.5px;margin-bottom:8px">補充說明 · Notes</span>
+  <h4 data-zh="GRCh38 vs T2T-CHM13：選擇尚未社群統一" data-en="GRCh38 vs T2T-CHM13: community not yet unified">參考基因組：GRCh38 / T2T-CHM13 / 1000G+decoys 的選擇</h4>
+  <p data-lang="zh">教學在 alignment 章節若僅推「最新 T2T-CHM13」，需補充：(1) <strong>GRCh38 (hs38DH, 含 ALT + decoys + HLA)</strong> 仍為 ClinVar、gnomAD v2/v3、絕大多數臨床 panel 與 medical-grade 工具鏈的標準座標系；(2) <strong>T2T-CHM13</strong> (Nurk 2022 Science) 新增 ~200 Mbp 序列、修正 GRCh38 數千處錯誤、揭露 segmental duplication 與 centromere 結構，但 gnomAD v4 (Chen 2024 Nature) 同時釋出 GRCh38 與 T2T；ClinVar 尚未全面 lift-over；(3) 臨床診斷至 2026 年仍建議使用 <strong>GRCh38 + lift-over 補充</strong>，研究探索可雙 build；(4) <strong>HPRC pangenome</strong> (Liao 2023 Nature) 為下一代方向，但 vg/GIRAFFE 流程尚未進入 GA4GH 認證的臨床 pipeline。</p>
+  <p data-lang="en">If the alignment chapter pushes only 'the newest T2T-CHM13', note: (1) <strong>GRCh38 (hs38DH with ALT + decoys + HLA)</strong> remains the standard coordinate system for ClinVar, gnomAD v2/v3, and most clinical panels / medical-grade tools; (2) <strong>T2T-CHM13</strong> (Nurk 2022 Science) adds ~200 Mbp, fixes thousands of GRCh38 errors, and reveals segmental duplication / centromere structure — gnomAD v4 (Chen 2024 Nature) releases both builds but ClinVar has not fully lifted over; (3) for clinical diagnosis as of 2026, recommend <strong>GRCh38 + supplementary lift-over</strong>; dual-build is fine for research; (4) the <strong>HPRC pangenome</strong> (Liao 2023 Nature) is the next direction but vg/GIRAFFE has not entered GA4GH-accredited clinical pipelines.</p>
+  <p data-lang="zh"><strong>Sources:</strong> Nurk S et al. (2022) <em>Science</em> 376:44; Aganezov S et al. (2022) <em>Science</em> 376:eabl3533; Liao WW et al. (2023) <em>Nature</em> 617:312.</p>
+</div>
+
+<div class="errata">
+  <span class="errata-label" data-zh="補充說明" data-en="Notes" style="display:inline-block;background:#e0e7ff;color:#3730a3;padding:2px 10px;border-radius:4px;font-size:.72rem;font-weight:700;letter-spacing:.5px;margin-bottom:8px">補充說明 · Notes</span>
+  <h4 data-zh="BQSR 對 DeepVariant / DRAGEN 不再必要" data-en="BQSR is no longer required for DeepVariant / DRAGEN">BQSR：流程現代化的取捨</h4>
+  <p data-lang="zh">教學若預設「所有 caller 之前一律先跑 BQSR」需澄清：BQSR 假設 known-sites VCF 含絕大多數真實變異，將其餘 mismatch 視為 base error 而校正 Q score。然而：(1) <strong>DeepVariant</strong> 與 <strong>DRAGEN ML caller</strong> 不使用 BAM 中的 Q score 做 likelihood，而是從 read pileup pixel 學習特徵，故 <strong>跑或不跑 BQSR 對 F1 幾乎無差</strong>（PrecisionFDA v2 結果）；(2) <strong>HaplotypeCaller</strong> 仍依賴 BQSR；(3) 非人類或缺乏 known-sites 物種應跳過 BQSR，或先做 self-bootstrap。實務：(a) HaplotypeCaller 流程保留 BQSR；(b) DeepVariant / DRAGEN 流程可省略以節省時間（~30% wall-clock）；(c) 教學圖表應標示「BQSR 為 GATK-specific」。</p>
+  <p data-lang="en">If the tutorial states 'always run BQSR before any caller', clarify: BQSR assumes known-sites VCF covers most true variants and treats remaining mismatches as base error to recalibrate Q. However: (1) <strong>DeepVariant</strong> and <strong>DRAGEN ML caller</strong> do not use BAM Q scores in their likelihood — they learn features from read-pileup pixels, so <strong>BQSR has near-zero F1 impact</strong> (PrecisionFDA v2 result); (2) <strong>HaplotypeCaller</strong> still relies on BQSR; (3) skip BQSR for non-human species or those without known-sites VCFs, or self-bootstrap. Rules: (a) keep BQSR in HaplotypeCaller pipelines; (b) it can be skipped in DeepVariant / DRAGEN pipelines (saves ~30% wall-clock); (c) annotate tutorial diagrams 'BQSR is GATK-specific'.</p>
+  <p data-lang="zh"><strong>Sources:</strong> Olson ND et al. (2022) PrecisionFDA Truth Challenge V2; Yun T et al. (2020) DeepVariant + GLnexus, <em>Bioinformatics</em> 36:5582.</p>
+</div>
+
+<div class="errata">
+  <span class="errata-label" data-zh="補充說明" data-en="Notes" style="display:inline-block;background:#e0e7ff;color:#3730a3;padding:2px 10px;border-radius:4px;font-size:.72rem;font-weight:700;letter-spacing:.5px;margin-bottom:8px">補充說明 · Notes</span>
+  <h4 data-zh="WES capture kit 之間差異顯著，需在 QC 報告交代" data-en="WES capture kits differ substantially — disclose in QC report">WES kit：Twist / IDT xGen / Agilent SureSelect / Roche KAPA 的差異</h4>
+  <p data-lang="zh">教學若視 WES 為「同質」需澄清：主流 kit (<strong>Twist Exome 2.0</strong>, <strong>IDT xGen Exome Hyb v2</strong>, <strong>Agilent SureSelect XT HS2</strong>, <strong>Roche KAPA HyperExome</strong>) 在 <strong>target region 定義、capture 效率、GC bias、insert size 分布、off-target rate</strong> 均有系統性差異。Chilamakuri 2014 BMC Genomics 與後續 Shigemizu 2015、Wang 2020 等 benchmark 顯示：(1) Twist 平均 on-target 較均勻；(2) IDT xGen 對 GC-extreme region 表現較好；(3) 不同 kit 的 BED 範圍差異可達 5–10%，直接影響 CNV/SV 工具的 baseline (CNVkit / GATK gCNV 都需 panel-of-normals)。實務：(a) 報告必須註明 kit 版本與廠商；(b) BED 設定需與 kit 一致；(c) cross-kit pooling 需重新計算 PoN；(d) WES CNV 偵測對 kit 一致性極敏感。</p>
+  <p data-lang="en">If the tutorial treats WES as 'homogeneous', clarify: mainstream kits (<strong>Twist Exome 2.0</strong>, <strong>IDT xGen Exome Hyb v2</strong>, <strong>Agilent SureSelect XT HS2</strong>, <strong>Roche KAPA HyperExome</strong>) differ systematically in <strong>target region definition, capture efficiency, GC bias, insert size, off-target rate</strong>. Chilamakuri 2014 BMC Genomics and follow-on benchmarks show: (1) Twist has more uniform on-target depth; (2) IDT xGen handles GC-extreme regions better; (3) BED differences across kits reach 5–10%, directly affecting CNV/SV baselines (CNVkit / GATK gCNV both need panels of normals). Rules: (a) reports must state kit version + vendor; (b) BED must match the kit; (c) cross-kit pooling requires recomputing the PoN; (d) WES CNV detection is highly kit-sensitive.</p>
+  <p data-lang="zh"><strong>Sources:</strong> Chilamakuri CSR et al. (2014) Performance comparison of four exome capture systems, <em>BMC Genomics</em> 15:449. DOI: <a href="https://doi.org/10.1186/1471-2164-15-449" target="_blank" rel="noopener">10.1186/1471-2164-15-449</a>; Babadi M et al. (2023) GATK-gCNV, <em>Nat Genet</em> 55:1589.</p>
+</div>
+
+<div class="errata">
+  <span class="errata-label" data-zh="補充說明" data-en="Notes" style="display:inline-block;background:#e0e7ff;color:#3730a3;padding:2px 10px;border-radius:4px;font-size:.72rem;font-weight:700;letter-spacing:.5px;margin-bottom:8px">補充說明 · Notes</span>
+  <h4 data-zh="MANE Select：HGVS c. 註記必須對齊單一規範轉錄本" data-en="MANE Select: HGVS c. notation must align to a single canonical transcript">MANE Select：報告應使用單一規範轉錄本</h4>
+  <p data-lang="zh">教學若示範 HGVS 而沒指定轉錄本，需澄清：同一變異在 RefSeq、Ensembl、UCSC 不同轉錄本中 c. 命名常不同，是診所一致性問題的主因。<strong>MANE Select</strong> (Morales 2022 Nature) 由 NCBI + EMBL-EBI 共同維護，為每個 protein-coding gene 指定 <strong>單一 RefSeq + Ensembl 等價轉錄本</strong>；<strong>MANE Plus Clinical</strong> 補充臨床重要 isoform。實務：(1) 所有臨床報告以 <strong>MANE Select</strong> 為主轉錄本；(2) VEP、SnpEff、ANNOVAR 都支援 MANE 過濾；(3) ClinVar、ClinGen 自 2023 起預設使用 MANE 命名；(4) 教學表格應同時列出 MANE Select 與 legacy refseq (NM_xxx) 以利對照。</p>
+  <p data-lang="en">If the tutorial shows HGVS without specifying a transcript, clarify: the same variant has different c. naming across RefSeq, Ensembl, UCSC transcripts — a leading cause of clinical inconsistency. <strong>MANE Select</strong> (Morales 2022 Nature), jointly maintained by NCBI + EMBL-EBI, designates a <strong>single equivalent RefSeq + Ensembl transcript</strong> per protein-coding gene; <strong>MANE Plus Clinical</strong> adds clinically important isoforms. Rules: (1) all clinical reports use <strong>MANE Select</strong> as primary; (2) VEP, SnpEff, ANNOVAR all support MANE filtering; (3) ClinVar and ClinGen default to MANE naming since 2023; (4) tutorials should list both MANE Select and the legacy RefSeq (NM_xxx) side by side.</p>
+  <p data-lang="zh"><strong>Sources:</strong> Morales J et al. (2022) MANE, <em>Nature</em> 604:310. DOI: <a href="https://doi.org/10.1038/s41586-022-04558-8" target="_blank" rel="noopener">10.1038/s41586-022-04558-8</a>; den Dunnen JT et al. (2016) HGVS 2016 update, <em>Hum Mutat</em> 37:564.</p>
+</div>
+
+</section>
+
+<nav class="page-nav">
+  <a href="../index.html"><span class="nav-dir" data-zh="← 教學首頁" data-en="← Tutorial home">← 教學首頁</span><span class="nav-title" data-zh="回到主教學頁" data-en="Back to tutorial hub">回到主教學頁</span></a>
+  <a href="../intro.html"><span class="nav-dir" data-zh="Step 1 →" data-en="Step 1 →">Step 1 →</span><span class="nav-title" data-zh="WGS / WES 簡介" data-en="WGS / WES Intro">WGS / WES 簡介</span></a>
+</nav>
+
+</main>
+
+<footer class="site-footer" style="text-align:center;color:var(--c-ink-muted);padding:20px;font-size:.85rem;border-top:1px solid var(--c-border-light);margin-top:40px">
+  © Charlene · WGS / WES Interactive Tutorial — References<br>
+  <span data-zh="學術論文、官方文件與工具連結 · 最後更新 2026-05" data-en="Papers, official docs and tool links · Last updated 2026-05">學術論文、官方文件與工具連結 · 最後更新 2026-05</span>
+</footer>
+
+<script src="../i18n.js"></script>
+</body>
+</html>
