@@ -1,279 +1,177 @@
 <!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Step 3: Alignment — WGS/WES Tutorial</title>
+<title>Step 4: Alignment (BWA-MEM2) — WGS/WES Tutorial</title>
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head><body>
 <nav class="top-nav"><div class="top-nav-inner">
   <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
-  <ul class="top-nav-links">
-    <li><a href="intro.html">Intro</a></li><li><a href="fastq-qc.html">FASTQ QC</a></li><li><a href="alignment.html" class="active">Align</a></li><li><a href="post-alignment.html">PostAln</a></li><li><a href="variant-calling.html">Calling</a></li><li><a href="joint-genotyping.html">Joint</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot</a></li><li><a href="interpretation.html">Interp</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="structural-variants.html">SV/CNV</a></li><li><a href="wes-considerations.html">WES</a></li>
-  </ul>
+  <ul class="top-nav-links"><li><a href="intro.html">Intro</a></li><li><a href="qc.html">QC</a></li><li><a href="trimming.html">Trim</a></li><li><a href="alignment.html" class="active">Align</a></li><li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li><li><a href="coverage.html">Coverage</a></li><li><a href="germline-calling.html">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot.</a></li><li><a href="cnv-sv.html">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html">Long-read</a></li><li><a href="acmg.html">ACMG</a></li><li><a href="clinical-report.html">Report</a></li><li><a href="cohort.html">Cohort</a></li><li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li></ul>
 </div></nav>
 <div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
-<header class="page-hero"><div class="step-badge">STEP 3 / 9</div>
-<h1 data-zh="序列比對 (Read Alignment)" data-en="Read Alignment">序列比對 (Read Alignment)</h1>
-<p class="subtitle" data-lang="zh">把幾億條 short reads 釘到 3 Gb 的人類基因體上——速度、準確度、MAPQ 三者的權衡。</p>
-<p class="subtitle" data-lang="en">Pin hundreds of millions of short reads onto a 3 Gb human genome — the trade-off between speed, accuracy, and MAPQ.</p>
+<header class="page-hero"><div class="step-badge">STEP 4 / 16</div>
+<h1 data-zh="序列比對 (BWA-MEM2)" data-en="Sequence Alignment (BWA-MEM2)">序列比對 (BWA-MEM2)</h1>
+<p class="subtitle" data-lang="zh">將 reads 對位到參考基因組——BWA-MEM2 的 SIMD 加速、CRAM 壓縮、Read Group 與 GRCh38/T2T 抉擇。</p>
+<p class="subtitle" data-lang="en">Map reads to the reference — BWA-MEM2 SIMD speedup, CRAM compression, Read Groups, and GRCh38 vs T2T.</p>
 </header>
 <main class="content-wrap">
 
 <section class="section">
-<div class="section-label" data-zh="為什麼" data-en="WHY">為什麼</div>
-<h2 data-zh="一、為什麼需要比對？" data-en="I. Why Alignment?">一、為什麼需要比對？</h2>
-<div data-lang="zh">
-<p>定序機讀出的 reads 是「一堆 150bp 的隨機片段」，沒有座標、沒有方向。<strong>Alignment</strong> 的工作就是找出每條 read 在參考基因組上「最可能來自」的位置，產生 <code>(chrom, pos, CIGAR, MAPQ)</code> 等資訊，輸出為 BAM 檔。後續所有 variant calling 都基於這份座標映射。</p>
-<p>對 30× WGS 的人類樣本而言，這意味著要處理約 <strong>6 億條 paired reads</strong>，每條都要在 3 Gb 的搜尋空間中定位——這是整個 pipeline 中<strong>計算量最大</strong>的單一步驟之一。</p>
-</div>
-<div data-lang="en">
-<p>The sequencer outputs reads as "a pile of 150bp random fragments" with no coordinates or orientation. <strong>Alignment</strong> finds the most-likely origin of each read on the reference, producing <code>(chrom, pos, CIGAR, MAPQ)</code> info written to a BAM file. All downstream variant calling depends on this coordinate map.</p>
-<p>For 30× human WGS, this means processing ~<strong>600 million paired reads</strong>, each searched against 3 Gb of reference — one of the <strong>most compute-intensive single steps</strong> in the entire pipeline.</p>
-</div>
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為什麼比對是 WGS/WES 的關鍵步驟？" data-en="Why alignment is the crux of WGS/WES">為什麼比對是 WGS/WES 的關鍵步驟？</h2>
+<div data-lang="zh"><p>比對 (alignment) 的目的是找出每條 read 最可能來自的基因組位置。錯誤的對位 → 錯誤的變異呼叫。短讀長 (~150bp) 在重複區、segmental duplication、HLA、KIR 等位點極具挑戰；長讀則改變遊戲規則但成本與錯誤模式不同。</p>
+<p><strong>2026 主流：BWA-MEM2</strong> (Vasimuddin 2019, IPDPS) 是 BWA-MEM (Li 2013, arXiv) 的 SIMD 加速重寫，輸出與原版<strong>位元等價</strong>，但速度快 2–3.5 倍。記憶體需求較大 (索引 ~80 GB for GRCh38)，需 AVX2/AVX512 CPU。</p></div>
+<div data-lang="en"><p>Alignment finds each read's most likely genomic origin. Wrong mapping → wrong variant calls. Short reads (~150 bp) struggle in repeats, segmental duplications, HLA, KIR. Long reads change the game but with different cost and error profiles.</p>
+<p><strong>2026 default: BWA-MEM2</strong> (Vasimuddin 2019, IPDPS) — a SIMD rewrite of BWA-MEM (Li 2013, arXiv) producing <strong>bit-identical</strong> output 2–3.5× faster. Larger memory footprint (~80 GB index for GRCh38) and AVX2/AVX512 CPU required.</p></div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心鏈：</strong>BWA-MEM2 (短讀比對) → samtools sort (依座標排序) → samtools index (建立 .bai/.csi) → 進入 MarkDuplicates。CRAM 比 BAM 省 30–50% 空間，但讀寫需參考。</span>
+<span data-lang="en"><strong>Core chain:</strong> BWA-MEM2 (short-read align) → samtools sort → samtools index (.bai/.csi) → MarkDuplicates. CRAM saves 30–50% over BAM but requires the reference for I/O.</span>
+</div></div>
 </section>
 
-<!-- ===== Section 2: BAM/SAM format ===== -->
-<section class="section">
-<div class="section-label" data-zh="輸出格式" data-en="OUTPUT FORMAT">輸出格式</div>
-<h2 data-zh="二、SAM / BAM 格式解析" data-en="II. Decoding SAM / BAM">二、SAM / BAM 格式解析</h2>
-<div data-lang="zh"><p>SAM 是文字版、BAM 是二進位壓縮版（同樣資訊但小 4–5 倍）。每行代表一條 read 的比對結果，包含 11 個必要欄位 + 任意數量的 tag。</p></div>
-<div data-lang="en"><p>SAM is text; BAM is compressed binary (same info, 4–5× smaller). Each line is one read's alignment, with 11 mandatory fields plus optional tags.</p></div>
-<div class="format-block"><span class="lbl">QNAME</span>     <span class="lbl">FLAG</span>  <span class="lbl">RNAME</span>  <span class="lbl">POS</span>      <span class="lbl">MAPQ</span>  <span class="lbl">CIGAR</span>     <span class="lbl">RNEXT</span> <span class="lbl">PNEXT</span>    <span class="lbl">TLEN</span>  <span class="lbl">SEQ</span>     <span class="lbl">QUAL</span>    <span class="lbl">tags...</span>
-<span class="val">A00123:1:1101</span> <span class="val">99</span>    <span class="val">chr1</span>   <span class="val">1234567</span>  <span class="val">60</span>    <span class="val">150M</span>      <span class="val">=</span>     <span class="val">1234817</span>  <span class="val">400</span>   <span class="val">ACGT...</span> <span class="val">FFFF...</span> <span class="val">NM:i:0  MD:Z:150  RG:Z:S1</span>
-
-<span class="ann">FLAG  99 → paired, mapped in proper pair, mate reversed, R1
-MAPQ  60 → uniquely mapped, very high confidence (max for BWA-MEM)
-CIGAR 150M → 150 matches, no indels
-NM    0 → 0 mismatches against reference</span></div>
-
-<div class="card-grid cols-3">
-<div class="card"><h4>FLAG</h4><div data-lang="zh"><p>位元欄位，12 個 bit 編碼狀態：paired? mapped? duplicate? secondary? 等。常用查詢工具：<a href="https://broadinstitute.github.io/picard/explain-flags.html" target="_blank">Picard FLAG decoder</a>。</p></div><div data-lang="en"><p>Bitfield with 12 bits encoding states: paired? mapped? duplicate? secondary? Use <a href="https://broadinstitute.github.io/picard/explain-flags.html" target="_blank">Picard FLAG decoder</a> to look up.</p></div></div>
-<div class="card"><h4>MAPQ</h4><div data-lang="zh"><p>Mapping quality，0–60 scale。MAPQ ≥ 30 通常視為可靠；MAPQ = 0 表示這條 read 比對到多個位置（multi-mapping，repetitive region）。</p></div><div data-lang="en"><p>Mapping quality, 0–60 scale. MAPQ ≥ 30 is generally considered reliable; MAPQ = 0 means the read maps to multiple locations (multi-mapping, repetitive region).</p></div></div>
-<div class="card"><h4>CIGAR</h4><div data-lang="zh"><p>緊湊字串描述 read 與 ref 的關係：M=match/mismatch、I=insertion、D=deletion、S=soft-clip、H=hard-clip。如 <code>50M2I98M</code>=50 對齊+2 插入+98 對齊。</p></div><div data-lang="en"><p>Compact string describing read vs ref: M=match/mismatch, I=insertion, D=deletion, S=soft-clip, H=hard-clip. E.g. <code>50M2I98M</code> = 50 aligned + 2 inserted + 98 aligned.</p></div></div>
-</div>
-</section>
-
-<!-- ===== Section 3: Aligner comparison ===== -->
 <section class="section">
 <div class="section-label" data-zh="工具比較" data-en="TOOL COMPARISON">工具比較</div>
-<h2 data-zh="三、主流 Aligner 比較" data-en="III. Mainstream Aligner Comparison">三、主流 Aligner 比較</h2>
-<table class="comp-table"><thead><tr><th data-zh="工具" data-en="Tool">工具</th><th data-zh="演算法" data-en="Algorithm">演算法</th><th data-zh="速度 (30× WGS)" data-en="Speed (30× WGS)">速度</th><th data-zh="準確度" data-en="Accuracy">準確度</th><th data-zh="主要場景" data-en="Use Case">場景</th></tr></thead><tbody>
-<tr><td><strong>BWA-MEM</strong></td><td data-lang="zh">FM-index + SMEM</td><td data-lang="zh">~6–10 hrs</td><td>⭐⭐⭐⭐</td><td data-lang="zh">標準 baseline，GATK 官方推薦</td><td data-lang="en">FM-index + SMEM</td><td data-lang="en">~6-10 hrs</td><td data-lang="en">Standard baseline, GATK recommended</td></tr>
-<tr><td><strong>BWA-MEM2</strong></td><td data-lang="zh">BWA-MEM 重寫，向量化 SIMD</td><td data-lang="zh">~2–3 hrs</td><td>⭐⭐⭐⭐ <span data-lang="zh">與 MEM 相同</span><span data-lang="en">same as MEM</span></td><td data-lang="zh">2024 起新專案首選</td><td data-lang="en">BWA-MEM rewrite, SIMD-vectorized</td><td data-lang="en">~2-3 hrs</td><td data-lang="en">Default for new projects from 2024</td></tr>
-<tr><td><strong>Bowtie2</strong></td><td data-lang="zh">FM-index, end-to-end / local</td><td data-lang="zh">~5–8 hrs</td><td>⭐⭐⭐</td><td data-lang="zh">RNA-seq 偏好；WGS/WES 低於 BWA</td><td data-lang="en">FM-index, end-to-end / local</td><td data-lang="en">~5-8 hrs</td><td data-lang="en">RNA-seq favored; lower than BWA for WGS/WES</td></tr>
-<tr><td><strong>DRAGEN</strong></td><td data-lang="zh">硬體加速 (FPGA)</td><td data-lang="zh">~30 min</td><td>⭐⭐⭐⭐⭐</td><td data-lang="zh">商業方案，極快但需專屬硬體</td><td data-lang="en">Hardware-accelerated (FPGA)</td><td data-lang="en">~30 min</td><td data-lang="en">Commercial, very fast but needs dedicated hardware</td></tr>
-<tr><td><strong>minimap2</strong></td><td data-lang="zh">k-mer chaining</td><td data-lang="zh">~2 hrs</td><td>⭐⭐⭐⭐</td><td data-lang="zh">long reads 主場 (PacBio/ONT)</td><td data-lang="en">k-mer chaining</td><td data-lang="en">~2 hrs</td><td data-lang="en">Long-read champion (PacBio/ONT)</td></tr>
-<tr><td><strong>Novoalign</strong></td><td data-lang="zh">Needleman-Wunsch</td><td data-lang="zh">~5–10 hrs</td><td>⭐⭐⭐⭐</td><td data-lang="zh">商業，敏感度略勝 BWA 但慢</td><td data-lang="en">Needleman-Wunsch</td><td data-lang="en">~5-10 hrs</td><td data-lang="en">Commercial, slightly more sensitive than BWA but slower</td></tr>
+<h2 data-zh="一、不同平台用不同比對器" data-en="I. Match aligner to platform">一、不同平台用不同比對器</h2>
+<table class="comp-table">
+<thead><tr><th>Aligner</th><th data-zh="平台" data-en="Platform">平台</th><th data-zh="特色" data-en="Features">特色</th><th data-zh="輸出" data-en="Output">輸出</th><th data-zh="參考" data-en="Ref.">參考</th></tr></thead>
+<tbody>
+<tr><td><strong>BWA-MEM2</strong></td><td>Illumina short read</td><td data-lang="zh">SIMD 加速、軟剪裁、與 BWA-MEM 位元等價</td><td>BAM/CRAM</td><td>Vasimuddin 2019</td><td data-lang="en">SIMD speedup, soft-clipping, bit-identical to BWA-MEM</td><td>BAM/CRAM</td><td>Vasimuddin 2019</td></tr>
+<tr><td><strong>BWA-MEM</strong></td><td>Illumina short</td><td data-lang="zh">經典；仍是 GATK best practice 的等效後備</td><td>BAM/CRAM</td><td>Li 2013</td><td data-lang="en">Classic; still a GATK best-practice fallback</td><td>BAM/CRAM</td><td>Li 2013</td></tr>
+<tr><td><strong>minimap2</strong></td><td>PacBio HiFi / ONT</td><td data-lang="zh">長讀比對、splice-aware (RNA)、map-ont/map-hifi presets</td><td>BAM</td><td>Li 2018</td><td data-lang="en">Long-read, splice-aware, map-ont/map-hifi presets</td><td>BAM</td><td>Li 2018</td></tr>
+<tr><td><strong>DRAGEN</strong></td><td>Illumina (HW)</td><td data-lang="zh">FPGA 加速；BWA-MEM 功能等價</td><td>BAM/CRAM</td><td>Illumina</td><td data-lang="en">FPGA-accelerated; functionally equivalent to BWA-MEM</td><td>BAM/CRAM</td><td>Illumina</td></tr>
 </tbody></table>
+</section>
 
-<div class="callout tip"><span class="callout-icon">⚡</span><div>
-<span data-lang="zh"><strong>2024 預設選擇：</strong>BWA-MEM2 與 BWA-MEM 在 variant calling 結果上完全相同（演算法相同，只是 SIMD 加速），但執行時間縮短 2–3 倍。新專案直接用 BWA-MEM2，記憶體需求約 80 GB（建索引時 100 GB）。</span>
-<span data-lang="en"><strong>2024 default:</strong> BWA-MEM2 produces identical variant-calling results to BWA-MEM (same algorithm, just SIMD-accelerated), but runs 2–3× faster. Use BWA-MEM2 for new projects; needs ~80 GB RAM (100 GB during indexing).</span>
+<section class="section">
+<div class="section-label" data-zh="檔案格式" data-en="FILE FORMATS">檔案格式</div>
+<h2 data-zh="二、SAM / BAM / CRAM 與 Read Groups" data-en="II. SAM / BAM / CRAM and Read Groups">二、SAM / BAM / CRAM 與 Read Groups</h2>
+<div class="card-grid cols-3">
+<div class="card"><div class="card-icon">📄</div><h4>SAM</h4><div data-lang="zh"><p>純文字版本，可讀但體積大；正式 pipeline 不常用，多用於除錯。</p></div><div data-lang="en"><p>Plain text — readable but huge; rarely used in production, mainly for debugging.</p></div></div>
+<div class="card"><div class="card-icon">📦</div><h4>BAM</h4><div data-lang="zh"><p>BGZF 壓縮二進位 SAM；GATK 預設 I/O。需 .bai 索引。</p></div><div data-lang="en"><p>BGZF-compressed binary SAM; GATK default I/O. Requires .bai index.</p></div></div>
+<div class="card"><div class="card-icon">🗜️</div><h4>CRAM</h4><div data-lang="zh"><p>參考導向壓縮，省 30–50%；歐洲 EGA 主流。讀寫需參考。</p></div><div data-lang="en"><p>Reference-based compression, 30–50% smaller; EGA default. Needs reference for I/O.</p></div></div>
+</div>
+<div data-lang="zh"><p><strong>Read Group (@RG)</strong> 是 GATK 必填的元資料：<code>ID</code> 唯一識別、<code>SM</code> 樣本名、<code>PL</code> 平台 (ILLUMINA)、<code>LB</code> library、<code>PU</code> platform unit (flowcell.lane.barcode)。<strong>MarkDuplicates 依 RG 區分 library；BQSR 依 RG 學習錯誤模型</strong>。RG 錯了，後面全錯。</p></div>
+<div data-lang="en"><p><strong>Read Group (@RG)</strong> is mandatory metadata for GATK: <code>ID</code> unique, <code>SM</code> sample, <code>PL</code> platform (ILLUMINA), <code>LB</code> library, <code>PU</code> platform unit (flowcell.lane.barcode). <strong>MarkDuplicates uses RG to separate libraries; BQSR learns the error model per RG.</strong> Wrong RG → everything downstream is wrong.</p></div>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>CIGAR 中 S 與 H 的差別：</strong>soft-clip (S) 保留序列但不對位 (位元仍在 BAM 中)；hard-clip (H) 將序列從 BAM 直接移除 (節省空間，但無法回溯)。BWA-MEM2 預設輸出 soft-clip，supplementary alignment 才會出現 H。</span>
+<span data-lang="en"><strong>CIGAR S vs H:</strong> soft-clip (S) keeps the sequence but excludes it from alignment (bases still in BAM); hard-clip (H) removes bases entirely (space-saving but irreversible). BWA-MEM2 emits S by default; H appears only on supplementary alignments.</span>
 </div></div>
 </section>
 
-<!-- ===== Section 4: MAPQ interactive ===== -->
+<section class="section">
+<div class="section-label" data-zh="參考基因組" data-en="REFERENCE">參考基因組</div>
+<h2 data-zh="三、GRCh38 ALT/decoy vs T2T-CHM13" data-en="III. GRCh38 ALT/decoy vs T2T-CHM13">三、GRCh38 ALT/decoy vs T2T-CHM13</h2>
+<div data-lang="zh"><p><strong>GRCh38 + ALT-aware</strong>：BWA 的 <code>.alt</code> 索引讓 reads 同時打到 primary 與 ALT contigs，並透過 <code>bwa-postalt.js</code> 解決多對位問題。<strong>decoy (hs38d1)</strong> 收集已知混雜序列，吸收原本誤對位到人類基因組的 reads。臨床流程目前仍主用 GRCh38。</p>
+<p><strong>T2T-CHM13 v2.0</strong> (Nurk 2022, Science) 補齊了著絲粒、rDNA、衛星序列，研究級項目 (尤其 segmental duplication、satellite) 越來越多採用；但臨床參考座標仍以 GRCh38 為主，需 liftover 工具如 <strong>levioSAM2</strong>。</p></div>
+<div data-lang="en"><p><strong>GRCh38 + ALT-aware:</strong> BWA's <code>.alt</code> index lets reads map to both primary and ALT contigs; <code>bwa-postalt.js</code> resolves the duplicates. <strong>Decoy (hs38d1)</strong> absorbs known contaminants that would otherwise mis-map. Clinical pipelines still use GRCh38.</p>
+<p><strong>T2T-CHM13 v2.0</strong> (Nurk 2022, Science) closes centromeres, rDNA, and satellites; research projects (esp. segmental duplications, satellites) increasingly adopt it. Clinical coordinates remain GRCh38 — use <strong>levioSAM2</strong> for liftover.</p></div>
+</section>
+
 <section class="section">
 <div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
-<h2 data-zh="四、MAPQ 過濾模擬器" data-en="IV. MAPQ Filter Simulator">四、MAPQ 過濾模擬器</h2>
-<div data-lang="zh"><p>不同 MAPQ 閾值會保留多少 reads？對下游 variant calling 又有什麼影響？拖動滑桿觀察。</p></div>
-<div data-lang="en"><p>How many reads pass at each MAPQ threshold, and what does it mean for downstream calling? Drag the slider.</p></div>
+<h2 data-zh="Read length × insert size → fragment overlap" data-en="Read length × insert size → fragment overlap">Read length × insert size → fragment overlap</h2>
+<div data-lang="zh"><p>調整讀長與 insert size，觀察 PE reads 是否重疊 (overlap)、是否會讀進 adapter。<strong>insert &lt; 2×L</strong> 時 reads 互相重疊；<strong>insert &lt; L</strong> 時 3' 端會讀到 adapter。</p></div>
+<div data-lang="en"><p>Tune read length and insert size to see whether PE reads overlap or read into adapter. When <strong>insert &lt; 2×L</strong> they overlap; when <strong>insert &lt; L</strong> the 3' end reads into adapter.</p></div>
 <div class="interactive-panel">
-<div class="slider-group"><label><span data-zh="MAPQ 閾值" data-en="MAPQ threshold">MAPQ 閾值</span> <span id="mapqVal">≥ 20</span></label><input type="range" id="mapqSlider" min="0" max="60" value="20" step="1"></div>
-<div class="sim-stats" id="mapqStats"></div>
-<div class="chart-container" style="height:280px;"><canvas id="mapqChart"></canvas></div>
-<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;" data-zh="MAPQ 分布：通常呈雙峰（高品質單一比對 vs 低品質 multi-mapping）" data-en="MAPQ distribution is usually bimodal (uniquely mapped vs multi-mapped reads)">MAPQ 分布：通常呈雙峰（高品質單一比對 vs 低品質 multi-mapping）</p>
+<div class="slider-group"><label><span data-zh="Read length (bp)" data-en="Read length (bp)">Read length</span> <span id="valRL">150</span></label><input type="range" id="sliderRL" min="50" max="300" value="150" step="10"></div>
+<div class="slider-group"><label><span data-zh="Insert size (bp)" data-en="Insert size (bp)">Insert size</span> <span id="valIS">350</span></label><input type="range" id="sliderIS" min="100" max="600" value="350" step="10"></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statOv">—</span><span class="sim-stat fail" id="statAd">—</span></div>
+<div class="chart-container"><canvas id="alignChart"></canvas></div>
 </div>
 </section>
 
-<!-- ===== Section 5: Read groups ===== -->
 <section class="section">
-<div class="section-label" data-zh="關鍵設定" data-en="KEY SETTING">關鍵設定</div>
-<h2 data-zh="五、Read Groups (RG)：絕對不能省" data-en="V. Read Groups (RG): Never Skip">五、Read Groups (RG)：絕對不能省</h2>
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="四、選哪個比對器？" data-en="IV. Which aligner to pick?">四、選哪個比對器？</h2>
+<div class="decision-tree">
+<h4>🌳 <span data-zh="Aligner 抉擇" data-en="Aligner decision">Aligner 抉擇</span></h4>
 <div data-lang="zh">
-<p>Read group 是 BAM header 中的元資料，告訴 GATK：<em>「這些 reads 來自哪個樣本、哪批 library、哪台儀器、哪條 lane」</em>。GATK 多步驟（BQSR、HaplotypeCaller）<strong>強制要求 RG</strong>，沒有 RG 的 BAM 會直接報錯。</p>
-<p>關鍵欄位：<code>ID</code>（unique，通常 flowcell.lane）、<code>SM</code>（sample name，最重要）、<code>LB</code>（library，給 dedup 用）、<code>PL</code>（platform，如 ILLUMINA）。</p>
+<div class="dt-node"><span class="dt-q">Q1:</span><div>平台是 Illumina 短讀 (PE 150)？ <span class="dt-arrow">→ 是 →</span> <strong>BWA-MEM2</strong> (預設) 或 DRAGEN (HW 可用時)。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>PacBio HiFi 或 ONT 長讀？ <span class="dt-arrow">→</span> <strong>minimap2</strong> with <code>-x map-hifi</code> 或 <code>-x map-ont</code>。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>需要 ALT contig 對應 (HLA、KIR、IGH)？ <span class="dt-arrow">→</span> 用 <strong>GRCh38 + .alt</strong> 索引 + <code>bwa-postalt.js</code>。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>研究 segmental duplication / centromere？ <span class="dt-arrow">→</span> 考慮 <strong>T2T-CHM13</strong>，最後 liftover 回 GRCh38。</div></div>
 </div>
 <div data-lang="en">
-<p>Read groups are BAM header metadata telling GATK: <em>"these reads are from sample X, library Y, machine Z, lane W."</em> GATK steps (BQSR, HaplotypeCaller) <strong>require RGs</strong> — a BAM without them errors out immediately.</p>
-<p>Key fields: <code>ID</code> (unique, usually flowcell.lane), <code>SM</code> (sample name, most important), <code>LB</code> (library, used by dedup), <code>PL</code> (platform, e.g. ILLUMINA).</p>
+<div class="dt-node"><span class="dt-q">Q1:</span><div>Illumina short read (PE 150)? <span class="dt-arrow">→ Yes →</span> <strong>BWA-MEM2</strong> (default) or DRAGEN if available.</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>PacBio HiFi or ONT? <span class="dt-arrow">→</span> <strong>minimap2</strong> with <code>-x map-hifi</code> / <code>-x map-ont</code>.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Need ALT contig handling (HLA, KIR, IGH)? <span class="dt-arrow">→</span> Use <strong>GRCh38 + .alt</strong> index + <code>bwa-postalt.js</code>.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Studying segmental duplications / centromeres? <span class="dt-arrow">→</span> Consider <strong>T2T-CHM13</strong>, liftover back to GRCh38.</div></div>
 </div>
-
-<div class="format-block"><span class="lbl">@RG</span>  <span class="val">ID:</span>HXXX.1  <span class="val">SM:</span>patient001  <span class="val">LB:</span>patient001_lib1  <span class="val">PL:</span>ILLUMINA  <span class="val">PU:</span>HXXX.1.ATCACG  <span class="val">CN:</span>BroadInstitute
-
-<span class="ann">ID  → unique per (flowcell, lane); appears in every read's RG:Z: tag
-SM  → sample identity; same patient sequenced multiple times shares this
-LB  → library; same SM but different LB tells dedup not to merge across libs
-PL  → ILLUMINA / PACBIO / ONT — affects how BQSR models errors
-PU  → platform unit (flowcell.lane.barcode); finer than ID</span></div>
-
-<div class="callout danger"><span class="callout-icon">🚫</span><div>
-<span data-lang="zh"><strong>常見災難：</strong>所有樣本的 RG 都設成同一個 SM（例如忘了改 sample name）。後果：joint genotyping 時所有 reads 被當成同一個樣本，所有 variant 變成 homozygous，分析全錯。<strong>每次 alignment 都要核對 SM。</strong></span>
-<span data-lang="en"><strong>Common disaster:</strong> All samples sharing the same SM (e.g. forgetting to change the sample name). Consequence: joint genotyping treats everything as one sample, every variant looks homozygous, the entire analysis is wrong. <strong>Verify SM at every alignment.</strong></span>
-</div></div>
+</div>
 </section>
 
-<!-- ===== Section 6: Code ===== -->
 <section class="section">
 <div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
-<h2 data-zh="六、實作範例" data-en="VI. Code Examples">六、實作範例</h2>
-<div class="code-tabs"><div class="code-tab-btns">
-<button class="code-tab-btn active" onclick="switchTab(this,'a1')">BWA-MEM2 (推薦)</button>
-<button class="code-tab-btn" onclick="switchTab(this,'a2')">BWA-MEM (傳統)</button>
-<button class="code-tab-btn" onclick="switchTab(this,'a3')">samtools 後處理</button>
-</div>
-<div class="code-tab-content active" id="a1"><pre><span class="comment"># BWA-MEM2 alignment：建索引後直接比對 + samtools 排序</span>
-REF=Homo_sapiens_assembly38.fasta
-SM=patient001
-ID=HXXX.1.ATCACG
+<h2 data-zh="比對與排序" data-en="Align and sort">比對與排序</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'a1')">BWA-MEM2</button><button class="code-tab-btn" onclick="switchTab(this,'a2')">minimap2 (long)</button><button class="code-tab-btn" onclick="switchTab(this,'a3')">CRAM</button></div>
+<div class="code-tab-content active" id="a1"><pre><span class="comment"># BWA-MEM2 + sort + index, with proper @RG / BWA-MEM2 加排序與索引</span>
+bwa-mem2 index -p ref/GRCh38 ref/GRCh38.fa
 
-bwa-mem2 mem \
-  <span class="flag">-t</span> <span class="num">16</span> \                                   <span class="comment"># thread 數</span>
-  <span class="flag">-K</span> <span class="num">100000000</span> \                            <span class="comment"># 確定性處理 batch（GATK 推薦）</span>
-  <span class="flag">-Y</span> \                                       <span class="comment"># soft-clip supplementary alignments</span>
-  <span class="flag">-R</span> <span class="str">"@RG\tID:${ID}\tSM:${SM}\tLB:${SM}_lib1\tPL:ILLUMINA"</span> \  <span class="comment"># RG 必填</span>
-  $REF \
-  ${SM}_R1.trim.fastq.gz ${SM}_R2.trim.fastq.gz \
-  | samtools sort -@ <span class="num">8</span> -o ${SM}.sorted.bam -
+RG="@RG\tID:S1.L001\tSM:S1\tPL:ILLUMINA\tLB:S1.lib1\tPU:HXXXXDSXY.1.ATCACG"
 
-samtools index ${SM}.sorted.bam</pre></div>
+bwa-mem2 mem -t 16 -R "$RG" -K 100000000 -Y \
+    ref/GRCh38 trim/S1_R1.fq.gz trim/S1_R2.fq.gz \
+  | samtools sort -@ 8 -m 2G -o bam/S1.sorted.bam -
+samtools index -@ 4 bam/S1.sorted.bam</pre></div>
+<div class="code-tab-content" id="a2"><pre><span class="comment"># minimap2 for PacBio HiFi or ONT</span>
+minimap2 -t 16 -ax map-hifi ref/GRCh38.fa hifi/S1.fq.gz \
+  | samtools sort -@ 8 -o bam/S1.hifi.bam -
+samtools index bam/S1.hifi.bam
 
-<div class="code-tab-content" id="a2"><pre><span class="comment"># 傳統 BWA-MEM（與 MEM2 結果完全相同，只是慢 2-3 倍）</span>
-bwa mem <span class="flag">-t</span> <span class="num">16</span> <span class="flag">-K</span> <span class="num">100000000</span> <span class="flag">-Y</span> \
-  <span class="flag">-R</span> <span class="str">"@RG\tID:HXXX.1\tSM:patient001\tLB:patient001_lib1\tPL:ILLUMINA"</span> \
-  Homo_sapiens_assembly38.fasta \
-  patient001_R1.trim.fastq.gz patient001_R2.trim.fastq.gz \
-  | samtools sort -@ <span class="num">8</span> -o patient001.sorted.bam -
+<span class="comment"># ONT R10.4.1</span>
+minimap2 -t 16 -ax map-ont ref/GRCh38.fa ont/S1.fq.gz | samtools sort -o bam/S1.ont.bam -</pre></div>
+<div class="code-tab-content" id="a3"><pre><span class="comment"># Convert BAM → CRAM (saves 30–50% disk)</span>
+samtools view -@ 8 -C -T ref/GRCh38.fa \
+    -o cram/S1.cram bam/S1.sorted.bam
+samtools index cram/S1.cram
 
-<span class="comment"># GATK best practice 用的 -K 與 -Y 是為了與下游 MarkDuplicates 行為一致</span></pre></div>
-
-<div class="code-tab-content" id="a3"><pre><span class="comment"># samtools 常用後處理</span>
-
-<span class="comment"># 1. 統計比對率與 MAPQ 分布</span>
-samtools flagstat patient001.sorted.bam
-
-<span class="comment"># 2. 過濾 MAPQ ≥ 20 並保留 properly paired</span>
-samtools view -b -q <span class="num">20</span> -f <span class="num">2</span> patient001.sorted.bam &gt; patient001.q20.bam
-
-<span class="comment"># 3. 視覺化某區段（IGV 之外的快速方式）</span>
-samtools view patient001.sorted.bam chr1:<span class="num">1000000</span>-<span class="num">1001000</span> | head
-
-<span class="comment"># 4. 計算特定區域的 coverage</span>
-samtools depth -a -r chr1:<span class="num">1000000</span>-<span class="num">2000000</span> patient001.sorted.bam | \
-  awk <span class="str">'{sum+=$3; n++} END {print "mean cov:", sum/n}'</span></pre></div>
+<span class="comment"># Read back to BAM if a tool needs it</span>
+samtools view -@ 8 -b -T ref/GRCh38.fa -o bam/S1.bam cram/S1.cram</pre></div>
 </div>
 </section>
 
-<!-- ===== Section 7: Common issues ===== -->
-<section class="section">
-<div class="section-label" data-zh="排查" data-en="TROUBLESHOOTING">排查</div>
-<h2 data-zh="七、常見問題" data-en="VII. Common Issues">七、常見問題</h2>
-
-<div class="accordion-item"><button class="accordion-btn" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')"><span data-zh="比對率 (mapping rate) 多少算正常？" data-en="What's a normal mapping rate?">比對率 (mapping rate) 多少算正常？</span></button><div class="accordion-body">
-<div data-lang="zh"><p>人類 WGS/WES 對 GRCh38 的比對率通常 ≥ <strong>97%</strong>。低於 90% 是警訊，常見原因：(1) 跨物種污染（細菌、mycoplasma）；(2) 沒有 trim 嚴重的 adapter；(3) 用錯參考（如 GRCh37 vs hg19 的 chr 命名差異）。<code>samtools flagstat</code> 是第一道檢查。</p></div>
-<div data-lang="en"><p>Human WGS/WES alignment to GRCh38 typically achieves ≥ <strong>97%</strong>. Below 90% is a red flag — common causes: (1) cross-species contamination (bacteria, mycoplasma); (2) unstripped adapter contamination; (3) wrong reference (GRCh37 vs hg19 chromosome naming mismatch). <code>samtools flagstat</code> is the first check.</p></div>
-</div></div>
-
-<div class="accordion-item"><button class="accordion-btn" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')"><span data-zh="MAPQ 為什麼大量出現 0？" data-en="Why are so many MAPQ values 0?">MAPQ 為什麼大量出現 0？</span></button><div class="accordion-body">
-<div data-lang="zh"><p>BWA-MEM 對 multi-mapping reads（同樣最佳分數比對到 ≥2 個位置）的 MAPQ 設為 0。這通常出現在：<strong>(1) repetitive regions</strong>（如 segmental duplications, telomeres, centromeres）；<strong>(2) 假基因/同源基因家族</strong>（如 GBA / GBAP1）。MAPQ=0 reads 在 variant calling 時會被忽略，這在某些臨床基因（如 SMN1/SMN2）造成嚴重盲區，需特別處理。</p></div>
-<div data-lang="en"><p>BWA-MEM sets MAPQ to 0 for multi-mapping reads (same best-score alignment in ≥2 places). Common in: <strong>(1) repetitive regions</strong> (segmental duplications, telomeres, centromeres); <strong>(2) pseudogenes / paralog families</strong> (e.g. GBA/GBAP1). MAPQ=0 reads are ignored during variant calling, creating serious blind spots for some clinical genes (e.g. SMN1/SMN2) requiring special handling.</p></div>
-</div></div>
-
-<div class="accordion-item"><button class="accordion-btn" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')"><span data-zh="GRCh38 ALT contigs 要不要用？" data-en="Should I use GRCh38 ALT contigs?">GRCh38 ALT contigs 要不要用？</span></button><div class="accordion-body">
-<div data-lang="zh"><p>GRCh38 包含 <strong>261 個 ALT contigs</strong>（人類群體中常見的替代單倍型，如 HLA、KIR）。GATK Best Practices 建議使用 alt-aware alignment（BWA-MEM 加上 <code>.alt</code> 索引檔），這會大幅改善這些區域的 calling 準確度。但工作流複雜度也提升——若不打算分析 HLA/KIR，使用「primary assembly only」（無 ALT）也可接受。</p></div>
-<div data-lang="en"><p>GRCh38 includes <strong>261 ALT contigs</strong> (alternative haplotypes common in human populations, e.g. HLA, KIR). GATK Best Practices recommends alt-aware alignment (BWA-MEM with <code>.alt</code> index), which substantially improves calling accuracy in these regions. But workflow complexity rises — if you don't plan to analyze HLA/KIR, "primary assembly only" (no ALT) is acceptable.</p></div>
-</div></div>
-
-<div class="accordion-item"><button class="accordion-btn" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')"><span data-zh="比對需要多少記憶體？" data-en="How much memory does alignment need?">比對需要多少記憶體？</span></button><div class="accordion-body">
-<div data-lang="zh"><p>BWA-MEM 比對人類基因組約需 <strong>10 GB RAM</strong>。<strong>BWA-MEM2 需要 80 GB</strong>（記憶體換速度——預先載入大型 SIMD-friendly index）。BWA-MEM2 建索引階段甚至需要 100 GB。雲端環境或筆電要先確認規格，否則會 OOM。</p></div>
-<div data-lang="en"><p>BWA-MEM uses ~<strong>10 GB RAM</strong> for human alignment. <strong>BWA-MEM2 needs 80 GB</strong> (memory-for-speed trade — pre-loading a large SIMD-friendly index). BWA-MEM2 indexing alone needs ~100 GB. Verify your cloud/laptop specs first or you'll OOM.</p></div>
-</div></div>
-</section>
-
-<!-- ===== Quiz ===== -->
-<section class="quiz-section"><h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
-
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
 <div class="quiz-q" data-answer="2">
-<p data-lang="zh">1. 你跑完 BWA-MEM 後 <code>samtools flagstat</code> 顯示 mapping rate 只有 78%。最該優先檢查的是？</p>
-<p data-lang="en">1. After BWA-MEM, <code>samtools flagstat</code> shows only 78% mapping rate. Most likely cause to check first?</p>
+<p data-lang="zh">1. 為什麼 @RG (Read Group) 是 GATK pipeline 必填欄位？</p>
+<p data-lang="en">1. Why is @RG mandatory for GATK pipelines?</p>
 <div class="quiz-options">
-<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. BWA 版本不對</span><span data-lang="en">A. Wrong BWA version</span></div>
-<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. CPU thread 數設太少</span><span data-lang="en">B. Too few CPU threads</span></div>
-<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 跨物種污染（細菌/mycoplasma）或 adapter 沒有 trim 乾淨</span><span data-lang="en">C. Cross-species contamination (bacteria/mycoplasma) or unstripped adapters</span></div>
-<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. Reference fasta 沒有索引</span><span data-lang="en">D. Reference fasta wasn't indexed</span></div>
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 因為 BWA-MEM2 沒它無法跑</span><span data-lang="en">A. BWA-MEM2 won't run without it</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 只是給人閱讀</span><span data-lang="en">B. It's only for humans to read</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. MarkDuplicates 依 LB 分 library、BQSR 依 ID 學錯誤模型，缺則無法工作</span><span data-lang="en">C. MarkDuplicates uses LB to separate libraries and BQSR learns error models per ID</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 用來計算 mapping rate</span><span data-lang="en">D. To compute mapping rate</span></div>
 </div><div class="quiz-feedback" id="fb1"></div></div>
-
-<div class="quiz-q" data-answer="0">
-<p data-lang="zh">2. 一個 read 的 MAPQ 是 0，正確的解讀是？</p>
-<p data-lang="en">2. A read with MAPQ = 0 means:</p>
-<div class="quiz-options">
-<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 這條 read 在 reference 上有多個最佳比對位置（multi-mapping）</span><span data-lang="en">A. The read maps equally well to multiple positions (multi-mapping)</span></div>
-<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 這條 read 完全沒有比對成功</span><span data-lang="en">B. The read failed to align entirely</span></div>
-<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 這條 read 的 base quality 很差</span><span data-lang="en">C. The read has poor base quality</span></div>
-<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 這條 read 來自 mitochondria</span><span data-lang="en">D. The read is from the mitochondria</span></div>
-</div><div class="quiz-feedback" id="fb2"></div></div>
-
 <div class="quiz-q" data-answer="1">
-<p data-lang="zh">3. 關於 Read Group (RG)，以下何者錯誤？</p>
-<p data-lang="en">3. Which statement about Read Groups (RG) is FALSE?</p>
+<p data-lang="zh">2. CIGAR 中 soft-clip (S) 與 hard-clip (H) 的差別？</p>
+<p data-lang="en">2. Difference between soft-clip (S) and hard-clip (H) in CIGAR?</p>
 <div class="quiz-options">
-<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. SM 欄位代表 sample name，必須在同一個樣本所有 BAM 中保持一致</span><span data-lang="en">A. The SM field is the sample name and must match across all BAMs from one sample</span></div>
-<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. RG 是可選的，沒設定 GATK 也能正常跑</span><span data-lang="en">B. RG is optional; GATK runs fine without it</span></div>
-<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. LB 欄位告訴 MarkDuplicates 哪些 reads 來自同一個 library</span><span data-lang="en">C. The LB field tells MarkDuplicates which reads share a library</span></div>
-<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. PL 欄位影響 BQSR 如何建模 base quality 錯誤</span><span data-lang="en">D. The PL field affects how BQSR models base quality errors</span></div>
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 兩者完全相同</span><span data-lang="en">A. They are identical</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. S 保留序列只是不對位；H 把序列從 BAM 中移除</span><span data-lang="en">B. S keeps the sequence but excludes from alignment; H removes bases from the record</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. S 只用於 RNA-seq</span><span data-lang="en">C. S is only for RNA-seq</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. H 比 S 準確</span><span data-lang="en">D. H is more accurate than S</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">3. 是非題：BWA-MEM2 的對位結果與 BWA-MEM 完全不同，因此不能混用。</p>
+<p data-lang="en">3. True/False: BWA-MEM2 produces different alignments from BWA-MEM, so they can't be mixed.</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對</span><span data-lang="en">A. True</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯——BWA-MEM2 是 SIMD 重寫，輸出與 BWA-MEM 位元等價</span><span data-lang="en">B. False — BWA-MEM2 is a SIMD rewrite, bit-identical to BWA-MEM</span></div>
 </div><div class="quiz-feedback" id="fb3"></div></div>
 </section>
 
 <nav class="page-nav">
-<a href="fastq-qc.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 2: FASTQ QC</span></a>
-<a href="post-alignment.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 4: Post-Alignment</span></a>
+<a href="trimming.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 3: Trimming</span></a>
+<a href="markdup-bqsr.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 5: MarkDup & BQSR</span></a>
 </nav>
 </main>
-<footer class="site-footer">© WGS/WES Interactive Tutorial</footer>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
 <script src="i18n.js"></script>
 <script>
 window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
 function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
-
-// MAPQ histogram simulator
-const mapqBins=Array.from({length:61},(_,i)=>i);
-// Realistic bimodal MAPQ: large peak at 60, smaller peak at 0, sparse middle
-const mapqCounts=mapqBins.map(q=>{
-  if(q===60) return 850;          // large unique peak
-  if(q===0) return 70;             // multi-map peak
-  if(q>=55) return Math.round(80*Math.exp(-(60-q)*0.4));
-  if(q<=10) return Math.round(20*Math.exp(-q*0.15));
-  return Math.max(1,Math.round(5+10*Math.random()));
-});
-const totalReads=mapqCounts.reduce((a,b)=>a+b,0);
-
-const mapqChart=new Chart(document.getElementById('mapqChart'),{type:'bar',data:{labels:mapqBins,datasets:[{label:'Pass',data:mapqCounts.map((v,i)=>i>=20?v:0),backgroundColor:'rgba(43,79,129,0.7)',borderWidth:0},{label:'Fail',data:mapqCounts.map((v,i)=>i<20?v:0),backgroundColor:'rgba(184,58,44,0.6)',borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},scales:{x:{title:{display:true,text:'MAPQ'},stacked:true,ticks:{maxTicksLimit:13}},y:{title:{display:true,text:'Read count'},stacked:true}}}});
-
-function updateMapq(){
-  const L=I18n.get();
-  const t=+document.getElementById('mapqSlider').value;
-  document.getElementById('mapqVal').textContent='≥ '+t;
-  const passData=mapqCounts.map((v,i)=>i>=t?v:0);
-  const failData=mapqCounts.map((v,i)=>i<t?v:0);
-  const pass=passData.reduce((a,b)=>a+b,0);
-  const fail=failData.reduce((a,b)=>a+b,0);
-  const passPct=(pass/totalReads*100).toFixed(1);
-  const failPct=(fail/totalReads*100).toFixed(1);
-  document.getElementById('mapqStats').innerHTML=
-    `<span class="sim-stat pass">${L==='zh'?'保留':'Kept'}: ${pass.toLocaleString()} (${passPct}%)</span>`+
-    `<span class="sim-stat fail">${L==='zh'?'剔除':'Removed'}: ${fail.toLocaleString()} (${failPct}%)</span>`;
-  mapqChart.data.datasets[0].data=passData;
-  mapqChart.data.datasets[1].data=failData;
-  mapqChart.data.datasets[0].label=L==='zh'?'保留':'Kept';
-  mapqChart.data.datasets[1].label=L==='zh'?'剔除':'Removed';
-  mapqChart.update('none');
-}
-document.getElementById('mapqSlider').addEventListener('input',updateMapq);
-document.addEventListener('langchange',updateMapq);
-updateMapq();
-
-const QF={
-  zh:{q1_y:'低 mapping rate 通常源自 reads 本身的問題（污染、adapter），不是工具設定。',q1_n:'正解已標示。',q2_y:'BWA-MEM 對 multi-mapping reads 給 MAPQ=0，常見於 repetitive regions 與 paralog 家族。',q2_n:'正解已標示。',q3_y:'GATK 多步驟強制要求 RG，缺 RG 會直接報錯。',q3_n:'正解已標示。'},
-  en:{q1_y:'Low mapping rate usually traces to read-side issues (contamination, adapters), not tool settings.',q1_n:'Correct answer highlighted.',q2_y:'BWA-MEM assigns MAPQ=0 to multi-mapping reads — common in repetitive regions and paralog families.',q2_n:'Correct answer highlighted.',q3_y:'GATK steps require RG; missing RG triggers an immediate error.',q3_n:'Correct answer highlighted.'}
-};
+const alignChart=new Chart(document.getElementById('alignChart'),{type:'bar',data:{labels:['R1','Gap/Overlap','R2'],datasets:[{label:'bp',data:[150,50,150],backgroundColor:['rgba(4,120,87,.75)','rgba(217,119,6,.5)','rgba(4,120,87,.75)']}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:'Fragment layout (bp)'}},scales:{x:{beginAtZero:true,title:{display:true,text:'Length (bp)'}}}}});
+function up(){const L=+document.getElementById('sliderRL').value,I=+document.getElementById('sliderIS').value;document.getElementById('valRL').textContent=L;document.getElementById('valIS').textContent=I;const overlap=Math.max(0,2*L-I);const gap=Math.max(0,I-2*L);const adapter=Math.max(0,L-I);const lang=I18n.get();document.getElementById('statOv').textContent=(lang==='zh'?'重疊: ':'Overlap: ')+overlap+' bp';document.getElementById('statAd').textContent=(lang==='zh'?'讀入 adapter: ':'Into adapter: ')+adapter+' bp/read';alignChart.data.datasets[0].data=[L,gap>0?gap:-overlap,L];alignChart.data.datasets[0].backgroundColor=['rgba(4,120,87,.75)',overlap>0?'rgba(185,28,28,.55)':'rgba(217,119,6,.5)','rgba(4,120,87,.75)'];alignChart.options.plugins.title.text=(lang==='zh'?'片段佈局 ':'Fragment ')+'(insert='+I+', R='+L+')';alignChart.update('none');}
+['sliderRL','sliderIS'].forEach(id=>document.getElementById(id).addEventListener('input',up));document.addEventListener('langchange',up);up();
+const QF={zh:{q1_y:'@RG 是 GATK 多步驟必要欄位。',q1_n:'答案：C。',q2_y:'S 留序、H 不留序，這影響下游 BQSR 與 dup 偵測。',q2_n:'答案：B。',q3_y:'BWA-MEM2 是 SIMD 加速重寫，結果與 BWA-MEM 位元等價。',q3_n:'答案：B。'},en:{q1_y:'@RG is required by multiple GATK steps.',q1_n:'Correct: C.',q2_y:'S keeps the sequence; H drops it — matters for BQSR & dup detection.',q2_n:'Correct: B.',q3_y:'BWA-MEM2 is a SIMD rewrite, bit-identical to BWA-MEM.',q3_n:'Correct: B.'}};
 document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
 </script>
 </body></html>

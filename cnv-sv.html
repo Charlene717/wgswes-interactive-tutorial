@@ -1,0 +1,179 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 11: CNV / SV Detection — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links"><li><a href="intro.html">Intro</a></li><li><a href="qc.html">QC</a></li><li><a href="trimming.html">Trim</a></li><li><a href="alignment.html">Align</a></li><li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li><li><a href="coverage.html">Coverage</a></li><li><a href="germline-calling.html">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot.</a></li><li><a href="cnv-sv.html" class="active">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html">Long-read</a></li><li><a href="acmg.html">ACMG</a></li><li><a href="clinical-report.html">Report</a></li><li><a href="cohort.html">Cohort</a></li><li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li></ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 11 / 16</div>
+<h1 data-zh="CNV / SV 偵測" data-en="CNV / SV Detection">CNV / SV 偵測</h1>
+<p class="subtitle" data-lang="zh">超越 SNV / Indel：缺失、重複、倒置、插入、易位——用 split read、discordant pair 與 read depth 三大訊號偵測。</p>
+<p class="subtitle" data-lang="en">Beyond SNV/Indel: DEL, DUP, INV, INS, TRA — detected via split-read, discordant-pair, and read-depth signals.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="什麼是 SV？什麼是 CNV？" data-en="What is SV vs CNV?">什麼是 SV？什麼是 CNV？</h2>
+<div data-lang="zh"><p><strong>SV (Structural Variant)</strong> = 大於 50 bp 的結構變異，包含 5 大類型：<strong>DEL</strong>（缺失）、<strong>DUP</strong>（重複）、<strong>INV</strong>（倒置）、<strong>INS</strong>（插入）、<strong>TRA / BND</strong>（易位 / breakend）。</p>
+<p><strong>CNV (Copy Number Variant)</strong> 是 SV 的子集，特指<strong>影響拷貝數</strong>的變異（DEL + DUP）。INV 不改變拷貝數所以不算 CNV。臨床上 CNV 涵蓋 chr 21 trisomy、22q11.2 deletion 等知名疾病。</p>
+<p>SV 偵測比 SNV 困難得多：訊號分散、breakpoint 不一定精確、repetitive 區域容易假陽性。<strong>T2T-CHM13 參考</strong>（Nurk 2022 Science、Aganezov 2022 Science）讓 ~5% 額外 SV 得以解析，特別是 centromere 與 acrocentric 區域。</p></div>
+<div data-lang="en"><p><strong>SV (Structural Variant)</strong> = variation &gt; 50 bp, five types: <strong>DEL</strong>, <strong>DUP</strong>, <strong>INV</strong>, <strong>INS</strong>, <strong>TRA / BND</strong> (translocation / breakend).</p>
+<p><strong>CNV (Copy Number Variant)</strong> is a subset of SV — only DEL + DUP that change copy number. INV doesn't change copy number, so it isn't a CNV. Clinically, CNVs include chr 21 trisomy and 22q11.2 deletion.</p>
+<p>SV detection is harder than SNV: signals are diffuse, breakpoints imprecise, and repeats produce FPs. <strong>T2T-CHM13</strong> (Nurk 2022, Aganezov 2022 Science) resolves ~5% more SVs per genome, especially in centromeric/acrocentric regions.</p></div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>三大訊號：</strong>(1) <strong>Split-read</strong>：單一 read 跨越 breakpoint 被切兩半；(2) <strong>Discordant pair</strong>：PE 兩端距離 / 方向異常；(3) <strong>Read depth</strong>：區段覆蓋深度偏離預期。專業 caller 同時用 2-3 種訊號。</span>
+<span data-lang="en"><strong>Three signals:</strong> (1) <strong>Split-read</strong>: a read crosses a breakpoint and is soft-clipped; (2) <strong>Discordant pair</strong>: PE distance/orientation abnormal; (3) <strong>Read depth</strong>: regional coverage deviates from expectation. Production callers use 2–3 signals jointly.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="工具比較" data-en="TOOL COMPARISON">工具比較</div>
+<h2 data-zh="一、主流 SV / CNV Caller" data-en="I. Major SV / CNV callers">一、主流 SV / CNV Caller</h2>
+<table class="comp-table">
+<thead><tr><th>Tool</th><th data-zh="發表" data-en="Reference">發表</th><th data-zh="訊號" data-en="Signals">訊號</th><th data-zh="平台" data-en="Platform">平台</th><th data-zh="推薦情境" data-en="Best for">推薦情境</th></tr></thead>
+<tbody>
+<tr><td><strong>Manta</strong></td><td>Chen 2016, Bioinformatics</td><td data-lang="zh">paired-end + split</td><td>WGS / WES</td><td data-lang="zh">germline + somatic 通用</td><td data-lang="en">paired-end + split</td><td data-lang="en">WGS/WES</td><td data-lang="en">Germline + somatic universal</td></tr>
+<tr><td><strong>DELLY</strong></td><td>Rausch 2012, Bioinformatics</td><td data-lang="zh">paired-end + split</td><td>WGS</td><td data-lang="zh">complex SV、TRA</td><td data-lang="en">paired-end + split</td><td data-lang="en">WGS</td><td data-lang="en">Complex SV, translocations</td></tr>
+<tr><td><strong>CNVkit</strong></td><td>Talevich 2016, PLOS CB</td><td data-lang="zh">read depth (含 panel-of-normals)</td><td>WES / panel</td><td data-lang="zh">WES somatic CNV</td><td data-lang="en">read depth (panel-of-normals)</td><td data-lang="en">WES / panel</td><td data-lang="en">WES somatic CNV</td></tr>
+<tr><td><strong>GATK gCNV</strong></td><td>Babadi 2023, Nat Genet</td><td data-lang="zh">read depth + HMM</td><td>WES / WGS cohort</td><td data-lang="zh">大型 cohort germline CNV</td><td data-lang="en">read depth + HMM</td><td data-lang="en">WES/WGS cohort</td><td data-lang="en">Large germline CNV cohort</td></tr>
+<tr><td><strong>Sniffles2</strong></td><td>Smolka 2024, Nat Biotech</td><td data-lang="zh">long-read alignment</td><td>PacBio / ONT</td><td data-lang="zh">long-read 第一選擇</td><td data-lang="en">long-read alignment</td><td data-lang="en">PacBio / ONT</td><td data-lang="en">First-choice for long-read</td></tr>
+<tr><td><strong>cuteSV</strong></td><td>Jiang 2020, Genome Biol</td><td data-lang="zh">long-read cluster</td><td>PacBio / ONT</td><td data-lang="zh">高 recall 補充</td><td data-lang="en">long-read clustering</td><td data-lang="en">PacBio / ONT</td><td data-lang="en">High-recall complement</td></tr>
+</tbody></table>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="二、依資料類型選擇 caller" data-en="II. Pick caller by data type">二、依資料類型選擇</h2>
+<div class="decision-tree">
+<h4>🌳 <span data-zh="SV/CNV Caller 選擇" data-en="SV/CNV caller selection">SV/CNV Caller 選擇</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>WGS short-read germline？ <span class="dt-arrow">→</span> <strong>Manta</strong> + <strong>DELLY</strong>（兩家共識），CNV 補 <strong>GATK gCNV</strong>。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>WES？ <span class="dt-arrow">→</span> SV 用 <strong>Manta exome 模式</strong>；CNV 用 <strong>CNVkit</strong>（targeted）或 <strong>XHMM/CoNIFER</strong>（cohort）。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Long-read (PacBio HiFi / ONT)？ <span class="dt-arrow">→</span> <strong>Sniffles2</strong> 主用 + <strong>cuteSV</strong> 補充。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Tumor / matched normal？ <span class="dt-arrow">→</span> Manta + <strong>GRIDSS2</strong>，再用 <strong>SvABA</strong> 交叉驗證。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>WGS short-read germline? <span class="dt-arrow">→</span> <strong>Manta</strong> + <strong>DELLY</strong> (consensus), add <strong>GATK gCNV</strong> for CNV.</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>WES? <span class="dt-arrow">→</span> SV via <strong>Manta exome mode</strong>; CNV via <strong>CNVkit</strong> (targeted) or <strong>XHMM/CoNIFER</strong> (cohort).</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Long-read (PacBio HiFi / ONT)? <span class="dt-arrow">→</span> <strong>Sniffles2</strong> primary + <strong>cuteSV</strong> for recall.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Tumor / matched normal? <span class="dt-arrow">→</span> Manta + <strong>GRIDSS2</strong>, cross-check with <strong>SvABA</strong>.</div></div>
+</div>
+</div>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>WES CNV 警告：</strong>WES 因捕獲偏差使 read-depth 信號雜訊大，CNV 解析力遠不如 WGS。臨床確認需要 array-CGH 或 MLPA。<strong>GATK gCNV 需要 ≥ 100 個技術相似 (kit + lab) 樣本</strong>建立 panel-of-normals。</span>
+<span data-lang="en"><strong>WES CNV caveat:</strong> capture bias makes read-depth noisy — WES CNV resolution is far worse than WGS. Clinical confirmation needs aCGH or MLPA. <strong>GATK gCNV requires ≥ 100 technically similar (kit + lab) samples</strong> to build a panel-of-normals.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="SV 訊號視覺化" data-en="SV signal visualization">SV 訊號視覺化</h2>
+<div data-lang="zh"><p>切換 SV 類型，觀察 split-read 與 discordant-pair 訊號在 breakpoint 周圍的分佈。實務上 caller 用統計模型整合這些訊號。</p></div>
+<div data-lang="en"><p>Toggle SV type to see how split-read and discordant-pair signals cluster near breakpoints. Real callers fuse these via statistical models.</p></div>
+<div class="interactive-panel">
+<div class="slider-group"><label><span data-zh="SV 類型" data-en="SV type">SV 類型</span></label>
+<select id="svType" style="padding:.4rem .8rem;border:1px solid var(--c-border);border-radius:8px;">
+<option value="DEL">DEL (deletion)</option><option value="DUP">DUP (duplication)</option><option value="INV">INV (inversion)</option></select></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statSR">—</span><span class="sim-stat fail" id="statDP">—</span></div>
+<div class="chart-container"><canvas id="sChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;" data-zh="綠=split read、橘=discordant pair、灰=normal depth" data-en="Green=split read, amber=discordant pair, grey=normal depth">綠=split read、橘=discordant pair</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作範例" data-en="Implementation">實作範例</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'c1')">Manta</button><button class="code-tab-btn" onclick="switchTab(this,'c2')">CNVkit (WES)</button><button class="code-tab-btn" onclick="switchTab(this,'c3')">GATK gCNV</button></div>
+<div class="code-tab-content active" id="c1"><pre><span class="comment"># Manta — germline SV</span>
+configManta.py \
+    --bam bam/S1.bqsr.bam \
+    --referenceFasta Homo_sapiens.GRCh38.fa \
+    --runDir manta/S1
+manta/S1/runWorkflow.py -m local -j 8
+
+<span class="comment"># 結果：manta/S1/results/variants/diploidSV.vcf.gz</span>
+<span class="comment"># 過濾 PASS + 大於 100 bp + 非低複雜度區</span>
+bcftools view -f PASS manta/S1/results/variants/diploidSV.vcf.gz \
+  | bcftools view -i 'INFO/SVLEN&lt;-100 || INFO/SVLEN&gt;100' \
+  &gt; sv/S1.manta.pass.vcf</pre></div>
+<div class="code-tab-content" id="c2"><pre><span class="comment"># CNVkit — WES somatic CNV</span>
+cnvkit.py batch \
+    bam/tumor.bam \
+    --normal bam/normal*.bam \
+    --targets target.bed \
+    --annotate refFlat.txt \
+    --fasta Homo_sapiens.GRCh38.fa \
+    --access access-5kb-mappable.hg38.bed \
+    --output-reference cnvkit/pon.cnn \
+    --output-dir cnvkit/ \
+    --processes 8
+
+cnvkit.py scatter cnvkit/tumor.cnr -s cnvkit/tumor.cns -o cnvkit/tumor.pdf
+cnvkit.py call cnvkit/tumor.cns -o cnvkit/tumor.call.cns</pre></div>
+<div class="code-tab-content" id="c3"><pre><span class="comment"># GATK gCNV — 大 cohort germline CNV</span>
+gatk PreprocessIntervals -L target.bed --interval-merging-rule OVERLAPPING_ONLY \
+    --bin-length 0 -R ref.fa -O intervals.preprocessed.interval_list
+
+gatk CollectReadCounts -I bam/S1.bqsr.bam -L intervals.preprocessed.interval_list \
+    --interval-merging-rule OVERLAPPING_ONLY -O counts/S1.counts.tsv
+
+<span class="comment"># cohort PON (建議 ≥ 100 同技術背景樣本)</span>
+gatk GermlineCNVCaller --run-mode COHORT \
+    -L intervals.preprocessed.interval_list \
+    -I counts/*.counts.tsv \
+    --contig-ploidy-calls ploidy/calls \
+    --output gcnv/ --output-prefix cohort</pre></div>
+</div>
+</section>
+
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. 下列哪個訊號「沒有」直接被 Manta / DELLY 使用？</p>
+<p data-lang="en">1. Which signal is NOT directly used by Manta / DELLY?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. Split read</span><span data-lang="en">A. Split read</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. Discordant paired-end</span><span data-lang="en">B. Discordant paired-end</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 質譜分析的胺基酸豐度</span><span data-lang="en">C. Mass-spec amino acid abundance</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. Soft-clip 序列</span><span data-lang="en">D. Soft-clip sequence</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">2. WES 適合用 CNVkit 而不是純 read-depth 比較的原因是？</p>
+<p data-lang="en">2. Why is CNVkit preferred over raw read-depth comparison on WES?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. CNVkit 比較快</span><span data-lang="en">A. CNVkit is faster</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. CNVkit 接受 BAM 而 mosdepth 不行</span><span data-lang="en">B. CNVkit accepts BAM, mosdepth doesn't</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. CNVkit 同時建模 on-target 與 off-target reads 並校正 GC / 捕獲偏差，能用 panel-of-normals</span><span data-lang="en">C. CNVkit models both on- and off-target reads, corrects GC/capture bias, supports panel-of-normals</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. CNVkit 只支援 WES</span><span data-lang="en">D. CNVkit only supports WES</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">3. 是非題：GATK gCNV 在 cohort 模式下至少需要 ~100 個技術相似的樣本來建立 panel-of-normals。</p>
+<p data-lang="en">3. True/False: GATK gCNV cohort mode needs ~100 technically similar samples for a PON.</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對</span><span data-lang="en">A. True</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯——10 個就夠</span><span data-lang="en">B. False — 10 is enough</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="annotation.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 10: Annotation</span></a>
+<a href="somatic.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 12: Somatic</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+const xs=[];for(let x=0;x<=200;x+=2)xs.push(x);
+const sChart=new Chart(document.getElementById('sChart'),{type:'line',data:{labels:xs,datasets:[{label:'Read depth',data:[],borderColor:'#9ca3af',backgroundColor:'rgba(156,163,175,.2)',borderWidth:2,fill:true,tension:.3,pointRadius:0},{label:'Split read',data:[],borderColor:'#047857',backgroundColor:'rgba(4,120,87,.6)',borderWidth:0,fill:false,pointRadius:3,showLine:false},{label:'Discordant pair',data:[],borderColor:'#d97706',backgroundColor:'rgba(217,119,6,.6)',borderWidth:0,fill:false,pointRadius:3,showLine:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{title:{display:true,text:'Coverage / signal'},min:0,max:80},x:{title:{display:true,text:'Position (kb)'}}}}});
+function up(){const t=document.getElementById('svType').value;const bp1=80,bp2=120;const depth=xs.map(x=>{if(t==='DEL'&&x>bp1&&x<bp2)return 5+Math.random()*4;if(t==='DUP'&&x>bp1&&x<bp2)return 55+Math.random()*8;return 28+Math.random()*5;});const split=xs.map(x=>(Math.abs(x-bp1)<3||Math.abs(x-bp2)<3)?(15+Math.random()*8):null);const disc=xs.map(x=>(Math.abs(x-bp1)<6||Math.abs(x-bp2)<6)?(10+Math.random()*6):null);sChart.data.datasets[0].data=depth;sChart.data.datasets[1].data=split;sChart.data.datasets[2].data=disc;sChart.update('none');const L=I18n.get();const srN=split.filter(v=>v).length,dpN=disc.filter(v=>v).length;document.getElementById('statSR').textContent=(L==='zh'?'Split: ':'Split: ')+srN;document.getElementById('statDP').textContent=(L==='zh'?'Discordant: ':'Discordant: ')+dpN;}
+document.getElementById('svType').addEventListener('change',up);document.addEventListener('langchange',up);up();
+const QF={zh:{q1_y:'SV caller 不用質譜資料。',q1_n:'答案：C。',q2_y:'CNVkit 同時用 on- 與 off-target reads + PON。',q2_n:'答案：C。',q3_y:'GATK gCNV 規定 cohort ≥ 100 技術相似樣本。',q3_n:'答案：A。'},en:{q1_y:'SV callers don\'t use mass-spec.',q1_n:'Correct: C.',q2_y:'CNVkit uses on/off-target reads with PON correction.',q2_n:'Correct: C.',q3_y:'GATK gCNV requires ~100 technically similar samples for PON.',q3_n:'Correct: A.'}};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

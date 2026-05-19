@@ -1,0 +1,166 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 15: Clinical Report & Databases — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links"><li><a href="intro.html">Intro</a></li><li><a href="qc.html">QC</a></li><li><a href="trimming.html">Trim</a></li><li><a href="alignment.html">Align</a></li><li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li><li><a href="coverage.html">Coverage</a></li><li><a href="germline-calling.html">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot.</a></li><li><a href="cnv-sv.html">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html">Long-read</a></li><li><a href="acmg.html">ACMG</a></li><li><a href="clinical-report.html" class="active">Report</a></li><li><a href="cohort.html">Cohort</a></li><li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li></ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 15 / 16</div>
+<h1 data-zh="臨床報告與資料庫" data-en="Clinical Report & Databases">臨床報告與資料庫</h1>
+<p class="subtitle" data-lang="zh">ClinVar、gnomAD v4、ACMG SF v3.2、HGVS 命名與報告結構：從變異到可作為臨床決策依據。</p>
+<p class="subtitle" data-lang="en">ClinVar, gnomAD v4, ACMG SF v3.2, HGVS nomenclature, and report structure — from variant to clinically actionable.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="臨床報告的「五個一定要」" data-en="Five must-haves for clinical reports">臨床報告的「五個一定要」</h2>
+<div data-lang="zh"><p>NGS 臨床報告不只是輸出 VCF：它是醫療紀錄。需符合 <strong>CAP/CLIA / ISO 15189</strong> 實驗室規範、ACMG/AMP 分類、HGVS 命名，並提供：</p>
+<ul><li><strong>檢驗適應症</strong> (clinical indication) — 為何做此檢測</li><li><strong>方法與限制</strong> — 覆蓋範圍、靈敏度、無法偵測的變異類型</li><li><strong>發現的變異</strong> — P/LP/VUS（B/LB 通常不報）含 HGVS、ClinVar、gnomAD、ACMG 依據</li><li><strong>不確定性聲明</strong> — VUS 解釋、reanalysis policy</li><li><strong>建議</strong> — 家族檢測、再分析時機、後續追蹤</li></ul></div>
+<div data-lang="en"><p>An NGS clinical report is not a VCF dump — it is a medical record. Must meet <strong>CAP/CLIA / ISO 15189</strong> standards, follow ACMG/AMP, use HGVS naming, and include:</p>
+<ul><li><strong>Clinical indication</strong> — why testing was ordered</li><li><strong>Method &amp; limits</strong> — coverage, sensitivity, undetectable variant types</li><li><strong>Findings</strong> — P/LP/VUS (B/LB usually not reported) with HGVS, ClinVar, gnomAD, ACMG basis</li><li><strong>Uncertainty statement</strong> — VUS interpretation, reanalysis policy</li><li><strong>Recommendations</strong> — family testing, reanalysis timing, follow-up</li></ul></div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>HGVS 命名（Den Dunnen 2016, Hum Mutat）：</strong>編碼 DNA 用 <code>c.</code>（如 <code>c.5266dup</code>），蛋白用 <code>p.</code>（如 <code>p.Lys41Glu</code> 或單碼 <code>p.K41E</code>）。基因組座標用 <code>g.</code>，前綴必加 transcript ID + 版本（<code>NM_007294.4:c.5266dup</code>）。</span>
+<span data-lang="en"><strong>HGVS (Den Dunnen 2016, Hum Mutat):</strong> coding DNA uses <code>c.</code> (e.g. <code>c.5266dup</code>); protein uses <code>p.</code> (e.g. <code>p.Lys41Glu</code> or short <code>p.K41E</code>); genome uses <code>g.</code>; always prefix with transcript ID + version (<code>NM_007294.4:c.5266dup</code>).</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="資料庫比較" data-en="DATABASE COMPARISON">資料庫比較</div>
+<h2 data-zh="一、四大臨床變異資料庫" data-en="I. Four core clinical variant databases">一、四大臨床變異資料庫</h2>
+<table class="comp-table">
+<thead><tr><th>DB</th><th data-zh="範疇" data-en="Scope">範疇</th><th data-zh="特色" data-en="Key features">特色</th><th data-zh="授權" data-en="License">授權</th></tr></thead>
+<tbody>
+<tr><td><strong>ClinVar</strong> (Landrum 2018 NAR)</td><td data-lang="zh">變異—疾病關聯</td><td data-lang="zh">公開、submission-based、有 1-4 星評級</td><td>NIH 公開</td><td data-lang="en">Variant-disease</td><td data-lang="en">Public submission, 1–4 star rating</td><td></td></tr>
+<tr><td><strong>OMIM</strong></td><td data-lang="zh">基因—表型目錄</td><td data-lang="zh">經典 Mendelian、研究級</td><td data-lang="zh">學術免費</td><td data-lang="en">Gene-phenotype catalog</td><td data-lang="en">Classic Mendelian, research-grade</td><td data-lang="en">Free for academia</td></tr>
+<tr><td><strong>HGMD</strong></td><td data-lang="zh">致病變異收集</td><td data-lang="zh">商業 (BIOBASE) 完整版需付費</td><td data-lang="zh">商業授權</td><td data-lang="en">Disease-causing variants</td><td data-lang="en">Commercial full version (BIOBASE)</td><td data-lang="en">Commercial</td></tr>
+<tr><td><strong>LOVD</strong></td><td data-lang="zh">locus-specific databases</td><td data-lang="zh">分散式，每基因獨立策展</td><td data-lang="zh">通常公開</td><td data-lang="en">Locus-specific</td><td data-lang="en">Distributed, per-gene curation</td><td data-lang="en">Usually public</td></tr>
+</tbody></table>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>ClinVar 星級評等：</strong>★ 單一 submitter 無證據 → ★★ 多 submitter 一致 → ★★★ 專業專家小組 (ClinGen VCEP) → ★★★★ practice guideline。引用時請註明星等與最後審核日期，不可盲信 ★ 級別。</span>
+<span data-lang="en"><strong>ClinVar star rating:</strong> ★ single submitter no criteria → ★★ multiple submitters concordant → ★★★ expert panel (ClinGen VCEP) → ★★★★ practice guideline. Cite with star level &amp; review date; never blindly trust ★ entries.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="人群頻率" data-en="POPULATION AF">人群頻率</div>
+<h2 data-zh="二、gnomAD v4 與次要發現" data-en="II. gnomAD v4 & secondary findings">二、gnomAD v4 與次要發現</h2>
+<div data-lang="zh"><p><strong>gnomAD v4</strong> (Karczewski 2024, Nature)：807,162 exomes + 76,215 genomes，最大族裔多樣性人群基因組頻率資源。<strong>用法：</strong>(1) MAF 過濾 (BA1/BS1/PM2)；(2) gene constraint metrics（LOEUF、pLI、misZ）；(3) structural variant frequency。</p>
+<p><strong>ACMG SF v3.2</strong> (Miller 2023, Genet Med)：定義 <strong>81 個次要發現基因</strong>（incidental findings），這些基因即使非檢測適應症發現變異，因有「可行動性 actionable」，應通報病人——例如 <em>BRCA1/2</em>、<em>MLH1</em>、<em>MYBPC3</em>、<em>RYR1</em> 等。</p></div>
+<div data-lang="en"><p><strong>gnomAD v4</strong> (Karczewski 2024, Nature): 807,162 exomes + 76,215 genomes — the largest, most ancestry-diverse population AF resource. Uses: (1) MAF filtering (BA1/BS1/PM2); (2) gene constraint metrics (LOEUF, pLI, misZ); (3) SV frequency.</p>
+<p><strong>ACMG SF v3.2</strong> (Miller 2023, Genet Med): defines <strong>81 secondary-findings genes</strong> — variants in these are actionable and should be reported even outside the test indication. Examples: <em>BRCA1/2</em>, <em>MLH1</em>, <em>MYBPC3</em>, <em>RYR1</em>.</p></div>
+<div class="decision-tree">
+<h4>🌳 <span data-zh="次要發現處理流程" data-en="Secondary findings workflow">次要發現處理流程</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>變異基因在 ACMG SF v3.2 81 基因之內？ <span class="dt-arrow">→</span> 進入次要發現審核。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>變異 P 或 LP？ <span class="dt-arrow">→</span> 病人在<strong>同意書</strong>選 opt-in 才回報。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Reanalysis：依 Wenger 2017 / Liu 2019，每 1-2 年重新分析未解 case，可增 ~10% 確診率。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>Gene in ACMG SF v3.2 (81 genes)? <span class="dt-arrow">→</span> Enter SF review.</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Variant P or LP? <span class="dt-arrow">→</span> Report only if patient opted-in on consent.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Reanalysis: per Wenger 2017 / Liu 2019, re-curate unsolved cases every 1–2 yr → ~10% extra diagnostic yield.</div></div>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="變異證據聚合模擬器" data-en="Variant evidence aggregator">變異證據聚合模擬器</h2>
+<div data-lang="zh"><p>調整 ClinVar 星級、gnomAD MAF 與 LOEUF，看「臨床報告信心分數」如何變化（教學用啟發式公式）。</p></div>
+<div data-lang="en"><p>Tune ClinVar stars, gnomAD MAF, and LOEUF to see how a "report confidence score" shifts (heuristic, for teaching).</p></div>
+<div class="interactive-panel">
+<div class="slider-group"><label><span data-zh="ClinVar 星級" data-en="ClinVar stars">ClinVar ★</span> <span id="valStar">2</span></label><input type="range" id="sliderStar" min="0" max="4" value="2" step="1"></div>
+<div class="slider-group"><label><span data-zh="gnomAD MAF (log10)" data-en="gnomAD MAF (log10)">log10 MAF</span> <span id="valMaf">-5</span></label><input type="range" id="sliderMaf" min="-6" max="-1" value="-5" step="0.5"></div>
+<div class="slider-group"><label><span data-zh="LOEUF" data-en="LOEUF">LOEUF</span> <span id="valLoeuf">0.3</span></label><input type="range" id="sliderLoeuf" min="0.05" max="2" value="0.3" step="0.05"></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statConf">—</span><span class="sim-stat fail" id="statRec">—</span></div>
+<div class="chart-container"><canvas id="repChart"></canvas></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="變異查詢與報告 JSON" data-en="Variant lookup & report JSON">變異查詢與報告 JSON</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r1')">gnomAD API</button><button class="code-tab-btn" onclick="switchTab(this,'r2')">ClinVar VCV</button><button class="code-tab-btn" onclick="switchTab(this,'r3')">Report JSON</button></div>
+<div class="code-tab-content active" id="r1"><pre><span class="comment"># gnomAD v4 GraphQL — per-population AF</span>
+curl -X POST https://gnomad.broadinstitute.org/api \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"{variant(variantId:\"17-43093454-T-C\",dataset:gnomad_r4){exome{ac an af populations{id ac an af}}}}"}' | jq</pre></div>
+<div class="code-tab-content" id="r2"><pre><span class="comment"># ClinVar — VCV lookup via E-utilities</span>
+esearch -db clinvar -query 'BRCA1[gene] AND c.5266dup' | \
+    esummary | xtract -pattern DocumentSummary \
+    -element variation_set/variation_name germline_classification/description review_status
+
+<span class="comment"># or by VCV ID directly</span>
+curl 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id=VCV000017661&retmode=json'</pre></div>
+<div class="code-tab-content" id="r3"><pre><span class="comment"># Minimal variant-report JSON (GA4GH-style)</span>
+{
+  "patient_id": "P0042",
+  "indication": "Hereditary breast/ovarian cancer suspicion",
+  "panel": "HBOC_v3 (45 genes)",
+  "method": "WES, 100x mean coverage, GRCh38",
+  "findings": [{
+    "gene": "BRCA1",
+    "transcript": "NM_007294.4",
+    "hgvs_c": "c.5266dup",
+    "hgvs_p": "p.Gln1756ProfsTer74",
+    "vaf": 0.49,
+    "clinvar": {"vcv": "VCV000017661", "stars": 4,
+                "classification": "Pathogenic"},
+    "acmg": {"tier": "P", "codes": ["PVS1","PS4","PM2","PP5"]},
+    "recommendation": "Family cascade testing"
+  }],
+  "reanalysis_policy": "Every 2 years if unsolved"
+}</pre></div>
+</div>
+</section>
+
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. ClinVar 中 ★★★ 三星評等代表？</p>
+<p data-lang="en">1. ClinVar ★★★ (three-star) rating means?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 單一 submitter 無 ACMG 證據</span><span data-lang="en">A. Single submitter, no criteria</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 多個 submitter 但不一致</span><span data-lang="en">B. Multiple submitters, discordant</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 經 ClinGen VCEP 專家小組審查通過</span><span data-lang="en">C. Reviewed by a ClinGen VCEP expert panel</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 已成 practice guideline</span><span data-lang="en">D. Practice guideline status</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">2. ACMG SF v3.2 (Miller 2023) 列出多少個次要發現基因？</p>
+<p data-lang="en">2. ACMG SF v3.2 (Miller 2023) lists how many secondary-findings genes?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 59</span><span data-lang="en">A. 59</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 81</span><span data-lang="en">B. 81</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 230</span><span data-lang="en">C. 230</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 1024</span><span data-lang="en">D. 1024</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">3. 是非題：HGVS 命名 c.5266dup 可省略 transcript ID。</p>
+<p data-lang="en">3. True/False: HGVS naming c.5266dup may omit the transcript ID.</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對</span><span data-lang="en">A. True</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯——必須含 transcript ID 與版本，如 NM_007294.4:c.5266dup</span><span data-lang="en">B. False — must include transcript ID + version, e.g. NM_007294.4:c.5266dup</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="acmg.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 14: ACMG</span></a>
+<a href="cohort.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 16: Cohort</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+const repChart=new Chart(document.getElementById('repChart'),{type:'radar',data:{labels:['ClinVar','Rarity','Constraint','Function','Inheritance'],datasets:[{label:'Evidence',data:[2,3,3,2,2],borderColor:'#047857',backgroundColor:'rgba(4,120,87,.25)',pointBackgroundColor:'#d97706'}]},options:{responsive:true,maintainAspectRatio:false,scales:{r:{min:0,max:5}}}});
+function up(){const s=+document.getElementById('sliderStar').value,m=+document.getElementById('sliderMaf').value,l=+document.getElementById('sliderLoeuf').value;document.getElementById('valStar').textContent=s;document.getElementById('valMaf').textContent=m;document.getElementById('valLoeuf').textContent=l;const cv=s,rar=Math.min(5,Math.max(0,-(m+1))),cons=Math.min(5,Math.max(0,(2-l)*2.5)),fn=3,inh=3;const score=(cv*2+rar+cons+fn+inh);repChart.data.datasets[0].data=[cv,rar,cons,fn,inh];repChart.update('none');const L=I18n.get();document.getElementById('statConf').textContent=(L==='zh'?'分數: ':'Score: ')+score.toFixed(1);let rec='VUS';if(score>=14)rec='P';else if(score>=10)rec='LP';else if(score<=4)rec='LB';document.getElementById('statRec').textContent=(L==='zh'?'建議: ':'Suggest: ')+rec;}
+['sliderStar','sliderMaf','sliderLoeuf'].forEach(id=>document.getElementById(id).addEventListener('input',up));document.addEventListener('langchange',up);up();
+const QF={zh:{q1_y:'★★★ 表示 ClinGen VCEP 審核。',q1_n:'答案：C。',q2_y:'v3.2 為 81 基因。',q2_n:'答案：B。',q3_y:'HGVS 必含 transcript ID。',q3_n:'答案：B。'},en:{q1_y:'★★★ = ClinGen VCEP-reviewed.',q1_n:'Correct: C.',q2_y:'v3.2 lists 81 genes.',q2_n:'Correct: B.',q3_y:'HGVS requires transcript ID.',q3_n:'Correct: B.'}};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

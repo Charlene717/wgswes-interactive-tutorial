@@ -1,0 +1,156 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 2: Raw FASTQ QC — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="intro.html">Intro</a></li><li><a href="qc.html" class="active">QC</a></li><li><a href="trimming.html">Trim</a></li><li><a href="alignment.html">Align</a></li><li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li><li><a href="coverage.html">Coverage</a></li><li><a href="germline-calling.html">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot.</a></li><li><a href="cnv-sv.html">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html">Long-read</a></li><li><a href="acmg.html">ACMG</a></li><li><a href="clinical-report.html">Report</a></li><li><a href="cohort.html">Cohort</a></li>
+    <li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 2 / 16</div>
+<h1 data-zh="原始定序 QC (FASTQ)" data-en="Raw FASTQ QC">原始定序 QC (FASTQ)</h1>
+<p class="subtitle" data-lang="zh">在比對之前識破測序問題：低品質 base、adapter 污染、GC bias、duplication、過度 PCR。</p>
+<p class="subtitle" data-lang="en">Catch sequencing problems before alignment: low-Q bases, adapter contamination, GC bias, duplication, over-PCR.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為什麼 FASTQ QC 是必要的？" data-en="Why FASTQ QC is mandatory">為什麼 FASTQ QC 是必要的？</h2>
+<div data-lang="zh"><p>FASTQ 是所有下游分析的源頭。<strong>Garbage in, garbage out</strong>：若原始定序資料有 adapter 污染、過度 PCR、樣本污染或 base quality 嚴重下降，無論後面用多先進的 caller 都會出現大量假陽性。</p>
+<p>QC 不只是「跑 FastQC 看綠色打勾」——你必須<strong>理解每個模組的失敗意義</strong>，特別是 WGS/WES 與 RNA-seq 的判讀差異 (例如 K-mer 重複在 WGS 是 PCR over-duplication；在 RNA-seq 則可能是高表達基因)。</p></div>
+<div data-lang="en"><p>FASTQ is the source of all downstream analyses. <strong>Garbage in, garbage out</strong>: if raw reads have adapter contamination, PCR over-duplication, sample swap, or quality drop, even the best caller will produce false positives.</p>
+<p>QC is not just "run FastQC and check for green ticks" — you must <strong>understand what each module's failure means</strong>, and how WGS/WES differs from RNA-seq (e.g., k-mer duplication in WGS suggests PCR over-cycling; in RNA-seq it may just be a highly expressed gene).</p></div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心工具鏈：</strong>FastQC (Andrews 2010, Babraham) 每樣本獨立報告 → MultiQC (Ewels 2016, Bioinformatics) 多樣本彙整 → fastp (Chen 2018, Bioinformatics) 一步完成 QC+trimming，已成現代主流。</span>
+<span data-lang="en"><strong>Core toolchain:</strong> FastQC (Andrews 2010, Babraham) per-sample → MultiQC (Ewels 2016, Bioinformatics) aggregation → fastp (Chen 2018, Bioinformatics) one-step QC+trim — the modern default.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="核心指標" data-en="CORE METRICS">核心指標</div>
+<h2 data-zh="一、FastQC 11 個模組必懂解讀" data-en="I. 11 FastQC modules you must read">一、FastQC 11 個模組必懂解讀</h2>
+<div class="card-grid cols-3">
+<div class="card"><div class="card-icon">📊</div><h4>Per base sequence quality</h4><div data-lang="zh"><p>Q score 沿讀長分佈。Illumina Q30 = 99.9% 準確；3' 末端常因化學疲乏下降。失敗：箱形圖中位數 &lt; Q20。</p></div><div data-lang="en"><p>Q distribution along read. Q30 = 99.9% accuracy. 3' end usually drops due to chemistry fatigue. Fail: median &lt; Q20.</p></div></div>
+<div class="card"><div class="card-icon">🧬</div><h4>Per sequence GC content</h4><div data-lang="zh"><p>人類 ~41% GC。雙峰常代表污染 (其他物種、adapter dimer)。WGS 期望單峰，WES 因捕獲探針可能略偏。</p></div><div data-lang="en"><p>Human ~41% GC. Bimodal often = contamination (another species, adapter dimers). WGS expects unimodal; WES may be slightly shifted by capture probes.</p></div></div>
+<div class="card"><div class="card-icon">🔁</div><h4>Sequence duplication</h4><div data-lang="zh"><p>WGS 高 dup (&gt;30%) 暗示 PCR over-cycling 或低 input；WES 可達 30–50%（高深度本就重複多），需 MarkDup 後再判斷。</p></div><div data-lang="en"><p>High dup (&gt;30%) in WGS suggests over-PCR or low input. WES often 30–50% (high depth inflates duplication) — judge after MarkDup.</p></div></div>
+<div class="card"><div class="card-icon">🪝</div><h4>Adapter content</h4><div data-lang="zh"><p>3' 末端 adapter 表示插入片段過短。Illumina TruSeq、Nextera、xGen 各有特定序列。fastp 可自動偵測。</p></div><div data-lang="en"><p>3' adapter = insert too short. Illumina TruSeq, Nextera, xGen each have distinct sequences. fastp auto-detects.</p></div></div>
+<div class="card"><div class="card-icon">🔬</div><h4>Overrepresented seqs</h4><div data-lang="zh"><p>WGS 出現特定 reads 多次 → 警示 PCR 偏差、rRNA 殘留、index hopping (NovaSeq patterned flowcell)。</p></div><div data-lang="en"><p>WGS reads recurring → flag PCR bias, rRNA residue, or index hopping (NovaSeq patterned flowcell).</p></div></div>
+<div class="card"><div class="card-icon">🎲</div><h4>Per tile sequence quality</h4><div data-lang="zh"><p>NovaSeq / NextSeq 顯示 flowcell 區域品質。一片 lane 紅色暗示氣泡、汙染、scratch。</p></div><div data-lang="en"><p>Shows per-tile quality on NovaSeq/NextSeq. A red band = bubble, contamination, or scratch.</p></div></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="Phred Q score → base accuracy" data-en="Phred Q → base accuracy">Phred Q score → base accuracy</h2>
+<div data-lang="zh"><p>拖動 Q score 觀察錯誤率變化。<strong>Q = -10·log₁₀(P_error)</strong>。理解 Q20/Q30/Q40 對應的實際錯誤率，才能評估 reads 是否值得保留。</p></div>
+<div data-lang="en"><p>Drag Q to see error rate. <strong>Q = -10·log₁₀(P_error)</strong>. Understanding Q20/Q30/Q40 in absolute terms helps decide whether reads are worth keeping.</p></div>
+<div class="interactive-panel">
+<div class="slider-group"><label><span data-zh="Phred Q score" data-en="Phred Q score">Phred Q</span> <span id="valQ">30</span></label><input type="range" id="sliderQ" min="10" max="42" value="30" step="1"></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statErr">—</span><span class="sim-stat fail" id="statAcc">—</span></div>
+<div class="chart-container"><canvas id="qChart"></canvas></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="二、QC 失敗時的決策樹" data-en="II. Decision tree for QC failures">二、QC 失敗時的決策樹</h2>
+<div class="decision-tree">
+<h4>🌳 <span data-zh="QC 異常排查" data-en="Triaging QC anomalies">QC 異常排查</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>Per base quality 3' 端嚴重下降？ <span class="dt-arrow">→ 是 →</span> 用 fastp/Trimmomatic <strong>quality trim</strong>，閾值 Q15-Q20。不要 over-trim。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Adapter content &gt; 5%？ <span class="dt-arrow">→ 是 →</span> 啟用 <strong>adapter trimming</strong>。fastp 預設可自動偵測。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>GC distribution 雙峰？ <span class="dt-arrow">→ 是 →</span> 跑 <strong>FastQ Screen / Kraken2</strong> 檢查物種污染。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Duplication &gt; 40%（WGS）？ <span class="dt-arrow">→ 是 →</span> 檢查 input DNA 量、PCR cycles。MarkDup 後若 dup &gt; 50% 仍嚴重，考慮重做。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>3' end quality drop? <span class="dt-arrow">→ Yes →</span> <strong>Quality trim</strong> with fastp/Trimmomatic at Q15–Q20. Avoid over-trimming.</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Adapter content &gt; 5%? <span class="dt-arrow">→ Yes →</span> Enable <strong>adapter trimming</strong>; fastp auto-detects by default.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Bimodal GC distribution? <span class="dt-arrow">→ Yes →</span> Run <strong>FastQ Screen / Kraken2</strong> for species contamination.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Duplication &gt; 40% (WGS)? <span class="dt-arrow">→ Yes →</span> Check input DNA mass and PCR cycles. If &gt; 50% after MarkDup, consider re-prep.</div></div>
+</div>
+</div>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>常見誤解：</strong>FastQC 給「紅色」未必代表資料壞——只代表「不符合通用 mRNA-seq 假設」。WGS/WES/amplicon 的判讀標準完全不同。一定要結合定序模式與生物背景判讀。</span>
+<span data-lang="en"><strong>Common misconception:</strong> FastQC "red" doesn't always mean bad data — it means "doesn't match generic mRNA-seq assumptions". WGS/WES/amplicon have different expectations. Always interpret in context.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="QC 工具實作" data-en="QC implementation">QC 工具實作</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'b1')">Bash</button><button class="code-tab-btn" onclick="switchTab(this,'b2')">fastp + MultiQC</button></div>
+<div class="code-tab-content active" id="b1"><pre><span class="comment"># FastQC + MultiQC for raw FASTQ QC</span>
+fastqc -t 8 -o qc/raw fq/*.fq.gz
+
+<span class="comment"># Aggregate multi-sample reports</span>
+multiqc qc/raw -o qc/multiqc_raw
+
+<span class="comment"># Optional: species contamination check</span>
+fastq_screen --conf fastq_screen.conf fq/sample_R1.fq.gz</pre></div>
+<div class="code-tab-content" id="b2"><pre><span class="comment"># fastp: one-step QC + trimming (recommended)</span>
+fastp \
+    -i fq/S1_R1.fq.gz -I fq/S1_R2.fq.gz \
+    -o trim/S1_R1.fq.gz -O trim/S1_R2.fq.gz \
+    -h qc/fastp/S1.html -j qc/fastp/S1.json \
+    --detect_adapter_for_pe \
+    --qualified_quality_phred 15 \
+    --length_required 50 \
+    --thread 8
+
+<span class="comment"># Then aggregate</span>
+multiqc qc/fastp -o qc/multiqc_fastp</pre></div>
+</div>
+</section>
+
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. Q30 對應的單一鹼基錯誤率是？</p>
+<p data-lang="en">1. The single-base error rate at Q30 is?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 1/10 (10%)</span><span data-lang="en">A. 1/10 (10%)</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 1/100 (1%)</span><span data-lang="en">B. 1/100 (1%)</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 1/1000 (0.1%)</span><span data-lang="en">C. 1/1000 (0.1%)</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 1/10000 (0.01%)</span><span data-lang="en">D. 1/10000 (0.01%)</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">2. FastQC 的 GC distribution 出現明顯雙峰，最可能的原因是？</p>
+<p data-lang="en">2. Bimodal GC distribution in FastQC most likely indicates?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. Quality 嚴重下降</span><span data-lang="en">A. Severe quality drop</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 樣本污染（其他物種、adapter dimer）</span><span data-lang="en">B. Sample contamination (another species, adapter dimers)</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 定序深度過低</span><span data-lang="en">C. Insufficient sequencing depth</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. PCR 偏差</span><span data-lang="en">D. PCR bias</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">3. 是非題：WES 樣本的 duplication rate 30-50% 一定代表資料有問題。</p>
+<p data-lang="en">3. True/False: A 30–50% duplication rate in WES always indicates a problem.</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對</span><span data-lang="en">A. True</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯——WES 高深度本就易出現高 dup；要看 MarkDup 後的「unique read 數」與插入片段分佈才能判斷</span><span data-lang="en">B. False — WES high depth naturally inflates dup; judge by unique reads & insert-size distribution after MarkDup</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="intro.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title" data-zh="Step 1: WGS / WES 概論" data-en="Step 1: Overview">Step 1: WGS / WES 概論</span></a>
+<a href="trimming.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title" data-zh="Step 3: Adapter Trimming" data-en="Step 3: Adapter Trimming">Step 3: Adapter Trimming</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+const qs=[];for(let q=10;q<=42;q++)qs.push(q);
+const qChart=new Chart(document.getElementById('qChart'),{type:'line',data:{labels:qs,datasets:[{label:'Error rate',data:qs.map(q=>Math.pow(10,-q/10)),borderColor:'#d97706',backgroundColor:'rgba(217,119,6,.15)',borderWidth:2,fill:true,tension:.3,pointRadius:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{type:'logarithmic',title:{display:true,text:'P(error)'}},x:{title:{display:true,text:'Phred Q'}}}}});
+function up(){const q=+document.getElementById('sliderQ').value;document.getElementById('valQ').textContent=q;const e=Math.pow(10,-q/10);const L=I18n.get();document.getElementById('statErr').textContent=(L==='zh'?'錯誤率: ':'Error: ')+(e*100).toFixed(e<0.001?4:2)+'%';document.getElementById('statAcc').textContent=(L==='zh'?'準確率: ':'Accuracy: ')+((1-e)*100).toFixed(4)+'%';}
+document.getElementById('sliderQ').addEventListener('input',up);document.addEventListener('langchange',up);up();
+const QF={zh:{q1_y:'Q = -10·log₁₀(P)，Q30 → 10⁻³ = 0.1%。',q1_n:'答案：C。Q30 對應 0.1% 錯誤率。',q2_y:'雙峰常見於物種污染或 adapter dimer。',q2_n:'答案：B。',q3_y:'WES 高深度本身就會抬高 dup 比例，要看 unique reads。',q3_n:'答案：B。'},en:{q1_y:'Q = -10·log₁₀(P), so Q30 → 10⁻³ = 0.1%.',q1_n:'Correct: C. Q30 = 0.1% error.',q2_y:'Bimodal GC typical of species contamination or adapter dimers.',q2_n:'Correct: B.',q3_y:'High WES depth inflates apparent dup — assess unique read count.',q3_n:'Correct: B.'}};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

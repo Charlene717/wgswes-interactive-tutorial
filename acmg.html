@@ -1,0 +1,164 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 14: ACMG / AMP Variant Classification — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links"><li><a href="intro.html">Intro</a></li><li><a href="qc.html">QC</a></li><li><a href="trimming.html">Trim</a></li><li><a href="alignment.html">Align</a></li><li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li><li><a href="coverage.html">Coverage</a></li><li><a href="germline-calling.html">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot.</a></li><li><a href="cnv-sv.html">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html">Long-read</a></li><li><a href="acmg.html" class="active">ACMG</a></li><li><a href="clinical-report.html">Report</a></li><li><a href="cohort.html">Cohort</a></li><li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li></ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 14 / 16</div>
+<h1 data-zh="ACMG / AMP 變異分類" data-en="ACMG / AMP Variant Classification">ACMG / AMP 變異分類</h1>
+<p class="subtitle" data-lang="zh">28 條證據規則 + 2025 點數系統：把變異化成 P / LP / VUS / LB / B 的標準框架。</p>
+<p class="subtitle" data-lang="en">28-criterion framework + 2025 point system: standardised P / LP / VUS / LB / B classification.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="ACMG / AMP 2015 + 演化" data-en="ACMG / AMP 2015 + evolution">ACMG / AMP 2015 + 演化</h2>
+<div data-lang="zh"><p>Richards 2015 (Genet Med) 由 American College of Medical Genetics 與 Association for Molecular Pathology 共同制定，定義 5 級分類：<strong>Pathogenic (P) / Likely Pathogenic (LP) / Variant of Uncertain Significance (VUS) / Likely Benign (LB) / Benign (B)</strong>。基於 28 條證據（16 條病原 + 12 條良性）的組合規則。</p>
+<p><strong>後續演化：</strong>(1) 2018 SVI splicing 規則更新；(2) Tayoun 2018 (Hum Mutat) <strong>PVS1 細化決策樹</strong>（去除/重啟動 codon、剪接破壞、整體 NMD 觸發）；(3) 2025 <strong>ClinGen SVI 點數系統</strong> — 將證據強度轉換為點數（PVS=8, PS=4, PM=2, PP=1, 良性負分），總分對應分類。</p></div>
+<div data-lang="en"><p>Richards 2015 (Genet Med), jointly authored by ACMG &amp; AMP, defines 5 tiers: <strong>Pathogenic (P) / Likely Pathogenic (LP) / Variant of Uncertain Significance (VUS) / Likely Benign (LB) / Benign (B)</strong>. Built on 28 criteria (16 pathogenic + 12 benign) combined by rules.</p>
+<p><strong>Evolution:</strong> (1) 2018 SVI splicing updates; (2) Tayoun 2018 (Hum Mutat) <strong>PVS1 refinement tree</strong> (loss vs alternate start, splice disruption, NMD); (3) 2025 <strong>ClinGen SVI point system</strong> — points per evidence (PVS=8, PS=4, PM=2, PP=1; benign negative), summed for classification.</p></div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>2025 點數系統優勢：</strong>解決了「PM2_supporting + PP3 是否能升 LP」這種長期模糊地帶。Pejaver 2022、Tavtigian 2018 (GIM) 用 Bayesian model 推導出點數對應—— P ≥ 10 分、LP 6-9 分、VUS 0-5 分、LB -1 to -6、B ≤ -7。</span>
+<span data-lang="en"><strong>2025 point-system advantage:</strong> resolves long-standing ambiguity (e.g. "does PM2_supporting + PP3 reach LP?"). Pejaver 2022, Tavtigian 2018 (GIM) derived points via Bayesian model — P ≥ 10, LP 6–9, VUS 0–5, LB -1 to -6, B ≤ -7.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="證據代碼" data-en="EVIDENCE CODES">證據代碼</div>
+<h2 data-zh="一、28 條核心證據" data-en="I. 28 core criteria">一、28 條核心證據</h2>
+<table class="comp-table">
+<thead><tr><th data-zh="強度" data-en="Strength">強度</th><th data-zh="病原 (Pathogenic)" data-en="Pathogenic">病原</th><th data-zh="良性 (Benign)" data-en="Benign">良性</th></tr></thead>
+<tbody>
+<tr><td><strong>Very Strong / Stand-alone</strong></td><td>PVS1 (null variant in LoF gene)</td><td>BA1 (MAF ≥ 5%)</td></tr>
+<tr><td><strong>Strong</strong></td><td>PS1–PS4 (same AA, de novo, functional, prevalence)</td><td>BS1–BS4 (high MAF, functional, segregation, lack)</td></tr>
+<tr><td><strong>Moderate</strong></td><td>PM1–PM6 (hotspot, absent gnomAD, length, missense burden, in-frame indel, de novo unconfirmed)</td><td>—</td></tr>
+<tr><td><strong>Supporting</strong></td><td>PP1–PP5 (cosegregation, missense gene, computational, phenotype, reputable)</td><td>BP1–BP7 (missense in truncation gene, in-trans, computational, silent, reputable, etc.)</td></tr>
+</tbody></table>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>BA1 陷阱：</strong>原始 5% 為通用閾值，但 ClinGen 已針對特定疾病/基因下調（例如 <em>BRCA1/2</em> 用 ≥ 1%）。<strong>勿盲套 5%</strong>——必須查 ClinGen gene-specific specification。亦不可僅憑 BA1 認定 B：需排除創始人效應（founder effect）。</span>
+<span data-lang="en"><strong>BA1 pitfall:</strong> default 5% is generic, but ClinGen specifies lower thresholds per gene (e.g. <em>BRCA1/2</em> uses ≥1%). <strong>Don't apply 5% blindly</strong> — consult ClinGen gene-specific specifications. BA1 alone is insufficient if a founder effect could explain high MAF.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="二、自動化工具與最佳實務" data-en="II. Automation tools & best practice">二、自動化工具與最佳實務</h2>
+<div class="decision-tree">
+<h4>🌳 <span data-zh="如何分類一個變異？" data-en="How to classify a variant?">如何分類一個變異？</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>VEP/SnpEff 註解後，是 nonsense/frameshift/canonical splice、且基因已知 LoF 致病？ <span class="dt-arrow">→</span> <strong>套 PVS1（依 Tayoun 2018 樹）</strong>。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>gnomAD MAF？ <span class="dt-arrow">→</span> &lt; 1/100,000 → PM2_supporting；ClinGen 閾值以上 → BA1/BS1。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>用 InterVar (Li 2017 AJHG)、Franklin、VarSome 自動初步分類，<strong>專業策展人再人工複核</strong>。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>送 ClinGen Variant Curation Interface (VCI) 結合 publishing → ClinVar。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>VEP/SnpEff: is variant nonsense/frameshift/canonical-splice in a LoF-pathogenic gene? <span class="dt-arrow">→</span> <strong>Apply PVS1 (per Tayoun 2018 tree)</strong>.</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>gnomAD MAF? <span class="dt-arrow">→</span> &lt; 1/100,000 → PM2_supporting; above ClinGen threshold → BA1/BS1.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Use InterVar (Li 2017 AJHG), Franklin, VarSome for first-pass, <strong>then expert manual curation</strong>.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Submit via ClinGen Variant Curation Interface (VCI) → ClinVar.</div></div>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="點數系統計算機" data-en="Point-system calculator">點數系統計算機</h2>
+<div data-lang="zh"><p>勾選證據數量，自動計算點數與分類。<strong>P ≥ 10, LP 6-9, VUS 0-5, LB -1~-6, B ≤ -7</strong>（Tavtigian 2018 / Pejaver 2022）。</p></div>
+<div data-lang="en"><p>Adjust evidence counts; points and tier auto-update. <strong>P ≥ 10, LP 6–9, VUS 0–5, LB -1 to -6, B ≤ -7</strong> (Tavtigian 2018 / Pejaver 2022).</p></div>
+<div class="interactive-panel">
+<div class="slider-group"><label><span data-zh="PVS1 (very strong)" data-en="PVS1 (very strong)">PVS1</span> <span id="valPVS">0</span></label><input type="range" id="sliderPVS" min="0" max="1" value="0" step="1"></div>
+<div class="slider-group"><label><span data-zh="PS (strong, 條數)" data-en="PS (strong count)">PS</span> <span id="valPS">0</span></label><input type="range" id="sliderPS" min="0" max="4" value="0" step="1"></div>
+<div class="slider-group"><label><span data-zh="PM (moderate, 條數)" data-en="PM (moderate count)">PM</span> <span id="valPM">0</span></label><input type="range" id="sliderPM" min="0" max="6" value="0" step="1"></div>
+<div class="slider-group"><label><span data-zh="PP (supporting, 條數)" data-en="PP (supporting count)">PP</span> <span id="valPP">0</span></label><input type="range" id="sliderPP" min="0" max="5" value="0" step="1"></div>
+<div class="slider-group"><label><span data-zh="良性點數 (-)" data-en="Benign points (-)">良性點數</span> <span id="valBen">0</span></label><input type="range" id="sliderBen" min="0" max="10" value="0" step="1"></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statPts">—</span><span class="sim-stat fail" id="statTier">—</span></div>
+<div class="chart-container"><canvas id="acmgChart"></canvas></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="自動化工具" data-en="Automation tools">自動化工具</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'a1')">InterVar</button><button class="code-tab-btn" onclick="switchTab(this,'a2')">VEP + LOFTEE</button><button class="code-tab-btn" onclick="switchTab(this,'a3')">ClinGen API</button></div>
+<div class="code-tab-content active" id="a1"><pre><span class="comment"># InterVar — automated ACMG classification from ANNOVAR output</span>
+python InterVar.py \
+    -i sample.vcf -o sample.intervar \
+    -b hg38 --input_type=VCF \
+    --table_annovar=table_annovar.pl \
+    --convert2annovar=convert2annovar.pl \
+    --annotate_variation=annotate_variation.pl \
+    -d humandb/
+
+<span class="comment"># Output per variant: ACMG criteria applied + final tier</span></pre></div>
+<div class="code-tab-content" id="a2"><pre><span class="comment"># VEP + LOFTEE for PVS1 evidence</span>
+vep --input_file sample.vcf.gz --output_file annotated.vcf \
+    --vcf --cache --offline --species homo_sapiens --assembly GRCh38 \
+    --plugin LOFTEE,loftee_path:/loftee/ \
+    --plugin SpliceAI,snv=spliceai.snv.vcf.gz,indel=spliceai.indel.vcf.gz \
+    --plugin AlphaMissense,file=AlphaMissense_hg38.tsv.gz
+
+<span class="comment"># LOFTEE: HC / LC / OS — informs PVS1 decision tree</span></pre></div>
+<div class="code-tab-content" id="a3"><pre><span class="comment"># Query ClinGen Allele Registry / VCI</span>
+import requests
+r = requests.get(
+    'https://reg.clinicalgenome.org/allele',
+    params={'hgvs':'NM_007294.4:c.5266dup'})
+print(r.json()['@id'])  # canonical CA ID
+
+<span class="comment"># Pull ClinGen gene-specific BA1/BS1 thresholds</span>
+g = requests.get('https://search.clinicalgenome.org/kb/gene-validity?gene=BRCA1')</pre></div>
+</div>
+</section>
+
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">1. PVS1 在 2018 Tayoun 更新後，下列哪一種情況「不適用」？</p>
+<p data-lang="en">1. After the 2018 Tayoun update, which scenario does NOT qualify for PVS1?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 在 LoF 致病機制基因的 canonical splice site (±1,2) 變異</span><span data-lang="en">A. Canonical splice (±1,2) variant in a LoF-pathogenic gene</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 最後一個 exon、且不會觸發 NMD 的 nonsense（須降為 PVS1_Strong 或更低）</span><span data-lang="en">B. Nonsense in last exon escaping NMD (must downgrade to PVS1_Strong or lower)</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. Frameshift 早期 exon、觸發 NMD</span><span data-lang="en">C. Frameshift early exon triggering NMD</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 起始 codon 喪失、無替代啟動</span><span data-lang="en">D. Start codon loss with no alternate start</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">2. BA1 通用 MAF 閾值是？</p>
+<p data-lang="en">2. The default BA1 MAF threshold is?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. ≥ 0.01% (1/10,000)</span><span data-lang="en">A. ≥ 0.01% (1/10,000)</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. ≥ 1%</span><span data-lang="en">B. ≥ 1%</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. ≥ 5% 在合適人群——但 ClinGen 已為某些基因調低</span><span data-lang="en">C. ≥ 5% in suitable population — ClinGen has lowered it for some genes</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. ≥ 50%</span><span data-lang="en">D. ≥ 50%</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">3. 是非題：2025 點數系統可量化解決 PM2_supporting + PP3 是否升 LP 的模糊地帶。</p>
+<p data-lang="en">3. True/False: The 2025 point system quantitatively resolves ambiguity such as "does PM2_supporting + PP3 reach LP?"</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對</span><span data-lang="en">A. True</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯</span><span data-lang="en">B. False</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="long-read.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 13: Long-read</span></a>
+<a href="clinical-report.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 15: Clinical Report</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+const acmgChart=new Chart(document.getElementById('acmgChart'),{type:'bar',data:{labels:['PVS','PS','PM','PP','Benign'],datasets:[{label:'Points',data:[0,0,0,0,0],backgroundColor:['#047857','#059669','#10b981','#34d399','#d97706']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'Points'}}}}});
+function tierOf(p){if(p>=10)return['P','#7f1d1d'];if(p>=6)return['LP','#b91c1c'];if(p>=0)return['VUS','#a16207'];if(p>=-6)return['LB','#15803d'];return['B','#166534'];}
+function up(){const pvs=+document.getElementById('sliderPVS').value,ps=+document.getElementById('sliderPS').value,pm=+document.getElementById('sliderPM').value,pp=+document.getElementById('sliderPP').value,ben=+document.getElementById('sliderBen').value;document.getElementById('valPVS').textContent=pvs;document.getElementById('valPS').textContent=ps;document.getElementById('valPM').textContent=pm;document.getElementById('valPP').textContent=pp;document.getElementById('valBen').textContent=ben;const pPVS=pvs*8,pPS=ps*4,pPM=pm*2,pPP=pp*1,pBen=-ben;const total=pPVS+pPS+pPM+pPP+pBen;const[t,c]=tierOf(total);acmgChart.data.datasets[0].data=[pPVS,pPS,pPM,pPP,pBen];acmgChart.update('none');const L=I18n.get();document.getElementById('statPts').textContent=(L==='zh'?'總點數: ':'Total: ')+total;document.getElementById('statTier').textContent=(L==='zh'?'分類: ':'Tier: ')+t;document.getElementById('statTier').style.background=c;}
+['sliderPVS','sliderPS','sliderPM','sliderPP','sliderBen'].forEach(id=>document.getElementById(id).addEventListener('input',up));document.addEventListener('langchange',up);up();
+const QF={zh:{q1_y:'NMD-escape 的 nonsense 必須降強度。',q1_n:'答案：B。',q2_y:'5% 為通用，但 gene-specific 可下調。',q2_n:'答案：C。',q3_y:'點數系統量化證據組合。',q3_n:'答案：A。'},en:{q1_y:'Nonsense escaping NMD must be downgraded.',q1_n:'Correct: B.',q2_y:'5% generic; gene-specific lowered.',q2_n:'Correct: C.',q3_y:'Point system quantifies evidence combinations.',q3_n:'Correct: A.'}};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 3: Adapter Trimming — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links"><li><a href="intro.html">Intro</a></li><li><a href="qc.html">QC</a></li><li><a href="trimming.html" class="active">Trim</a></li><li><a href="alignment.html">Align</a></li><li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li><li><a href="coverage.html">Coverage</a></li><li><a href="germline-calling.html">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot.</a></li><li><a href="cnv-sv.html">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html">Long-read</a></li><li><a href="acmg.html">ACMG</a></li><li><a href="clinical-report.html">Report</a></li><li><a href="cohort.html">Cohort</a></li><li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li></ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 3 / 16</div>
+<h1 data-zh="Adapter Trimming" data-en="Adapter Trimming">Adapter Trimming</h1>
+<p class="subtitle" data-lang="zh">移除 adapter 與低品質 base——但別 over-trim：軟剪裁與硬剪裁的權衡。</p>
+<p class="subtitle" data-lang="en">Remove adapters and low-quality bases — but don't over-trim. Soft vs hard trimming trade-offs.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="什麼時候要 trim？什麼時候不要？" data-en="When to trim — and when not to?">什麼時候要 trim？什麼時候不要？</h2>
+<div data-lang="zh">
+<p>Adapter trimming 處理兩種問題：(1) <strong>insert size 短於 read length</strong> 時 3' 端讀到 adapter；(2) <strong>3' 端品質下降</strong>。但是過度 trim 會降低比對率、丟失資訊。</p>
+<p><strong>爭議：</strong>MacManes (2014, Front. Genet.) 與 Del Fabbro (2013) 都指出，Q5-Q10 以下的 aggressive quality trimming 反而降低下游表現。<strong>對於 BWA-MEM2 等 soft-clipping 的 aligner，輕度 trim 即可</strong>；BBTools 作者 Bushnell 主張幾乎不需 quality trim。但對於精確要求極高的 (panel/MRD)、或舊式 aligner，trim 仍然有效。</p>
+</div>
+<div data-lang="en">
+<p>Adapter trimming handles two problems: (1) <strong>insert size shorter than read length</strong> reading into adapter at the 3' end; (2) <strong>3' end quality drop</strong>. But over-trimming reduces mapping rate and discards information.</p>
+<p><strong>The debate:</strong> MacManes (2014, Front. Genet.) and Del Fabbro (2013) showed aggressive quality trimming below Q5–Q10 actually <em>hurts</em> downstream performance. For soft-clipping aligners like BWA-MEM2, light trimming suffices; BBTools author Bushnell argues quality trimming is mostly unnecessary. For panels/MRD or legacy aligners, trimming still matters.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>2026 默認方案：</strong>用 <strong>fastp</strong> 的 <code>--detect_adapter_for_pe</code>，搭配 <code>-q 15 -l 50</code>（Q15 滑動窗、最小長度 50 bp）。BWA-MEM2 接住其餘的軟剪裁。</span>
+<span data-lang="en"><strong>2026 default:</strong> use <strong>fastp</strong> <code>--detect_adapter_for_pe</code> with <code>-q 15 -l 50</code> (Q15 sliding window, min length 50 bp). BWA-MEM2 handles the rest via soft-clipping.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="工具比較" data-en="TOOL COMPARISON">工具比較</div>
+<h2 data-zh="一、主流 Trimming 工具" data-en="I. Major trimming tools">一、主流 Trimming 工具</h2>
+<table class="comp-table">
+<thead><tr><th>Tool</th><th>Language</th><th data-zh="特色" data-en="Features">特色</th><th data-zh="速度" data-en="Speed">速度</th><th data-zh="推薦情境" data-en="Best for">推薦情境</th></tr></thead>
+<tbody>
+<tr><td><strong>fastp</strong></td><td>C++</td><td data-lang="zh">一步 QC + trim + adapter detect + UMI</td><td data-lang="zh">★★★★★</td><td data-lang="zh">2026 預設首選</td><td data-lang="en">QC + trim + adapter detect + UMI in one</td><td data-lang="en">★★★★★</td><td data-lang="en">2026 default</td></tr>
+<tr><td><strong>Trimmomatic</strong></td><td>Java</td><td data-lang="zh">經典、可指定 ILLUMINACLIP fasta</td><td>★★★</td><td data-lang="zh">老 pipeline 相容</td><td data-lang="en">Classic; ILLUMINACLIP fasta</td><td data-lang="en">★★★</td><td data-lang="en">Legacy pipeline</td></tr>
+<tr><td><strong>BBDuk</strong> (BBTools)</td><td>Java</td><td data-lang="zh">k-mer based adapter & contaminant remove</td><td>★★★★</td><td data-lang="zh">嚴格 contaminant 移除</td><td data-lang="en">k-mer adapter/contaminant removal</td><td data-lang="en">★★★★</td><td data-lang="en">Strict contaminant removal</td></tr>
+<tr><td><strong>cutadapt</strong></td><td>Python</td><td data-lang="zh">最早最知名、可處理複雜 adapter pattern</td><td>★★★</td><td data-lang="zh">RNA-seq、小 RNA、複雜 adapter</td><td data-lang="en">Original; complex adapter patterns</td><td data-lang="en">★★★</td><td data-lang="en">RNA-seq, small RNA, complex adapters</td></tr>
+</tbody></table>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="Trimming 閾值 → reads 保留率" data-en="Trim threshold → read retention">Trimming 閾值 → reads 保留率</h2>
+<div class="interactive-panel">
+<div class="slider-group"><label><span data-zh="Quality 閾值 (Q)" data-en="Quality threshold (Q)">Quality 閾值</span> <span id="valQT">15</span></label><input type="range" id="sliderQT" min="0" max="30" value="15" step="1"></div>
+<div class="slider-group"><label><span data-zh="最短保留長度 (bp)" data-en="Min length kept (bp)">最短長度</span> <span id="valLen">50</span></label><input type="range" id="sliderLen" min="20" max="120" value="50" step="5"></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statRet">—</span><span class="sim-stat fail" id="statLoss">—</span></div>
+<div class="chart-container"><canvas id="trimChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;" data-zh="X: read 編號 | Y: 保留長度 (綠=通過、紅=丟棄)" data-en="X: read index | Y: kept length (green=pass, red=fail)">X: read 編號 | Y: 保留長度</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作範例" data-en="Implementation">實作範例</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'t1')">fastp</button><button class="code-tab-btn" onclick="switchTab(this,'t2')">Trimmomatic</button><button class="code-tab-btn" onclick="switchTab(this,'t3')">BBDuk</button></div>
+<div class="code-tab-content active" id="t1"><pre><span class="comment"># fastp — recommended default</span>
+fastp \
+    -i fq/S1_R1.fq.gz -I fq/S1_R2.fq.gz \
+    -o trim/S1_R1.fq.gz -O trim/S1_R2.fq.gz \
+    --detect_adapter_for_pe \
+    --qualified_quality_phred 15 \
+    --length_required 50 \
+    --cut_tail --cut_tail_window_size 4 --cut_tail_mean_quality 15 \
+    -j qc/fastp/S1.json -h qc/fastp/S1.html \
+    --thread 8
+
+<span class="comment"># UMI support (e.g. Twist UMI panels)</span>
+fastp ... --umi --umi_loc per_read --umi_len 8 ...</pre></div>
+<div class="code-tab-content" id="t2"><pre><span class="comment"># Trimmomatic — paired-end with Illumina TruSeq adapters</span>
+trimmomatic PE -threads 8 -phred33 \
+    fq/S1_R1.fq.gz fq/S1_R2.fq.gz \
+    trim/S1_R1.fq.gz trim/S1_R1_unpaired.fq.gz \
+    trim/S1_R2.fq.gz trim/S1_R2_unpaired.fq.gz \
+    ILLUMINACLIP:TruSeq3-PE-2.fa:2:30:10:2:keepBothReads \
+    LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:50</pre></div>
+<div class="code-tab-content" id="t3"><pre><span class="comment"># BBDuk — strict k-mer adapter removal</span>
+bbduk.sh \
+    in1=fq/S1_R1.fq.gz in2=fq/S1_R2.fq.gz \
+    out1=trim/S1_R1.fq.gz out2=trim/S1_R2.fq.gz \
+    ref=adapters,artifacts,phix \
+    ktrim=r k=23 mink=11 hdist=1 tbo tpe \
+    qtrim=r trimq=15 minlength=50 \
+    threads=8</pre></div>
+</div>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>UMI 警告：</strong>若使用 UMI panel，<strong>必須先抽出 UMI 再 trim</strong>，否則 UMI 序列會被當 adapter 剪掉。fastp 的 <code>--umi_loc</code> 可指定 UMI 位置 (read1/read2/per_index/per_read)。</span>
+<span data-lang="en"><strong>UMI warning:</strong> for UMI panels you <strong>must extract UMI before trimming</strong>, else UMI bases get clipped. fastp <code>--umi_loc</code> specifies UMI location (read1/read2/per_index/per_read).</span>
+</div></div>
+</section>
+
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">1. 為何不建議對下游用 BWA-MEM2 的數據做 aggressive Q-trim (Q&gt;20)？</p>
+<p data-lang="en">1. Why is aggressive Q-trim (Q&gt;20) discouraged before BWA-MEM2?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. BWA-MEM2 需要 phred64</span><span data-lang="en">A. BWA-MEM2 needs phred64</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. BWA-MEM2 已能 soft-clip 低品質 3' 端，過度 trim 會丟失資訊降低 mapping rate</span><span data-lang="en">B. BWA-MEM2 soft-clips low-Q 3' ends; over-trim discards information and lowers mapping</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. BWA-MEM2 不接受 trim 過的 reads</span><span data-lang="en">C. BWA-MEM2 rejects trimmed reads</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. trim 後檔案太大</span><span data-lang="en">D. Trimmed files become too large</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">2. UMI panel 流程的正確步驟順序是？</p>
+<p data-lang="en">2. Correct step order for UMI panel workflow?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 先抽 UMI → 再 trim → 再 align → consensus</span><span data-lang="en">A. Extract UMI → trim → align → consensus</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 先 trim → 再抽 UMI → align</span><span data-lang="en">B. Trim → extract UMI → align</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. align → trim → 抽 UMI</span><span data-lang="en">C. Align → trim → extract UMI</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. UMI 不需特別處理</span><span data-lang="en">D. UMIs need no special handling</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">3. 是非題：fastp 在 WGS/WES 流程中可同時取代 FastQC 與 Trimmomatic。</p>
+<p data-lang="en">3. True/False: fastp can replace both FastQC and Trimmomatic in a WGS/WES pipeline.</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對——fastp 提供完整 JSON/HTML 報告與 adapter trim</span><span data-lang="en">A. True — fastp provides full JSON/HTML reports and adapter trim</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯</span><span data-lang="en">B. False</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="qc.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 2: QC</span></a>
+<a href="alignment.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 4: Alignment</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const reads=[];for(let i=0;i<200;i++){const baseLen=150;const qualDrop=Math.max(0,Math.min(120,40+randn()*30));reads.push({len:baseLen,qtailStart:baseLen-qualDrop});}
+const trimChart=new Chart(document.getElementById('trimChart'),{type:'bar',data:{labels:reads.map((_,i)=>i+1),datasets:[{label:'Kept',data:[],backgroundColor:'rgba(4,120,87,.7)'},{label:'Trimmed',data:[],backgroundColor:'rgba(217,119,6,.4)'}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},scales:{x:{display:false,stacked:true},y:{stacked:true,min:0,max:160,title:{display:true,text:'Length (bp)'}}}}});
+function up(){const qt=+document.getElementById('sliderQT').value,minL=+document.getElementById('sliderLen').value;document.getElementById('valQT').textContent=qt;document.getElementById('valLen').textContent=minL;let kept=0,lost=0;const keptArr=[],trimArr=[];reads.forEach(r=>{const aggressive=Math.max(0,(qt-15)*4);const newLen=Math.max(0,r.qtailStart-aggressive);if(newLen>=minL){kept++;keptArr.push(newLen);trimArr.push(r.len-newLen);}else{lost++;keptArr.push(0);trimArr.push(r.len);}});const L=I18n.get();document.getElementById('statRet').textContent=(L==='zh'?'保留: ':'Kept: ')+kept+' ('+Math.round(kept/reads.length*100)+'%)';document.getElementById('statLoss').textContent=(L==='zh'?'丟棄: ':'Lost: ')+lost+' ('+Math.round(lost/reads.length*100)+'%)';trimChart.data.datasets[0].data=keptArr;trimChart.data.datasets[1].data=trimArr;trimChart.update('none');}
+['sliderQT','sliderLen'].forEach(id=>document.getElementById(id).addEventListener('input',up));document.addEventListener('langchange',up);up();
+const QF={zh:{q1_y:'BWA-MEM2 自帶軟剪裁，過度 trim 反而丟資訊。',q1_n:'答案：B。',q2_y:'UMI 必須先從 read 上抽出再 trim。',q2_n:'答案：A。',q3_y:'fastp 可同時做 QC 報告與 trim，常用於現代 pipeline。',q3_n:'答案：A。'},en:{q1_y:'BWA-MEM2 already soft-clips; over-trim discards information.',q1_n:'Correct: B.',q2_y:'UMI must be extracted before trimming.',q2_n:'Correct: A.',q3_y:'fastp does both QC reports and trim — modern default.',q3_n:'Correct: A.'}};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

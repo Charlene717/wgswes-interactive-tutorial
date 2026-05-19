@@ -1,50 +1,73 @@
 <!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>WGS / WES Interactive Tutorial</title>
-<meta name="description" content="Bilingual whole-genome (WGS) and whole-exome (WES) sequencing analysis interactive tutorial.">
+<meta name="description" content="Complete bilingual WGS/WES interactive tutorial — from FASTQ to clinical variant report.">
 <link rel="stylesheet" href="styles.css"></head><body>
 <nav class="top-nav"><div class="top-nav-inner">
   <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
   <ul class="top-nav-links">
     <li><a href="intro.html">Intro</a></li>
-    <li><a href="fastq-qc.html">FASTQ QC</a></li>
+    <li><a href="qc.html">QC</a></li>
+    <li><a href="trimming.html">Trim</a></li>
     <li><a href="alignment.html">Align</a></li>
-    <li><a href="post-alignment.html">PostAln</a></li>
-    <li><a href="variant-calling.html">Calling</a></li>
-    <li><a href="joint-genotyping.html">Joint</a></li>
+    <li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li>
+    <li><a href="coverage.html">Coverage</a></li>
+    <li><a href="germline-calling.html">Germline VC</a></li>
+    <li><a href="joint-genotyping.html">Joint GT</a></li>
     <li><a href="filtering.html">Filter</a></li>
-    <li><a href="annotation.html">Annot</a></li>
-    <li><a href="interpretation.html">Interp</a></li>
+    <li><a href="annotation.html">Annot.</a></li>
+    <li><a href="cnv-sv.html">CNV/SV</a></li>
     <li><a href="somatic.html">Somatic</a></li>
-    <li><a href="structural-variants.html">SV/CNV</a></li>
-    <li><a href="wes-considerations.html">WES</a></li>
+    <li><a href="long-read.html">Long-read</a></li>
+    <li><a href="acmg.html">ACMG</a></li>
+    <li><a href="clinical-report.html">Report</a></li>
+    <li><a href="cohort.html">Cohort</a></li>
+    <li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li>
   </ul>
 </div></nav>
 <header class="hub-hero"><div style="position:relative;z-index:1;">
 <h1 data-zh="WGS / WES 互動式教學" data-en="WGS / WES Interactive Tutorial">WGS / WES 互動式教學</h1>
-<p data-lang="zh">從 FASTQ 到臨床解讀——12 個步驟掌握 全基因組 (WGS) 與 全外顯子 (WES) 變異分析流程，搭配互動模擬與 GATK 程式碼範例。</p>
-<p data-lang="en">From FASTQ to clinical interpretation — master Whole Genome (WGS) and Whole Exome (WES) variant analysis in 12 steps, with interactive simulations and GATK code examples.</p>
+<p data-lang="zh">從 FASTQ 到臨床變異報告 ── 16 章涵蓋 GATK 4.x、DeepVariant、VEP、CNV/SV、ACMG 分類與大規模佇列分析的完整流程，搭配互動模擬與雙語程式碼範例。</p>
+<p data-lang="en">From FASTQ to clinical variant report — 16 chapters covering GATK 4.x, DeepVariant, VEP, CNV/SV, ACMG classification, and population-scale cohort analysis, with interactive simulations and bilingual code examples.</p>
 </div></header>
 
-<h2 class="hub-section-title"><span>01</span> <span data-zh="核心分析流程" data-en="Core Analysis Pipeline">核心分析流程</span></h2>
+<h2 class="hub-section-title"><span>01</span> <span data-zh="原始資料處理與比對" data-en="Reads Preprocessing & Alignment">原始資料處理與比對</span></h2>
 <div class="hub-steps-grid">
-  <a href="intro.html" class="hub-card"><div class="hub-emoji">🧭</div><span class="step-num">Step 1</span><h3 data-zh="入門：WGS vs WES" data-en="Intro: WGS vs WES">入門：WGS vs WES</h3><p data-lang="zh">理解兩種定序策略的覆蓋範圍、成本、適用情境，並選擇正確的方法。</p><p data-lang="en">Understand coverage, cost, and use cases of both strategies. Choose the right approach.</p></a>
-  <a href="fastq-qc.html" class="hub-card"><div class="hub-emoji">🧪</div><span class="step-num">Step 2</span><h3 data-zh="FASTQ 品質管控" data-en="FASTQ Quality Control">FASTQ 品質管控</h3><p data-lang="zh">用 FastQC、fastp 評估 Phred 分數、adapter 含量，並進行 trimming。</p><p data-lang="en">Assess Phred scores and adapter content with FastQC/fastp, then trim reads.</p></a>
-  <a href="alignment.html" class="hub-card"><div class="hub-emoji">🎯</div><span class="step-num">Step 3</span><h3 data-zh="序列比對 (Alignment)" data-en="Read Alignment">序列比對</h3><p data-lang="zh">用 BWA-MEM/MEM2 將 reads 比對到參考基因組，產出 BAM 檔。</p><p data-lang="en">Align reads to the reference genome with BWA-MEM/MEM2, producing BAM files.</p></a>
-  <a href="post-alignment.html" class="hub-card"><div class="hub-emoji">🛠️</div><span class="step-num">Step 4</span><h3 data-zh="比對後處理" data-en="Post-Alignment Processing">比對後處理</h3><p data-lang="zh">MarkDuplicates 標記 PCR 重複，BQSR 校正鹼基品質分數。</p><p data-lang="en">Mark PCR duplicates and recalibrate base quality scores (BQSR).</p></a>
-  <a href="variant-calling.html" class="hub-card"><div class="hub-emoji">📢</div><span class="step-num">Step 5</span><h3 data-zh="變異呼叫 (Calling)" data-en="Variant Calling">變異呼叫</h3><p data-lang="zh">HaplotypeCaller、DeepVariant、DRAGEN 比較與 GVCF 模式。</p><p data-lang="en">Compare HaplotypeCaller, DeepVariant, DRAGEN, and the GVCF workflow.</p></a>
-  <a href="joint-genotyping.html" class="hub-card"><div class="hub-emoji">👥</div><span class="step-num">Step 6</span><h3 data-zh="聯合基因分型" data-en="Joint Genotyping">聯合基因分型</h3><p data-lang="zh">GenomicsDBImport + GenotypeGVCFs：跨樣本提升 rare variant 召回率。</p><p data-lang="en">GenomicsDBImport + GenotypeGVCFs: boost rare-variant recall across cohorts.</p></a>
-  <a href="filtering.html" class="hub-card"><div class="hub-emoji">🧹</div><span class="step-num">Step 7</span><h3 data-zh="變異過濾" data-en="Variant Filtering">變異過濾</h3><p data-lang="zh">VQSR 機器學習過濾 vs 硬性閾值 (Hard Filtering)，何時用哪個？</p><p data-lang="en">VQSR machine-learning filtering vs hard thresholds — when to use each.</p></a>
-  <a href="annotation.html" class="hub-card"><div class="hub-emoji">🏷️</div><span class="step-num">Step 8</span><h3 data-zh="變異註釋" data-en="Variant Annotation">變異註釋</h3><p data-lang="zh">VEP、ANNOVAR、SnpEff 比較，加入 gnomAD、ClinVar 等族群與臨床資料庫。</p><p data-lang="en">Compare VEP, ANNOVAR, SnpEff. Layer in gnomAD, ClinVar, and population databases.</p></a>
-  <a href="interpretation.html" class="hub-card"><div class="hub-emoji">⚖️</div><span class="step-num">Step 9</span><h3 data-zh="變異解讀 (ACMG)" data-en="Interpretation (ACMG)">變異解讀</h3><p data-lang="zh">用 ACMG/AMP 五級分類系統 (Pathogenic ↔ Benign) 評估臨床意義。</p><p data-lang="en">Use the ACMG/AMP 5-tier system (Pathogenic ↔ Benign) to assess clinical significance.</p></a>
+  <a href="intro.html" class="hub-card"><div class="hub-emoji">📖</div><span class="step-num">Step 1</span><h3 data-zh="WGS / WES 概論" data-en="WGS / WES Overview">WGS / WES 概論</h3><p data-lang="zh">WGS vs WES vs Panel 的覆蓋率、成本、應用差異；基因組學歷史與臨床現況。</p><p data-lang="en">WGS vs WES vs Panel — coverage, cost, applications. Brief history and current clinical landscape.</p></a>
+  <a href="qc.html" class="hub-card"><div class="hub-emoji">🧪</div><span class="step-num">Step 2</span><h3 data-zh="原始定序 QC" data-en="Raw FASTQ QC">原始定序 QC</h3><p data-lang="zh">FastQC、MultiQC、fastp 報告判讀；Q score、GC bias、adapter 污染、duplicate rate。</p><p data-lang="en">FastQC, MultiQC, fastp reports. Interpret Q scores, GC bias, adapter content, duplicate rate.</p></a>
+  <a href="trimming.html" class="hub-card"><div class="hub-emoji">✂️</div><span class="step-num">Step 3</span><h3 data-zh="Adapter trimming" data-en="Adapter Trimming">Adapter Trimming</h3><p data-lang="zh">fastp / Trimmomatic / BBDuk 比較；何時要 trim、何時不要 trim 的爭議。</p><p data-lang="en">fastp / Trimmomatic / BBDuk compared. When to trim — and when not to — the ongoing debate.</p></a>
+  <a href="alignment.html" class="hub-card"><div class="hub-emoji">🧷</div><span class="step-num">Step 4</span><h3 data-zh="序列比對 (BWA-MEM2)" data-en="Alignment (BWA-MEM2)">序列比對 (BWA-MEM2)</h3><p data-lang="zh">BWA-MEM2 / minimap2 演算法、SAM/BAM/CRAM 格式、read group、軟硬剪裁。</p><p data-lang="en">BWA-MEM2 / minimap2 algorithms. SAM/BAM/CRAM formats. Read groups, soft/hard clipping.</p></a>
+  <a href="markdup-bqsr.html" class="hub-card"><div class="hub-emoji">🔁</div><span class="step-num">Step 5</span><h3 data-zh="MarkDup 與 BQSR" data-en="MarkDup & BQSR">MarkDup 與 BQSR</h3><p data-lang="zh">PCR/光學重複辨識、BQSR 校正定序錯誤模型；GATK 4.x 與 DRAGEN-GATK 比較。</p><p data-lang="en">PCR/optical duplicate identification. BQSR error model recalibration. GATK 4.x vs DRAGEN-GATK.</p></a>
+  <a href="coverage.html" class="hub-card"><div class="hub-emoji">📐</div><span class="step-num">Step 6</span><h3 data-zh="覆蓋率與 QC 指標" data-en="Coverage & QC Metrics">覆蓋率與 QC 指標</h3><p data-lang="zh">Picard CollectWgsMetrics、mosdepth、Qualimap；30× / 100× 的真正含義。</p><p data-lang="en">Picard CollectWgsMetrics, mosdepth, Qualimap. What 30× / 100× really means.</p></a>
 </div>
 
-<h2 class="hub-section-title"><span>02</span> <span data-zh="進階分析主題" data-en="Advanced Topics">進階分析主題</span></h2>
+<h2 class="hub-section-title"><span>02</span> <span data-zh="生殖系變異呼叫與過濾" data-en="Germline Variant Calling & Filtering">生殖系變異呼叫與過濾</span></h2>
 <div class="hub-steps-grid">
-  <a href="somatic.html" class="hub-card"><div class="hub-emoji">🧬</div><span class="step-num">Advanced</span><h3 data-zh="體細胞變異 (癌症)" data-en="Somatic Variants (Cancer)">體細胞變異</h3><p data-lang="zh">Mutect2 tumor-vs-normal 分析、Panel of Normals、低 VAF 突變偵測。</p><p data-lang="en">Mutect2 tumor-vs-normal analysis, Panel of Normals, low-VAF mutation detection.</p></a>
-  <a href="structural-variants.html" class="hub-card"><div class="hub-emoji">🧩</div><span class="step-num">Advanced</span><h3 data-zh="結構變異 / CNV" data-en="Structural Variants / CNV">結構變異 / CNV</h3><p data-lang="zh">用 Manta、Delly、CNVnator 偵測 &gt;50bp 的 deletions、duplications、translocations。</p><p data-lang="en">Detect &gt;50bp deletions, duplications, and translocations with Manta, Delly, CNVnator.</p></a>
-  <a href="wes-considerations.html" class="hub-card"><div class="hub-emoji">🎯</div><span class="step-num">Advanced</span><h3 data-zh="WES 專屬考量" data-en="WES-specific Considerations">WES 專屬考量</h3><p data-lang="zh">target enrichment、capture kit 選擇、coverage uniformity、外顯子盲區。</p><p data-lang="en">Target enrichment, capture kit choice, coverage uniformity, exome blind spots.</p></a>
+  <a href="germline-calling.html" class="hub-card"><div class="hub-emoji">🎯</div><span class="step-num">Step 7</span><h3 data-zh="生殖系變異呼叫" data-en="Germline Variant Calling">生殖系變異呼叫</h3><p data-lang="zh">GATK HaplotypeCaller HMM、DeepVariant CNN、Strelka2 比較；assembly-based 重新比對。</p><p data-lang="en">GATK HaplotypeCaller HMM, DeepVariant CNN, Strelka2 compared. Assembly-based local realignment.</p></a>
+  <a href="joint-genotyping.html" class="hub-card"><div class="hub-emoji">🧮</div><span class="step-num">Step 8</span><h3 data-zh="Joint Genotyping" data-en="Joint Genotyping">Joint Genotyping</h3><p data-lang="zh">GVCF workflow、GenomicsDBImport、GenotypeGVCFs；為何要 Joint Calling？</p><p data-lang="en">GVCF workflow, GenomicsDBImport, GenotypeGVCFs. Why joint calling matters.</p></a>
+  <a href="filtering.html" class="hub-card"><div class="hub-emoji">🔍</div><span class="step-num">Step 9</span><h3 data-zh="VQSR 與 Hard Filter" data-en="VQSR & Hard Filtering">VQSR 與 Hard Filter</h3><p data-lang="zh">VQSR Gaussian mixture、Hard Filter 閾值表、CNNScoreVariants 1D/2D；何時用哪種？</p><p data-lang="en">VQSR Gaussian mixture, hard filter thresholds, CNNScoreVariants 1D/2D. When to use which.</p></a>
+  <a href="annotation.html" class="hub-card"><div class="hub-emoji">🏷️</div><span class="step-num">Step 10</span><h3 data-zh="變異註釋 (VEP / SnpEff)" data-en="Variant Annotation (VEP)">變異註釋 (VEP / SnpEff)</h3><p data-lang="zh">VEP / SnpEff / ANNOVAR；轉錄本選擇 MANE Select、dbNSFP 4.x、SpliceAI 整合。</p><p data-lang="en">VEP / SnpEff / ANNOVAR. Transcript selection (MANE Select), dbNSFP 4.x, SpliceAI integration.</p></a>
+</div>
+
+<h2 class="hub-section-title"><span>03</span> <span data-zh="結構變異與體細胞分析" data-en="Structural & Somatic Variants">結構變異與體細胞分析</span></h2>
+<div class="hub-steps-grid">
+  <a href="cnv-sv.html" class="hub-card"><div class="hub-emoji">🧩</div><span class="step-num">Step 11</span><h3 data-zh="CNV / SV 偵測" data-en="CNV / SV Detection">CNV / SV 偵測</h3><p data-lang="zh">Manta / DELLY 偵測 SV、CNVkit / GATK gCNV 偵測 CNV；read-depth vs split-read 訊號。</p><p data-lang="en">Manta / DELLY for SV. CNVkit / GATK gCNV for CNV. Read-depth vs split-read signals.</p></a>
+  <a href="somatic.html" class="hub-card"><div class="hub-emoji">🦠</div><span class="step-num">Step 12</span><h3 data-zh="體細胞變異呼叫" data-en="Somatic Variant Calling">體細胞變異呼叫</h3><p data-lang="zh">Mutect2 tumor-only / tumor-normal、Strelka2、PoN、FFPE artefact 過濾；ctDNA 低 VAF。</p><p data-lang="en">Mutect2 tumor-only / tumor-normal, Strelka2, Panel of Normals, FFPE artefact filtering, ctDNA low VAF.</p></a>
+  <a href="long-read.html" class="hub-card"><div class="hub-emoji">📏</div><span class="step-num">Step 13</span><h3 data-zh="長讀長定序分析" data-en="Long-read Sequencing">長讀長定序分析</h3><p data-lang="zh">PacBio HiFi、ONT R10；DeepVariant、Clair3、Sniffles2、PMDV；T2T-CHM13 參考。</p><p data-lang="en">PacBio HiFi, ONT R10. DeepVariant, Clair3, Sniffles2, PMDV. T2T-CHM13 reference.</p></a>
+</div>
+
+<h2 class="hub-section-title"><span>04</span> <span data-zh="臨床應用與大規模分析" data-en="Clinical & Population Analysis">臨床應用與大規模分析</span></h2>
+<div class="hub-steps-grid">
+  <a href="acmg.html" class="hub-card"><div class="hub-emoji">⚖️</div><span class="step-num">Step 14</span><h3 data-zh="ACMG / AMP 變異分類" data-en="ACMG / AMP Classification">ACMG / AMP 變異分類</h3><p data-lang="zh">PVS1-PP5、BS1-BP6 證據碼；InterVar、Franklin、ClinGen SVI 規則；2025 點數系統。</p><p data-lang="en">PVS1-PP5, BS1-BP6 evidence codes. InterVar, Franklin, ClinGen SVI rules. 2025 point-based system.</p></a>
+  <a href="clinical-report.html" class="hub-card"><div class="hub-emoji">📋</div><span class="step-num">Step 15</span><h3 data-zh="臨床報告與資料庫" data-en="Clinical Report & Databases">臨床報告與資料庫</h3><p data-lang="zh">ClinVar、OMIM、gnomAD v4、HGMD、LOVD；報告結構、incidental findings、CAP/CLIA 規範。</p><p data-lang="en">ClinVar, OMIM, gnomAD v4, HGMD, LOVD. Report structure, incidental findings, CAP/CLIA standards.</p></a>
+  <a href="cohort.html" class="hub-card"><div class="hub-emoji">🌐</div><span class="step-num">Step 16</span><h3 data-zh="Trio / 大規模佇列分析" data-en="Trio & Cohort Analysis">Trio / 大規模佇列分析</h3><p data-lang="zh">Trio Mendel violation、de novo 過濾、PED 檔；gnomAD v4、UK Biobank、All of Us 大型佇列。</p><p data-lang="en">Trio Mendel violations, de novo filtering, PED files. gnomAD v4, UK Biobank, All of Us large cohorts.</p></a>
+</div>
+
+<h2 class="hub-section-title"><span>05</span> <span data-zh="延伸學習" data-en="Further Learning">延伸學習</span></h2>
+<div class="hub-steps-grid">
+  <a href="references/index.html" class="hub-card"><div class="hub-emoji">📚</div><span class="step-num">References</span><h3 data-zh="參考資料佐證" data-en="References &amp; Citations">參考資料佐證</h3><p data-lang="zh">16 主題的學術論文、官方文件、Best Practices 與臨床指引整理，附 DOI 連結與疑義注記。</p><p data-lang="en">Academic papers, official docs, best practices, and clinical guidelines for all 16 topics — with DOI links and errata.</p></a>
+  <a href="wgswes-quiz/index.html" class="hub-card" target="_blank" rel="noopener"><div class="hub-emoji">📝</div><span class="step-num">Quiz</span><h3 data-zh="互動式考題" data-en="Interactive Quiz">互動式考題</h3><p data-lang="zh">160 題涵蓋 16 主題的單選、多選、是非題，含錯題複習、隨機抽考與多使用者進度。</p><p data-lang="en">160 single-choice, multi-select, and true/false questions covering all 16 topics, with wrong-answer review, random exam mode, and multi-user progress.</p></a>
 </div>
 <div style="height:60px"></div>
-<footer class="site-footer">© WGS/WES Interactive Tutorial — <span data-zh="基於 GATK Best Practices 與當代基因體學文獻" data-en="Based on GATK Best Practices and current genomics literature">基於 GATK Best Practices 與當代基因體學文獻</span></footer>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
 <script src="i18n.js"></script>
 </body></html>

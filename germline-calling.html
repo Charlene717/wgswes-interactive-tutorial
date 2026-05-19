@@ -1,0 +1,175 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 7: Germline Variant Calling — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links"><li><a href="intro.html">Intro</a></li><li><a href="qc.html">QC</a></li><li><a href="trimming.html">Trim</a></li><li><a href="alignment.html">Align</a></li><li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li><li><a href="coverage.html">Coverage</a></li><li><a href="germline-calling.html" class="active">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot.</a></li><li><a href="cnv-sv.html">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html">Long-read</a></li><li><a href="acmg.html">ACMG</a></li><li><a href="clinical-report.html">Report</a></li><li><a href="cohort.html">Cohort</a></li><li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li></ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 7 / 16</div>
+<h1 data-zh="生殖系變異呼叫" data-en="Germline Variant Calling">生殖系變異呼叫</h1>
+<p class="subtitle" data-lang="zh">HaplotypeCaller 的局部重組裝、DeepVariant 的 CNN 影像、Strelka2 的貝氏速度——以及為何 gVCF 是聯合呼叫的關鍵。</p>
+<p class="subtitle" data-lang="en">HaplotypeCaller's local reassembly, DeepVariant's CNN images, Strelka2's Bayesian speed — and why gVCF is the key to joint genotyping.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為什麼 simple pileup 不夠？" data-en="Why simple pileup isn't enough">為什麼 simple pileup 不夠？</h2>
+<div data-lang="zh"><p>早期變異呼叫器 (UnifiedGenotyper、bcftools call) 在 mismatch 位置直接看 pileup 投票。但 indel 周圍、重複序列、HLA 等位點，BWA 的對位本身就會出現系統性錯誤——這時你需要<strong>局部重組裝 (local de novo assembly)</strong>：丟掉原始對位，在窗口內重組讀數成 haplotype，再以 HMM 計算每條 read 對每條 haplotype 的概率。</p>
+<p>2026 主流三家：<strong>HaplotypeCaller</strong> (GATK，局部組裝 + PairHMM)、<strong>DeepVariant</strong> (Google，CNN 看 pileup 影像)、<strong>Strelka2</strong> (Illumina，貝氏 + indel 重組)。DRAGEN 整合自家 caller。</p></div>
+<div data-lang="en"><p>Early callers (UnifiedGenotyper, bcftools call) voted directly on pileups. But around indels, repeats, HLA, BWA's alignment is systematically wrong — you need <strong>local de novo assembly</strong>: discard the original alignment, reassemble reads in a window into haplotypes, then use HMM to compute the probability of each read given each haplotype.</p>
+<p>The 2026 big three: <strong>HaplotypeCaller</strong> (GATK; local assembly + PairHMM), <strong>DeepVariant</strong> (Google; CNN over pileup images), <strong>Strelka2</strong> (Illumina; Bayesian + indel reassembly). DRAGEN ships its own.</p></div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>gVCF 是聯合呼叫的必要條件：</strong>HaplotypeCaller 用 <code>-ERC GVCF</code> 為每樣本輸出 gVCF——既包含變異位點，也包含非變異區的「參考信賴度」區塊。沒有 gVCF，後續 GenomicsDB / CombineGVCFs / GenotypeGVCFs 都做不了。</span>
+<span data-lang="en"><strong>gVCF is mandatory for joint calling:</strong> HaplotypeCaller with <code>-ERC GVCF</code> emits a per-sample gVCF — variants plus "reference confidence" blocks at non-variant sites. Without it, GenomicsDB / CombineGVCFs / GenotypeGVCFs can't run.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="呼叫器比較" data-en="CALLER COMPARISON">呼叫器比較</div>
+<h2 data-zh="一、三大生殖系呼叫器" data-en="I. The three major germline callers">一、三大生殖系呼叫器</h2>
+<table class="comp-table">
+<thead><tr><th>Caller</th><th data-zh="原理" data-en="Method">原理</th><th data-zh="優勢" data-en="Strength">優勢</th><th data-zh="弱點" data-en="Weakness">弱點</th><th data-zh="參考" data-en="Ref.">參考</th></tr></thead>
+<tbody>
+<tr><td><strong>HaplotypeCaller</strong></td><td data-lang="zh">局部 de novo 重組裝 + PairHMM</td><td data-lang="zh">業界基準、gVCF 支援、最廣 ecosystem</td><td data-lang="zh">PairHMM 慢、需 BQSR</td><td>Poplin 2018 BioRxiv</td><td data-lang="en">Local de novo reassembly + PairHMM</td><td data-lang="en">Industry baseline, gVCF, broad ecosystem</td><td data-lang="en">PairHMM is slow, needs BQSR</td><td>Poplin 2018 BioRxiv</td></tr>
+<tr><td><strong>DeepVariant</strong></td><td data-lang="zh">CNN 對 read pileup 影像分類</td><td data-lang="zh">PrecisionFDA 多次冠軍、跨平台 (Illumina/PacBio/ONT)</td><td data-lang="zh">無法用未見過的 chemistry，模型需更新</td><td>Poplin 2018 NatBT</td><td data-lang="en">CNN over read pileup images</td><td data-lang="en">PrecisionFDA winner, Illumina/PacBio/ONT</td><td data-lang="en">Needs trained model per chemistry</td><td>Poplin 2018 NatBT</td></tr>
+<tr><td><strong>Strelka2</strong></td><td data-lang="zh">Bayes germline + assembly 補強 indel</td><td data-lang="zh">速度最快、indel 強</td><td data-lang="zh">無 gVCF (僅 VCF gVCF-like)</td><td>Kim 2018 NatMet</td><td data-lang="en">Bayesian + indel reassembly</td><td data-lang="en">Fastest, strong indels</td><td data-lang="en">No standard gVCF</td><td>Kim 2018 NatMet</td></tr>
+<tr><td><strong>DRAGEN germline</strong></td><td data-lang="zh">HW + ML 雜合</td><td data-lang="zh">5–10×速度、含整 pipeline</td><td data-lang="zh">需 DRAGEN 機器</td><td>Illumina</td><td data-lang="en">HW + ML hybrid</td><td data-lang="en">5–10× speed, full pipeline</td><td data-lang="en">Requires DRAGEN hardware</td><td>Illumina</td></tr>
+</tbody></table>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="局部組裝" data-en="LOCAL ASSEMBLY">局部組裝</div>
+<h2 data-zh="二、Active region 與 PairHMM" data-en="II. Active regions and PairHMM">二、Active region 與 PairHMM</h2>
+<div class="card-grid cols-3">
+<div class="card"><div class="card-icon">🎯</div><h4>Active region</h4><div data-lang="zh"><p>HC 先掃一遍 BAM，找出有 mismatch / indel 證據的窗口。其他區直接呼叫 ref，省 90% 計算。</p></div><div data-lang="en"><p>HC scans the BAM and flags windows with mismatch/indel evidence. Other regions go straight to ref, saving 90% compute.</p></div></div>
+<div class="card"><div class="card-icon">🧩</div><h4>De Bruijn assembly</h4><div data-lang="zh"><p>在 active region 內用 k-mer 圖重組裝 reads，得到候選 haplotypes (常見 2–10 條)。</p></div><div data-lang="en"><p>K-mer De Bruijn graph reassembles reads in the window into candidate haplotypes (typically 2–10).</p></div></div>
+<div class="card"><div class="card-icon">📐</div><h4>PairHMM</h4><div data-lang="zh"><p>每條 read × 每條 haplotype，HMM 計算 P(read | haplotype)。GATK 透過 SIMD/AVX 加速最慢的這一步。</p></div><div data-lang="en"><p>For every read × every haplotype, PairHMM computes P(read | haplotype). The hot loop is SIMD/AVX-accelerated.</p></div></div>
+</div>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>downsampling 注意：</strong>HC 預設將 active region 內讀數 downsample 至 500×。極深 panel 必須 <code>--max-reads-per-alignment-start 0</code> 關閉，否則低 VAF 變異被丟。</span>
+<span data-lang="en"><strong>Downsampling caveat:</strong> HC downsamples active-region reads to 500× by default. For ultra-deep panels, disable with <code>--max-reads-per-alignment-start 0</code> or low-VAF variants get dropped.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="呼叫器 sensitivity vs precision" data-en="Caller sensitivity vs precision">呼叫器 sensitivity vs precision</h2>
+<div data-lang="zh"><p>調整模擬深度，比較三家 caller 在 SNV 與 indel 的表現。深度越低，indel 差異越明顯——局部組裝 + CNN 優勢顯著。</p></div>
+<div data-lang="en"><p>Adjust simulated depth to compare callers on SNVs vs indels. At lower depth, indel performance separates them — local assembly + CNN show clear advantages.</p></div>
+<div class="interactive-panel">
+<div class="slider-group"><label><span data-zh="模擬深度 (×)" data-en="Simulated depth (×)">模擬深度</span> <span id="valDepth">30</span>×</label><input type="range" id="sliderDepth" min="5" max="80" value="30" step="5"></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statF1">—</span><span class="sim-stat fail" id="statBest">—</span></div>
+<div class="chart-container"><canvas id="callerChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;" data-zh="GIAB HG002 NA24385 模擬，僅示意" data-en="Schematic, based on GIAB HG002 NA24385 benchmarks">示意數據</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="三、Caller 抉擇" data-en="III. Pick a caller">三、Caller 抉擇</h2>
+<div class="decision-tree">
+<h4>🌳 <span data-zh="如何選 caller？" data-en="Caller decision">如何選 caller？</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>需要 cohort 聯合呼叫？ <span class="dt-arrow">→ 是 →</span> <strong>HaplotypeCaller -ERC GVCF</strong> + GenomicsDB + GenotypeGVCFs。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>追求最高精準度、有 GPU？ <span class="dt-arrow">→</span> <strong>DeepVariant</strong> (model 對應到你的 chemistry)。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>速度優先、單樣本？ <span class="dt-arrow">→</span> <strong>Strelka2</strong> 或 DRAGEN。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>PacBio HiFi 或 ONT 長讀？ <span class="dt-arrow">→</span> <strong>DeepVariant 長讀模型</strong> 或 Clair3。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>Need cohort joint calling? <span class="dt-arrow">→ Yes →</span> <strong>HaplotypeCaller -ERC GVCF</strong> + GenomicsDB + GenotypeGVCFs.</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Top accuracy, GPU available? <span class="dt-arrow">→</span> <strong>DeepVariant</strong> with chemistry-matched model.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Speed-first single sample? <span class="dt-arrow">→</span> <strong>Strelka2</strong> or DRAGEN.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>PacBio HiFi or ONT? <span class="dt-arrow">→</span> <strong>DeepVariant long-read model</strong> or Clair3.</div></div>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="三大 caller 實作" data-en="Three caller implementations">三大 caller 實作</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'g1')">HaplotypeCaller</button><button class="code-tab-btn" onclick="switchTab(this,'g2')">DeepVariant</button><button class="code-tab-btn" onclick="switchTab(this,'g3')">Strelka2</button></div>
+<div class="code-tab-content active" id="g1"><pre><span class="comment"># HaplotypeCaller in GVCF mode (single-sample) / GVCF 模式</span>
+gatk HaplotypeCaller \
+    -I bam/S1.recal.bam \
+    -R ref/GRCh38.fa \
+    -O gvcf/S1.g.vcf.gz \
+    -ERC GVCF \
+    --pair-hmm-implementation FASTEST_AVAILABLE \
+    --native-pair-hmm-threads 4
+
+<span class="comment"># Optional: WES — restrict to capture intervals</span>
+gatk HaplotypeCaller -I bam/S1.recal.bam -R ref/GRCh38.fa \
+    -L capture/targets.interval_list -ip 100 \
+    -O gvcf/S1.g.vcf.gz -ERC GVCF</pre></div>
+<div class="code-tab-content" id="g2"><pre><span class="comment"># DeepVariant via Singularity / Apptainer</span>
+BIN_VERSION="1.6.1"
+singularity run docker://google/deepvariant:${BIN_VERSION} \
+    /opt/deepvariant/bin/run_deepvariant \
+    --model_type=WGS \
+    --ref=ref/GRCh38.fa \
+    --reads=bam/S1.recal.bam \
+    --output_vcf=vcf/S1.dv.vcf.gz \
+    --output_gvcf=gvcf/S1.dv.g.vcf.gz \
+    --num_shards=16</pre></div>
+<div class="code-tab-content" id="g3"><pre><span class="comment"># Strelka2 germline workflow</span>
+configureStrelkaGermlineWorkflow.py \
+    --bam bam/S1.recal.bam \
+    --referenceFasta ref/GRCh38.fa \
+    --runDir strelka_S1/
+
+strelka_S1/runWorkflow.py -m local -j 16
+<span class="comment"># Output: strelka_S1/results/variants/variants.vcf.gz</span></pre></div>
+</div>
+</section>
+
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. HaplotypeCaller 與 DeepVariant 在「如何決定變異」上的核心差別？</p>
+<p data-lang="en">1. Core difference between HaplotypeCaller and DeepVariant in how they call variants?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 兩者完全相同</span><span data-lang="en">A. They are identical</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. HC 用 CNN、DV 用 HMM</span><span data-lang="en">B. HC uses CNN; DV uses HMM</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. HC 局部重組裝 + PairHMM；DV 把 pileup 轉成影像用 CNN 分類</span><span data-lang="en">C. HC does local reassembly + PairHMM; DV converts pileups to images and classifies with a CNN</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. HC 只能跑 WES、DV 只能跑 WGS</span><span data-lang="en">D. HC is WES-only; DV is WGS-only</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">2. 為什麼 cohort 聯合呼叫一定要 gVCF 而不是普通 VCF？</p>
+<p data-lang="en">2. Why does cohort joint calling require gVCF instead of plain VCF?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. gVCF 較小</span><span data-lang="en">A. gVCF is smaller</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. gVCF 含「非變異位點的參考信賴度」，能區分「真 ref」與「未覆蓋」，聯合呼叫才有依據</span><span data-lang="en">B. gVCF carries reference-confidence at non-variant sites, distinguishing true-ref from uncalled — essential for joint calling</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 純粹是 GATK 規定</span><span data-lang="en">C. Pure GATK convention</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. gVCF 不需索引</span><span data-lang="en">D. gVCF needs no index</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">3. 是非題：HaplotypeCaller 的局部重組裝可用於 indel 周圍，但在純 SNV 區是浪費時間。</p>
+<p data-lang="en">3. True/False: HC's local reassembly is useful around indels but wasted in pure-SNV regions.</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對</span><span data-lang="en">A. True</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯——active region 機制只在「有差異證據」的窗口才重組裝，純 ref 區直接跳過</span><span data-lang="en">B. False — the active-region mechanism reassembles only in windows with evidence; pure-ref regions are skipped</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="coverage.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 6: Coverage QC</span></a>
+<a href="joint-genotyping.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 8: Joint Genotyping</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+const callerLabels=['HC SNV','HC indel','DV SNV','DV indel','Strelka2 SNV','Strelka2 indel'];
+const callerChart=new Chart(document.getElementById('callerChart'),{type:'bar',data:{labels:callerLabels,datasets:[{label:'F1',data:[],backgroundColor:['rgba(4,120,87,.8)','rgba(4,120,87,.4)','rgba(217,119,6,.8)','rgba(217,119,6,.4)','rgba(8,145,178,.8)','rgba(8,145,178,.4)']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:'F1 score by caller (simulated)'}},scales:{y:{min:0.6,max:1,title:{display:true,text:'F1 score'}}}}});
+function up(){const d=+document.getElementById('sliderDepth').value;document.getElementById('valDepth').textContent=d;const depthFactor=Math.min(1,d/30);const noise=()=>(Math.random()-.5)*.01;const hcS=Math.min(.998,.85+.14*depthFactor)+noise();const hcI=Math.min(.97,.7+.25*depthFactor)+noise();const dvS=Math.min(.999,.87+.13*depthFactor)+noise();const dvI=Math.min(.98,.75+.22*depthFactor)+noise();const stS=Math.min(.995,.83+.15*depthFactor)+noise();const stI=Math.min(.96,.68+.27*depthFactor)+noise();const vals=[hcS,hcI,dvS,dvI,stS,stI];callerChart.data.datasets[0].data=vals;callerChart.update('none');const meanF1=vals.reduce((a,b)=>a+b,0)/vals.length;const maxIdx=vals.indexOf(Math.max(...vals));const L=I18n.get();document.getElementById('statF1').textContent=(L==='zh'?'平均 F1: ':'Mean F1: ')+meanF1.toFixed(3);document.getElementById('statBest').textContent=(L==='zh'?'最佳: ':'Best: ')+callerLabels[maxIdx];}
+document.getElementById('sliderDepth').addEventListener('input',up);document.addEventListener('langchange',up);up();
+const QF={zh:{q1_y:'HC=局部組裝+PairHMM；DV=pileup 影像 CNN。',q1_n:'答案：C。',q2_y:'gVCF 帶有非變異位點 ref-confidence，是 joint genotyping 的基石。',q2_n:'答案：B。',q3_y:'Active region 只在有差異證據時組裝，純 ref 區跳過。',q3_n:'答案：B。'},en:{q1_y:'HC = local assembly + PairHMM; DV = CNN on pileup images.',q1_n:'Correct: C.',q2_y:'gVCF carries non-variant ref-confidence — required for joint calling.',q2_n:'Correct: B.',q3_y:'Active regions skip pure-ref windows by design.',q3_n:'Correct: B.'}};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

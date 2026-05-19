@@ -1,281 +1,217 @@
 <!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Step 1: Intro — WGS vs WES Tutorial</title>
+<title>Step 1: WGS / WES Overview — Tutorial</title>
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head><body>
 <nav class="top-nav"><div class="top-nav-inner">
   <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
   <ul class="top-nav-links">
-    <li><a href="intro.html" class="active">Intro</a></li>
-    <li><a href="fastq-qc.html">FASTQ QC</a></li><li><a href="alignment.html">Align</a></li><li><a href="post-alignment.html">PostAln</a></li><li><a href="variant-calling.html">Calling</a></li><li><a href="joint-genotyping.html">Joint</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot</a></li><li><a href="interpretation.html">Interp</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="structural-variants.html">SV/CNV</a></li><li><a href="wes-considerations.html">WES</a></li>
+    <li><a href="intro.html" class="active">Intro</a></li><li><a href="qc.html">QC</a></li><li><a href="trimming.html">Trim</a></li><li><a href="alignment.html">Align</a></li><li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li><li><a href="coverage.html">Coverage</a></li><li><a href="germline-calling.html">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot.</a></li><li><a href="cnv-sv.html">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html">Long-read</a></li><li><a href="acmg.html">ACMG</a></li><li><a href="clinical-report.html">Report</a></li><li><a href="cohort.html">Cohort</a></li>
+    <li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li>
   </ul>
 </div></nav>
 <div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
-<header class="page-hero"><div class="step-badge">STEP 1 / 9</div>
-<h1 data-zh="入門：WGS vs WES" data-en="Intro: WGS vs WES">入門：WGS vs WES</h1>
-<p class="subtitle" data-lang="zh">從基因體 3 Gb 到外顯子 60 Mb——選對策略，讓每一次定序都物超所值。</p>
-<p class="subtitle" data-lang="en">From a 3 Gb genome to a 60 Mb exome — choose the right strategy and make every sequencing run count.</p>
+<header class="page-hero"><div class="step-badge">STEP 1 / 16</div>
+<h1 data-zh="WGS / WES 概論" data-en="WGS / WES Overview">WGS / WES 概論</h1>
+<p class="subtitle" data-lang="zh">在進入分析流程前，先弄清楚 WGS、WES、Panel 在覆蓋率、成本與臨床用途上的根本差異。</p>
+<p class="subtitle" data-lang="en">Before diving into the pipeline — understand the fundamental differences between WGS, WES, and Panel sequencing in coverage, cost, and clinical use.</p>
 </header>
 <main class="content-wrap">
 
-<!-- ===== Section 1: Why this choice ===== -->
 <section class="section">
 <div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
-<h2 data-zh="為什麼這個選擇是整個流程的起點？" data-en="Why this choice shapes the entire pipeline">為什麼這個選擇是整個流程的起點？</h2>
+<h2 data-zh="為什麼要學 WGS / WES？" data-en="Why learn WGS / WES?">為什麼要學 WGS / WES？</h2>
 <div data-lang="zh">
-<p><strong>WGS (Whole Genome Sequencing)</strong> 嘗試讀完整個基因體；<strong>WES (Whole Exome Sequencing)</strong> 只讀蛋白質編碼的外顯子區。雖然兩者上游分析流程高度重疊（都用 BWA、GATK），但選擇哪一種會深刻影響下游每一步的決策——從 coverage 設定、QC 閾值、到能不能偵測 CNV 與 non-coding variants。</p>
-<p>人類基因體約 <strong>3 × 10⁹ bp</strong>，但其中只有約 <strong>1–2%</strong> 是外顯子（總共 ~60 Mb，涵蓋約 20,000 基因的約 180,000 個 exons）。然而，目前估計約 <strong>85% 的已知致病性 Mendelian 變異</strong>位於外顯子內，這就是 WES 在臨床診斷上長期受歡迎的原因。</p>
+<p><strong>全基因組定序 (WGS, Whole Genome Sequencing)</strong> 與 <strong>全外顯子定序 (WES, Whole Exome Sequencing)</strong> 是現代基因組醫學的基石。從罕見疾病診斷、癌症精準治療、藥物基因組學、產前篩檢、到族群遺傳學，幾乎所有需要鑑定 SNV / indel / CNV / SV 的研究都建立在這套流程上。</p>
+<p>截至 2026 年，WGS 30× 的市場成本已降至 USD $200 以下 (Illumina NovaSeq X、Ultima Genomics UG100、MGI DNBSEQ-T7)，PacBio Revio 與 ONT PromethION 也讓 long-read 普及。但「<strong>從 FASTQ 到臨床等級變異報告</strong>」中間隔著數十個工具與決策——這正是本教學要教的。</p>
 </div>
 <div data-lang="en">
-<p><strong>WGS (Whole Genome Sequencing)</strong> attempts to read the entire genome; <strong>WES (Whole Exome Sequencing)</strong> reads only protein-coding exons. While both share most of the upstream analysis pipeline (both use BWA, GATK), the choice profoundly shapes every downstream decision — coverage targets, QC thresholds, and whether you can detect CNVs and non-coding variants.</p>
-<p>The human genome is ~<strong>3 × 10⁹ bp</strong>, but only <strong>~1–2%</strong> is exonic (~60 Mb, covering ~180,000 exons across ~20,000 genes). Yet roughly <strong>85% of known pathogenic Mendelian variants</strong> reside within exons — the reason WES has long been the workhorse of clinical diagnostics.</p>
+<p><strong>Whole Genome Sequencing (WGS)</strong> and <strong>Whole Exome Sequencing (WES)</strong> are the cornerstones of modern genomic medicine. From rare-disease diagnosis to precision oncology, pharmacogenomics, prenatal screening, and population genetics — virtually all work that requires identifying SNVs / indels / CNVs / SVs is built on this pipeline.</p>
+<p>As of 2026, 30× WGS market cost has dropped below USD $200 (Illumina NovaSeq X, Ultima Genomics UG100, MGI DNBSEQ-T7). PacBio Revio and ONT PromethION have made long-read accessible. But between <strong>"FASTQ"</strong> and a clinical-grade variant report sit dozens of tools and decisions — that's what this tutorial covers.</p>
 </div>
 <div class="callout tip"><span class="callout-icon">💡</span><div>
-<span data-lang="zh"><strong>核心原則：</strong>WES 用更少的成本提供 exon 區域的<strong>更深 coverage</strong>（典型 100× vs WGS 30×），但完全看不到 introns、promoters、enhancers。WGS 雖然每個位點淺，卻提供更<strong>均勻</strong>且能偵測 SV/CNV 的全景圖。問題從來不是「哪個比較好」，而是「你的研究問題是什麼」。</span>
-<span data-lang="en"><strong>Core principle:</strong> WES delivers <strong>deeper coverage</strong> in exonic regions at lower cost (typically 100× vs WGS's 30×), but is blind to introns, promoters, and enhancers. WGS gives shallower per-base depth but a far more <strong>uniform</strong> picture and can detect SVs/CNVs. The question is never "which is better" — it's "what is your research question?"</span>
+<span data-lang="zh"><strong>核心原則：</strong>沒有「最好的流程」——只有「最適合你的樣本、預算、目標的流程」。GATK Best Practices、DRAGEN、DeepVariant、nf-core/sarek 都是合理選擇。本教學以 GATK 4.x + Snakemake/Nextflow 為主軸，但會在每章比較替代方案。</span>
+<span data-lang="en"><strong>Core principle:</strong> there is no "best pipeline" — only one best suited to your sample, budget, and goals. GATK Best Practices, DRAGEN, DeepVariant, and nf-core/sarek are all reasonable choices. This tutorial centres on GATK 4.x + Snakemake/Nextflow, but compares alternatives in every chapter.</span>
 </div></div>
 </section>
 
-<!-- ===== Section 2: Side-by-side comparison ===== -->
 <section class="section">
-<div class="section-label" data-zh="技術對比" data-en="TECHNICAL COMPARISON">技術對比</div>
-<h2 data-zh="一、技術規格全面對比" data-en="I. Full Technical Comparison">一、技術規格全面對比</h2>
-<table class="comp-table"><thead><tr><th data-zh="特性" data-en="Feature">特性</th><th>WGS</th><th>WES</th></tr></thead><tbody>
-<tr><td><strong data-zh="覆蓋範圍" data-en="Coverage Region">覆蓋範圍</strong><br><span data-lang="zh" style="font-size:.8rem;color:var(--c-ink-muted)">基因體中讀取的部分</span><span data-lang="en" style="font-size:.8rem;color:var(--c-ink-muted)">portion of genome sequenced</span></td><td data-lang="zh">~98%（全基因體 3 Gb）</td><td data-lang="zh">~1–2%（外顯子 ~60 Mb）</td><td data-lang="en">~98% (whole genome ~3 Gb)</td><td data-lang="en">~1–2% (exons ~60 Mb)</td></tr>
-<tr><td><strong data-zh="典型 coverage 深度" data-en="Typical Depth">典型 coverage</strong></td><td>30–60×</td><td>100–200×</td></tr>
-<tr><td><strong data-zh="製備方法" data-en="Library Prep">製備方法</strong></td><td data-lang="zh">PCR-free 直接定序</td><td data-lang="zh">target capture (探針雜合捕獲)</td><td data-lang="en">PCR-free direct sequencing</td><td data-lang="en">Target capture (probe hybridization)</td></tr>
-<tr><td><strong data-zh="Coverage 均勻度" data-en="Coverage Uniformity">Coverage 均勻度</strong></td><td>⭐⭐⭐⭐⭐ <span data-lang="zh">非常均勻</span><span data-lang="en">very uniform</span></td><td>⭐⭐⭐ <span data-lang="zh">受捕獲偏好影響</span><span data-lang="en">capture-bias affected</span></td></tr>
-<tr><td><strong data-zh="Non-coding 變異" data-en="Non-coding Variants">Non-coding 變異</strong></td><td>✅ <span data-lang="zh">可偵測</span><span data-lang="en">detectable</span></td><td>❌ <span data-lang="zh">幾乎看不到</span><span data-lang="en">essentially invisible</span></td></tr>
-<tr><td><strong data-zh="結構變異 (SV) 與 CNV" data-en="Structural Variants & CNV">SV / CNV</strong></td><td>✅ <span data-lang="zh">高解析度斷點</span><span data-lang="en">single-bp breakpoints</span></td><td>⚠️ <span data-lang="zh">僅 exon 內，斷點不準</span><span data-lang="en">exon-only, imprecise breakpoints</span></td></tr>
-<tr><td><strong data-zh="GC-rich 區域" data-en="GC-rich Regions">GC-rich 區域</strong></td><td data-lang="zh">PCR-free WGS 涵蓋良好</td><td data-lang="zh">捕獲偏差較大</td><td data-lang="en">PCR-free WGS covers well</td><td data-lang="en">Significant capture bias</td></tr>
-<tr><td><strong data-zh="原始數據量" data-en="Raw Data Size">數據量 / sample</strong></td><td>~90–120 GB FASTQ</td><td>~10–15 GB FASTQ</td></tr>
-<tr><td><strong data-zh="相對成本" data-en="Relative Cost">相對成本</strong></td><td>3–5×</td><td>1×</td></tr>
-<tr><td><strong data-zh="主要用途" data-en="Primary Use">主要用途</strong></td><td data-lang="zh">研究、罕見病、population genetics、SV 分析</td><td data-lang="zh">臨床 Mendelian 診斷、大規模族群篩檢</td><td data-lang="en">Research, rare disease, population genetics, SV analysis</td><td data-lang="en">Clinical Mendelian diagnostics, large cohort screening</td></tr>
+<div class="section-label" data-zh="核心比較" data-en="CORE COMPARISON">核心比較</div>
+<h2 data-zh="一、WGS vs WES vs Panel" data-en="I. WGS vs WES vs Panel">一、WGS vs WES vs Panel</h2>
+<table class="comp-table">
+<thead><tr><th>—</th><th>WGS</th><th>WES</th><th>Targeted Panel</th></tr></thead>
+<tbody>
+<tr><td data-zh="覆蓋區域" data-en="Region"><strong data-zh="覆蓋區域" data-en="Region">覆蓋區域</strong></td><td data-lang="zh">全基因組 (~3 Gb)</td><td data-lang="zh">編碼區 ~1–2%</td><td data-lang="zh">特定基因 (~kb–Mb)</td><td data-lang="en">Whole genome (~3 Gb)</td><td data-lang="en">Coding regions ~1–2%</td><td data-lang="en">Specific genes (~kb–Mb)</td></tr>
+<tr><td><strong data-zh="典型覆蓋深度" data-en="Typical depth">深度</strong></td><td>30–40× <span data-lang="zh">(臨床常 30×)</span><span data-lang="en">(clinical: 30×)</span></td><td>100–200×</td><td>500–10,000×</td></tr>
+<tr><td><strong data-zh="成本" data-en="Cost">成本</strong></td><td>$200–$600</td><td>$300–$500</td><td>$50–$200</td></tr>
+<tr><td><strong data-zh="可偵測變異" data-en="Variants detected">可偵測變異</strong></td><td data-lang="zh">SNV/Indel/CNV/SV/STR/MEI</td><td data-lang="zh">編碼區 SNV/Indel，CNV 有限</td><td data-lang="zh">設計區內所有變異類型</td><td data-lang="en">SNV/Indel/CNV/SV/STR/MEI</td><td data-lang="en">Coding SNV/Indel; limited CNV</td><td data-lang="en">All types within target</td></tr>
+<tr><td><strong data-zh="優勢" data-en="Strengths">優勢</strong></td><td data-lang="zh">無捕獲偏差、可解 SV/regulatory</td><td data-lang="zh">高深度便宜、編碼區覆蓋好</td><td data-lang="zh">超深度、適合 ctDNA / 低頻變異</td><td data-lang="en">No capture bias; SV/regulatory</td><td data-lang="en">Cheap deep coding coverage</td><td data-lang="en">Ultra-deep; ctDNA / low VAF</td></tr>
+<tr><td><strong data-zh="限制" data-en="Limitations">限制</strong></td><td data-lang="zh">資料量大、儲存運算成本高</td><td data-lang="zh">捕獲偏差、CNV 困難</td><td data-lang="zh">區域外無資料、設計偏差</td><td data-lang="en">Large data, storage/compute cost</td><td data-lang="en">Capture bias, CNV difficult</td><td data-lang="en">Blind outside design</td></tr>
 </tbody></table>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>關於 WES「節省成本」的迷思：</strong>WES 雖然單次測序便宜，但<strong>捕獲試劑</strong> (Agilent SureSelect, Twist, IDT xGen) 才是真正成本大頭。30× WGS 在 2026 年的總成本常已低於 100× WES。許多大型計畫 (UKBB、All of Us) 已轉向 WGS。</span>
+<span data-lang="en"><strong>The "WES is cheaper" myth:</strong> while sequencing per sample is cheaper, <strong>capture reagents</strong> (Agilent SureSelect, Twist, IDT xGen) dominate cost. In 2026, total 30× WGS cost is often below 100× WES. Major projects (UKBB, All of Us) have switched to WGS.</span>
+</div></div>
 </section>
 
-<!-- ===== Section 3: Interactive coverage simulator ===== -->
 <section class="section">
 <div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
-<h2 data-zh="二、Coverage 分布模擬器" data-en="II. Coverage Distribution Simulator">二、Coverage 分布模擬器</h2>
-<div data-lang="zh"><p>這個模擬器顯示同一段基因體區域在 WGS 與 WES 下的 read depth 分布。切換按鈕，觀察兩種策略在 <strong>exon</strong>（深色區）與 <strong>intron</strong>（淺色區）的差異。注意 WES 在 exon 內 coverage 高但很不均勻；WGS 則覆蓋全區但深度較淺。</p></div>
-<div data-lang="en"><p>This simulator shows read-depth distribution across the same genomic region under WGS and WES. Toggle to compare how each strategy handles <strong>exons</strong> (dark bands) vs <strong>introns</strong> (light bands). Note that WES is deep but uneven in exons; WGS is shallower but uniform across the whole region.</p></div>
+<h2 data-zh="覆蓋深度 → 變異偵測敏感度" data-en="Coverage → Variant Detection Sensitivity">覆蓋深度 → 變異偵測敏感度</h2>
+<div data-lang="zh"><p>拖動下方滑桿觀察：給定 VAF (等位基因頻率)，需要多少深度才能可靠呼叫變異？這對 WGS 30×、WES 100×、與低 VAF ctDNA 的策略有直接影響。</p></div>
+<div data-lang="en"><p>Drag the slider to see: at a given VAF (variant allele fraction), how much depth is needed to reliably call a variant? Critical for choosing WGS 30× vs WES 100× vs deep ctDNA.</p></div>
 <div class="interactive-panel">
-<div class="toggle-row">
-<button class="toggle-btn active" id="btn-wgs" onclick="showCov('wgs')">WGS (30×)</button>
-<button class="toggle-btn" id="btn-wes" onclick="showCov('wes')">WES (100×)</button>
-<button class="toggle-btn" id="btn-both" onclick="showCov('both')">Both</button>
-</div>
-<div class="sim-stats" id="covStats"></div>
-<div class="chart-container" style="height:320px;"><canvas id="covChart"></canvas></div>
-<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;"><span data-zh="X 軸：基因體位置 | Y 軸：read depth | 灰色背景：exon 區" data-en="X: genomic position | Y: read depth | Gray bands: exonic regions">X 軸：基因體位置 | Y 軸：read depth | 灰色背景：exon 區</span></p>
+<div class="slider-group"><label><span data-zh="目標 VAF (等位基因頻率)" data-en="Target VAF">目標 VAF</span> <span id="valVAF">50%</span></label><input type="range" id="sliderVAF" min="1" max="50" value="50" step="1"></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statRec">—</span><span class="sim-stat fail" id="statRule">—</span></div>
+<div class="chart-container"><canvas id="covChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;"><span data-zh="X: 平均覆蓋深度 | Y: 偵測機率 (≥4 ALT reads)" data-en="X: Mean coverage | Y: Detection probability (≥4 ALT reads)">X: 平均覆蓋深度 | Y: 偵測機率</span></p>
 </div>
 </section>
 
-<!-- ===== Section 4: When to choose what ===== -->
 <section class="section">
-<div class="section-label" data-zh="決策樹" data-en="DECISION TREE">決策樹</div>
-<h2 data-zh="三、我該選 WGS 還是 WES？" data-en="III. Which one should I choose?">三、我該選 WGS 還是 WES？</h2>
-<div class="decision-tree"><h4>🌳 <span data-zh="決策路徑" data-en="Decision path">決策路徑</span></h4>
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="二、如何為你的研究選擇定序策略？" data-en="II. Choosing the right sequencing strategy">二、如何為你的研究選擇定序策略？</h2>
+<div class="decision-tree">
+<h4>🌳 <span data-zh="平台選擇決策流程" data-en="Platform selection decision tree">平台選擇決策流程</span></h4>
 <div data-lang="zh">
-<div class="dt-node"><span class="dt-q">Q1:</span><div>你只在意 protein-coding 變異，且預算有限？ <span class="dt-arrow">→ 是 →</span> <strong>WES</strong>（如大規模 Mendelian 疾病基因篩查）。</div></div>
-<div class="dt-node"><span class="dt-q">Q2:</span><div>需要偵測 deep intronic、promoter/enhancer、或 splicing 異常？ <span class="dt-arrow">→ 是 →</span> <strong>WGS</strong>（WES 看不到這些）。</div></div>
-<div class="dt-node"><span class="dt-q">Q3:</span><div>需要可靠地偵測 CNV、SV、translocations？ <span class="dt-arrow">→ 是 →</span> <strong>WGS</strong>（WES 的 capture 偏差讓 CNV 偵測不可靠）。</div></div>
-<div class="dt-node"><span class="dt-q">Q4:</span><div>樣本量大（&gt;1000 人），希望快速 turnaround？ <span class="dt-arrow">→ 是 →</span> <strong>WES</strong>（成本/儲存/算力都低很多）。</div></div>
-<div class="dt-node"><span class="dt-q">Q5:</span><div>研究 GC-rich 基因（如 GBA、HBA）或假基因家族？ <span class="dt-arrow">→ 是 →</span> <strong>PCR-free WGS</strong>（WES 對 GC-rich 區嚴重欠覆蓋）。</div></div>
+<div class="dt-node"><span class="dt-q">Q1:</span><div>需要偵測 CNV / SV / 結構變異 / 非編碼區變異？ <span class="dt-arrow">→ 是 →</span> 選 <strong>WGS 30×</strong>（必要時加 long-read）。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>僅關注編碼區、預算非常緊？ <span class="dt-arrow">→ 是 →</span> <strong>WES 100×</strong> 仍合理；但比較整體成本後 WGS 常勝出。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>需要偵測 ctDNA 或低 VAF 體細胞變異 (&lt;1%)？ <span class="dt-arrow">→ 是 →</span> <strong>Targeted panel 1,000–10,000×</strong> + UMI。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>SV-rich 疾病 (杜興肌肉失養、亨丁頓舞蹈)？ <span class="dt-arrow">→ 是 →</span> 考慮 <strong>PacBio HiFi 或 ONT long-read</strong>，T2T-CHM13 作為參考。</div></div>
 </div>
 <div data-lang="en">
-<div class="dt-node"><span class="dt-q">Q1:</span><div>Only care about protein-coding variants, on a budget? <span class="dt-arrow">→ Yes →</span> <strong>WES</strong> (e.g. large-cohort Mendelian disease screening).</div></div>
-<div class="dt-node"><span class="dt-q">Q2:</span><div>Need deep-intronic, promoter/enhancer, or splicing variants? <span class="dt-arrow">→ Yes →</span> <strong>WGS</strong> (WES is blind to these).</div></div>
-<div class="dt-node"><span class="dt-q">Q3:</span><div>Need reliable CNV/SV/translocation detection? <span class="dt-arrow">→ Yes →</span> <strong>WGS</strong> (WES capture bias makes CNV calls unreliable).</div></div>
-<div class="dt-node"><span class="dt-q">Q4:</span><div>Large cohort (&gt;1000 samples), need fast turnaround? <span class="dt-arrow">→ Yes →</span> <strong>WES</strong> (much lower cost, storage, compute).</div></div>
-<div class="dt-node"><span class="dt-q">Q5:</span><div>Studying GC-rich genes (GBA, HBA) or pseudogene families? <span class="dt-arrow">→ Yes →</span> <strong>PCR-free WGS</strong> (WES severely under-covers GC-rich regions).</div></div>
-</div></div>
-
-<div class="callout warn"><span class="callout-icon">⚠️</span><div>
-<span data-lang="zh"><strong>新趨勢：</strong>近年 PCR-free WGS 成本大幅下降，且其在編碼區的 coverage 完整性已超越 WES。許多臨床機構正在從「WES first → WGS reflex」轉向「直接 WGS」的單階段策略。</span>
-<span data-lang="en"><strong>Trend to watch:</strong> PCR-free WGS costs have dropped sharply, and its coding-region coverage now surpasses WES. Many clinical labs are moving from "WES first → WGS reflex" toward a single-stage "WGS upfront" strategy.</span>
-</div></div>
+<div class="dt-node"><span class="dt-q">Q1:</span><div>Need CNV / SV / non-coding variants? <span class="dt-arrow">→ Yes →</span> Choose <strong>WGS 30×</strong> (consider adding long-read).</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Coding only, tight budget? <span class="dt-arrow">→ Yes →</span> <strong>WES 100×</strong> still reasonable — but compare total cost; WGS often wins.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>ctDNA or low-VAF somatic (&lt;1%)? <span class="dt-arrow">→ Yes →</span> <strong>Targeted panel 1,000–10,000×</strong> + UMI.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>SV-rich disease (DMD, Huntington)? <span class="dt-arrow">→ Yes →</span> <strong>PacBio HiFi or ONT long-read</strong>; consider T2T-CHM13.</div></div>
+</div>
+</div>
 </section>
 
-<!-- ===== Section 5: The pipeline at a glance ===== -->
 <section class="section">
-<div class="section-label" data-zh="流程預覽" data-en="PIPELINE PREVIEW">流程預覽</div>
-<h2 data-zh="四、整體分析流程鳥瞰" data-en="IV. Pipeline at a Glance">四、整體分析流程鳥瞰</h2>
-<div data-lang="zh"><p>無論是 WGS 還是 WES，從 FASTQ 到 annotated VCF 的核心步驟高度相似。WES 只在 calling 與 coverage 評估時加上 <code>--intervals</code> 限制目標區。下面是後續 8 個章節將涵蓋的主軸：</p></div>
-<div data-lang="en"><p>Whether WGS or WES, the core path from FASTQ to annotated VCF is largely shared. WES merely adds <code>--intervals</code> to confine calling and coverage assessment to target regions. Here is the spine of the next 8 chapters:</p></div>
+<div class="section-label" data-zh="完整流程" data-en="FULL PIPELINE">完整流程</div>
+<h2 data-zh="三、本教學涵蓋的 16 步驟流程" data-en="III. The 16-step pipeline of this tutorial">三、本教學涵蓋的 16 步驟流程</h2>
 <div class="workflow">
-<div class="workflow-step" data-step="1"><h4>FASTQ QC <span style="color:var(--c-ink-muted);font-weight:400;font-size:.85rem">— FastQC, fastp</span></h4><div data-lang="zh"><p>檢查 Phred 分數、adapter 含量、duplication；trim 低品質 bases。</p></div><div data-lang="en"><p>Check Phred scores, adapter content, duplication. Trim low-quality bases.</p></div></div>
-<div class="workflow-step" data-step="2"><h4>Alignment <span style="color:var(--c-ink-muted);font-weight:400;font-size:.85rem">— BWA-MEM2</span></h4><div data-lang="zh"><p>比對到 GRCh38；輸出 BAM。</p></div><div data-lang="en"><p>Align to GRCh38; output BAM.</p></div></div>
-<div class="workflow-step" data-step="3"><h4>Post-alignment <span style="color:var(--c-ink-muted);font-weight:400;font-size:.85rem">— MarkDuplicates, BQSR</span></h4><div data-lang="zh"><p>標記 PCR duplicates、校正 base quality scores。</p></div><div data-lang="en"><p>Mark PCR duplicates, recalibrate base quality scores.</p></div></div>
-<div class="workflow-step" data-step="4"><h4>Variant calling <span style="color:var(--c-ink-muted);font-weight:400;font-size:.85rem">— HaplotypeCaller / DeepVariant</span></h4><div data-lang="zh"><p>產出每樣本 GVCF 或單樣本 VCF。</p></div><div data-lang="en"><p>Produce per-sample GVCF or single-sample VCF.</p></div></div>
-<div class="workflow-step" data-step="5"><h4>Joint genotyping <span style="color:var(--c-ink-muted);font-weight:400;font-size:.85rem">— GenomicsDBImport, GenotypeGVCFs</span></h4><div data-lang="zh"><p>跨樣本合併、refining genotypes。</p></div><div data-lang="en"><p>Cross-sample merging, refined genotyping.</p></div></div>
-<div class="workflow-step" data-step="6"><h4>Filtering <span style="color:var(--c-ink-muted);font-weight:400;font-size:.85rem">— VQSR / Hard filters</span></h4><div data-lang="zh"><p>移除假陽性 SNV/indel calls。</p></div><div data-lang="en"><p>Remove false-positive SNV/indel calls.</p></div></div>
-<div class="workflow-step" data-step="7"><h4>Annotation <span style="color:var(--c-ink-muted);font-weight:400;font-size:.85rem">— VEP, ANNOVAR, SnpEff</span></h4><div data-lang="zh"><p>加上基因、後果、族群頻率、臨床資料庫。</p></div><div data-lang="en"><p>Add gene, consequence, population frequency, clinical databases.</p></div></div>
-<div class="workflow-step" data-step="8"><h4>Interpretation <span style="color:var(--c-ink-muted);font-weight:400;font-size:.85rem">— ACMG/AMP</span></h4><div data-lang="zh"><p>套用 28 條證據準則，分為 Pathogenic ↔ Benign 五級。</p></div><div data-lang="en"><p>Apply 28 evidence criteria, classify across 5 tiers (Pathogenic ↔ Benign).</p></div></div>
+<div class="workflow-step" data-step="1"><h4>Intro</h4><p data-lang="zh">本章 — WGS/WES/Panel 比較與策略選擇。</p><p data-lang="en">This chapter — WGS/WES/Panel comparison and strategy.</p></div>
+<div class="workflow-step" data-step="2"><h4>QC → Trimming → Alignment</h4><p data-lang="zh">FastQC/MultiQC → fastp → BWA-MEM2/minimap2 → BAM/CRAM。</p><p data-lang="en">FastQC/MultiQC → fastp → BWA-MEM2/minimap2 → BAM/CRAM.</p></div>
+<div class="workflow-step" data-step="3"><h4>MarkDup → BQSR → Coverage</h4><p data-lang="zh">Picard / GATK；mosdepth 評估覆蓋均勻度。</p><p data-lang="en">Picard / GATK; mosdepth for uniformity.</p></div>
+<div class="workflow-step" data-step="4"><h4>Germline VC → Joint GT → Filter</h4><p data-lang="zh">HaplotypeCaller GVCF → GenomicsDBImport → GenotypeGVCFs → VQSR/Hard Filter。</p><p data-lang="en">HaplotypeCaller GVCF → GenomicsDBImport → GenotypeGVCFs → VQSR/Hard Filter.</p></div>
+<div class="workflow-step" data-step="5"><h4>Annotation → CNV/SV</h4><p data-lang="zh">VEP / SnpEff + dbNSFP；Manta / DELLY / CNVkit / gCNV。</p><p data-lang="en">VEP / SnpEff + dbNSFP; Manta / DELLY / CNVkit / gCNV.</p></div>
+<div class="workflow-step" data-step="6"><h4>Somatic & Long-read</h4><p data-lang="zh">Mutect2 / Strelka2；DeepVariant / Clair3 / Sniffles2。</p><p data-lang="en">Mutect2 / Strelka2; DeepVariant / Clair3 / Sniffles2.</p></div>
+<div class="workflow-step" data-step="7"><h4>ACMG → Clinical Report → Cohort</h4><p data-lang="zh">PVS1-PP5 證據碼；ClinVar/gnomAD v4；Trio + 大型佇列。</p><p data-lang="en">PVS1-PP5 evidence codes; ClinVar/gnomAD v4; Trio + large cohort.</p></div>
 </div>
 </section>
 
-<!-- ===== Section 6: Reference genomes ===== -->
-<section class="section">
-<div class="section-label" data-zh="參考基因組" data-en="REFERENCE">參考基因組</div>
-<h2 data-zh="五、選擇參考基因組" data-en="V. Choosing a Reference Genome">五、選擇參考基因組</h2>
-<div class="card-grid cols-3">
-<div class="card"><h4>GRCh38 / hg38</h4>
-<div data-lang="zh"><p>2013 起的主流參考。包含 ALT contigs、修正了 hg19 的多處錯誤，是 GATK Best Practices 的<strong>預設選擇</strong>。新專案應一律用 hg38。</p></div>
-<div data-lang="en"><p>The mainstream reference since 2013. Includes ALT contigs, fixes many hg19 errors. Default in GATK Best Practices. New projects should use hg38.</p></div>
-</div>
-<div class="card"><h4>GRCh37 / hg19</h4>
-<div data-lang="zh"><p>2009 版本。仍見於既有 cohort 資料庫（如 1000 Genomes phase 3、ExAC v1）。除非為了與舊資料整合，否則不建議新專案使用。</p></div>
-<div data-lang="en"><p>The 2009 build. Still present in legacy cohort databases (1000 Genomes phase 3, ExAC v1). Avoid for new projects unless legacy integration is required.</p></div>
-</div>
-<div class="card"><h4>T2T-CHM13</h4>
-<div data-lang="zh"><p>2022 年 telomere-to-telomere 完整組裝（包含 centromeres、acrocentric arms）。研究價值高，但生態系工具支援還在追趕中。</p></div>
-<div data-lang="en"><p>The 2022 telomere-to-telomere complete assembly (including centromeres and acrocentric arms). High research value; tool ecosystem still catching up.</p></div>
-</div>
-</div>
-</section>
-
-<!-- ===== Section 7: Code samples ===== -->
 <section class="section">
 <div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
-<h2 data-zh="六、第一步：取得參考檔" data-en="VI. First Step: Get the Reference Files">六、第一步：取得參考檔</h2>
-<div class="code-tabs"><div class="code-tab-btns">
-<button class="code-tab-btn active" onclick="switchTab(this,'r1')">Bash / GATK</button>
-<button class="code-tab-btn" onclick="switchTab(this,'r2')">Bash / WES intervals</button>
+<h2 data-zh="範例：從 FASTQ 到 VCF 的最小可行流程" data-en="Example: minimal FASTQ → VCF pipeline">範例：從 FASTQ 到 VCF 的最小可行流程</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'bash1')">Bash</button><button class="code-tab-btn" onclick="switchTab(this,'snake1')">Snakemake</button><button class="code-tab-btn" onclick="switchTab(this,'nf1')">nf-core</button></div>
+<div class="code-tab-content active" id="bash1"><pre><span class="comment"># GATK Best Practices 4.x 最小流程 / Minimal pipeline</span>
+<span class="comment"># 1. Alignment</span>
+bwa-mem2 mem -t 16 -R <span class="str">"@RG\tID:S1\tSM:S1\tPL:ILLUMINA\tLB:lib1"</span> \
+    ref.fa S1_R1.fq.gz S1_R2.fq.gz | samtools sort -@ 4 -o S1.bam -
+
+<span class="comment"># 2. Mark duplicates</span>
+gatk MarkDuplicatesSpark -I S1.bam -O S1.dedup.bam -M S1.metrics.txt
+
+<span class="comment"># 3. BQSR (Base Quality Score Recalibration)</span>
+gatk BaseRecalibrator -I S1.dedup.bam -R ref.fa \
+    --known-sites dbsnp.vcf.gz --known-sites Mills_and_1000G.vcf.gz -O recal.table
+gatk ApplyBQSR -I S1.dedup.bam -R ref.fa --bqsr-recal-file recal.table -O S1.recal.bam
+
+<span class="comment"># 4. HaplotypeCaller (gVCF mode)</span>
+gatk HaplotypeCaller -I S1.recal.bam -R ref.fa -O S1.g.vcf.gz -ERC GVCF
+
+<span class="comment"># 5. GenotypeGVCFs (single sample — for multi-sample use GenomicsDBImport)</span>
+gatk GenotypeGVCFs -V S1.g.vcf.gz -R ref.fa -O S1.vcf.gz
+
+<span class="comment"># 6. Hard filter (for single sample or small cohorts)</span>
+gatk VariantFiltration -V S1.vcf.gz -R ref.fa -O S1.filtered.vcf.gz \
+    --filter-expression <span class="str">"QD &lt; 2.0"</span> --filter-name QD2 \
+    --filter-expression <span class="str">"FS &gt; 60.0"</span> --filter-name FS60 \
+    --filter-expression <span class="str">"MQ &lt; 40.0"</span> --filter-name MQ40</pre></div>
+<div class="code-tab-content" id="snake1"><pre><span class="comment"># Snakemake 範例 — 多樣本平行化 / Multi-sample parallel</span>
+SAMPLES = [<span class="str">"S1"</span>, <span class="str">"S2"</span>, <span class="str">"S3"</span>]
+
+rule all:
+    input: expand(<span class="str">"vcf/{s}.filtered.vcf.gz"</span>, s=SAMPLES)
+
+rule align:
+    input: r1=<span class="str">"fq/{s}_R1.fq.gz"</span>, r2=<span class="str">"fq/{s}_R2.fq.gz"</span>
+    output: <span class="str">"bam/{s}.bam"</span>
+    threads: 16
+    shell:
+        <span class="str">"bwa-mem2 mem -t {threads} -R '@RG\\tID:{wildcards.s}\\tSM:{wildcards.s}\\tPL:ILLUMINA' "</span>
+        <span class="str">"ref.fa {input.r1} {input.r2} | samtools sort -@ 4 -o {output} -"</span>
+
+rule call:
+    input: <span class="str">"bam/{s}.recal.bam"</span>
+    output: <span class="str">"gvcf/{s}.g.vcf.gz"</span>
+    shell: <span class="str">"gatk HaplotypeCaller -I {input} -R ref.fa -O {output} -ERC GVCF"</span></pre></div>
+<div class="code-tab-content" id="nf1"><pre><span class="comment"># nf-core/sarek — production-grade pipeline / 生產級流程</span>
+nextflow run nf-core/sarek \
+    -profile docker \
+    --input samplesheet.csv \
+    --genome GATK.GRCh38 \
+    --tools haplotypecaller,deepvariant,strelka,mutect2,manta,cnvkit,vep \
+    --joint_germline true \
+    --outdir results/
+
+<span class="comment"># samplesheet.csv:</span>
+<span class="comment"># patient,sample,lane,fastq_1,fastq_2</span>
+<span class="comment"># P1,S1,L001,fq/S1_R1.fq.gz,fq/S1_R2.fq.gz</span></pre></div>
 </div>
-<div class="code-tab-content active" id="r1"><pre><span class="comment"># 從 GATK resource bundle 下載 GRCh38 參考</span>
-gsutil cp gs://genomics-public-data/references/GRCh38/Homo_sapiens_assembly38.fasta .
-gsutil cp gs://genomics-public-data/references/GRCh38/Homo_sapiens_assembly38.fasta.fai .
-gsutil cp gs://genomics-public-data/references/GRCh38/Homo_sapiens_assembly38.dict .
-
-<span class="comment"># BWA-MEM2 需要建索引</span>
-bwa-mem2 <span class="func">index</span> Homo_sapiens_assembly38.fasta
-
-<span class="comment"># 已知變異位點（給 BQSR / VQSR 使用）</span>
-gsutil cp gs://genomics-public-data/references/GRCh38/dbsnp_146.hg38.vcf.gz .
-gsutil cp gs://genomics-public-data/references/GRCh38/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz .</pre></div>
-<div class="code-tab-content" id="r2"><pre><span class="comment"># WES：下載捕獲 kit 的 BED 檔（依廠商提供）</span>
-<span class="comment"># 例：Twist Comprehensive Exome、Agilent SureSelect、IDT xGen</span>
-wget https://example-vendor.com/exome_v2_targets.bed
-
-<span class="comment"># 加上 100 bp padding 以涵蓋 splicing 區與 capture 邊緣</span>
-gatk <span class="func">PreprocessIntervals</span> \
-  -L exome_v2_targets.bed \
-  -R Homo_sapiens_assembly38.fasta \
-  --bin-length <span class="num">0</span> \
-  --padding <span class="num">100</span> \
-  --interval-merging-rule OVERLAPPING_ONLY \
-  -O exome_v2_targets.padded.interval_list
-
-<span class="comment"># 後續 HaplotypeCaller 加入 -L 即可限制在 exon 區</span></pre></div></div>
-<div class="callout tip"><span class="callout-icon">📋</span><div>
-<span data-lang="zh"><strong>WES 重點：</strong>務必使用<strong>定序廠商提供的</strong> capture kit BED 檔，不要自行從 GENCODE/Ensembl 拼湊 exon 座標。實際被定序的區域 = capture probe 涵蓋區，不等於 annotated exons。</span>
-<span data-lang="en"><strong>WES essential:</strong> Always use the <strong>vendor-supplied</strong> capture kit BED file. Don't piece together exon coordinates from GENCODE/Ensembl yourself. The actually-sequenced region = capture probe coverage, which is not the same as annotated exons.</span>
-</div></div>
 </section>
 
-<!-- ===== Quiz ===== -->
-<section class="quiz-section"><h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
-
-<div class="quiz-q" data-answer="2">
-<p data-lang="zh">1. 你的研究團隊想找出一個 unsolved Mendelian 家族中的致病變異——前一輪 WES 已經做過但沒找到答案。下一步最合理的選擇是？</p>
-<p data-lang="en">1. Your team wants to identify the pathogenic variant in an unsolved Mendelian family — a prior WES round found nothing. What's the most reasonable next step?</p>
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">1. 對於罕見疾病診斷，需偵測 SNV、indel、CNV、SV 等多種變異類型時，最佳定序策略是？</p>
+<p data-lang="en">1. For rare-disease diagnosis requiring SNV/indel/CNV/SV detection, best strategy?</p>
 <div class="quiz-options">
-<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 重做一次 WES，但提高 coverage 到 200×</span><span data-lang="en">A. Repeat WES at higher coverage (200×)</span></div>
-<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 換一家 WES 廠商使用不同 capture kit</span><span data-lang="en">B. Switch WES vendors to use a different capture kit</span></div>
-<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 改做 WGS，因為可能涉及 deep intronic / regulatory / SV 變異</span><span data-lang="en">C. Switch to WGS — may involve deep intronic / regulatory / SV variants</span></div>
-<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 放棄定序，改用 Sanger 重測候選基因</span><span data-lang="en">D. Drop sequencing, do Sanger on candidate genes</span></div>
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. WGS 30×</span><span data-lang="en">A. WGS 30×</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. WES 100×</span><span data-lang="en">B. WES 100×</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. Targeted panel 1000×</span><span data-lang="en">C. Targeted panel 1000×</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. Sanger sequencing</span><span data-lang="en">D. Sanger sequencing</span></div>
 </div><div class="quiz-feedback" id="fb1"></div></div>
 
-<div class="quiz-q" data-answer="1">
-<p data-lang="zh">2. 關於 WES coverage，以下何者正確？</p>
-<p data-lang="en">2. Which statement about WES coverage is correct?</p>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">2. 關於 WES 的「成本優勢」迷思，下列何者最正確？</p>
+<p data-lang="en">2. Regarding the "WES is cheaper" myth, which is most correct?</p>
 <div class="quiz-options">
-<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. WES 在每個 exon 上覆蓋都很均勻，跟 WGS 一樣</span><span data-lang="en">A. WES coverage is uniform across all exons, just like WGS</span></div>
-<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. WES 的 capture 對 GC-rich 區域有顯著偏差，部分 exons 可能完全 dropout</span><span data-lang="en">B. WES capture is biased against GC-rich regions; some exons may completely drop out</span></div>
-<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. WES 不需要設定 target intervals，HaplotypeCaller 會自動偵測</span><span data-lang="en">C. WES doesn't need target intervals; HaplotypeCaller detects them automatically</span></div>
-<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. WES 與 WGS 的數據量相同</span><span data-lang="en">D. WES and WGS produce the same data volume</span></div>
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. WES 永遠比 WGS 便宜</span><span data-lang="en">A. WES is always cheaper than WGS</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. WGS 與 WES 成本相同</span><span data-lang="en">B. WGS and WES cost the same</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 捕獲試劑成本是 WES 的主要開銷；2026 年 WGS 30× 常總成本低於 100× WES</span><span data-lang="en">C. Capture reagents dominate WES cost; in 2026, 30× WGS total cost often beats 100× WES</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. Panel 永遠最貴</span><span data-lang="en">D. Panels are always the most expensive</span></div>
 </div><div class="quiz-feedback" id="fb2"></div></div>
 
-<div class="quiz-q" data-answer="0">
-<p data-lang="zh">3. 一位 PI 說：「現在 WGS 比較貴，但 PCR-free WGS 對 exon 的 coverage 反而比 WES 更完整」。這個說法？</p>
-<p data-lang="en">3. A PI says: "WGS is more expensive, but PCR-free WGS actually covers exons more completely than WES." This statement is:</p>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">3. 是非題：30× WGS 對於偵測 0.5% VAF 的 ctDNA 體細胞變異是合適的策略。</p>
+<p data-lang="en">3. True/False: 30× WGS is suitable for detecting 0.5% VAF ctDNA somatic variants.</p>
 <div class="quiz-options">
-<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 大致正確——文獻已證實 PCR-free WGS 在編碼區的 coverage 完整性勝過 WES</span><span data-lang="en">A. Largely correct — literature confirms PCR-free WGS gives more complete coding-region coverage than WES</span></div>
-<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 完全錯誤，WES 永遠在 exon 上 coverage 較好</span><span data-lang="en">B. Completely wrong; WES always has better exon coverage</span></div>
-<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 只在 short-read 平台成立</span><span data-lang="en">C. True only on short-read platforms</span></div>
-<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 與 reference genome 版本有關</span><span data-lang="en">D. Depends on the reference genome version</span></div>
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對 (True)</span><span data-lang="en">A. True</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯——低 VAF 需要極深度 (~1,000–10,000×) panel + UMI</span><span data-lang="en">B. False — low VAF needs ultra-deep (~1,000–10,000×) panel + UMI</span></div>
 </div><div class="quiz-feedback" id="fb3"></div></div>
 </section>
 
 <nav class="page-nav"><div class="placeholder"></div>
-<a href="fastq-qc.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 2: FASTQ QC</span></a>
+<a href="qc.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title" data-zh="Step 2: 原始定序 QC" data-en="Step 2: Raw FASTQ QC">Step 2: 原始定序 QC</span></a>
 </nav>
 </main>
-<footer class="site-footer">© WGS/WES Interactive Tutorial</footer>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
 <script src="i18n.js"></script>
 <script>
 window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
 function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
 
-// Coverage simulator: generate gene region with 4 exons + introns
-function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
-const N=200; // bins along genomic region
-const exonRanges=[[15,35],[60,78],[105,128],[155,180]]; // exon bin ranges
-const isExon=i=>exonRanges.some(([a,b])=>i>=a&&i<=b);
-const wgsCov=[],wesCov=[];
-for(let i=0;i<N;i++){
-  // WGS: ~30x with mild gaussian noise + small GC dip mimicry
-  let w=Math.max(0,28+randn()*4);
-  // Add coverage drops in two random regions to mimic GC-rich dropout
-  if(i>40&&i<48) w*=0.55;
-  if(i>140&&i<148) w*=0.65;
-  wgsCov.push(w);
-  // WES: ~100x in exons (highly variable), ~3x in introns (off-target)
-  if(isExon(i)){
-    let e=Math.max(20,95+randn()*35);
-    // Some exons have strong dropout (GC-rich)
-    if(i>=60&&i<=78) e*=0.45; // simulate one bad exon
-    if(i>=170&&i<=180) e*=0.6;
-    wesCov.push(e);
-  } else {
-    wesCov.push(Math.max(0,3+randn()*1.5));
-  }
-}
-const labels=Array.from({length:N},(_,i)=>i*50); // genomic positions
-// Background exon highlight via annotation
-const exonBgPlugin={id:'exonBg',beforeDraw:(c)=>{const ctx=c.ctx,sc=c.scales.x,sy=c.scales.y;ctx.save();ctx.fillStyle='rgba(43,79,129,0.07)';exonRanges.forEach(([a,b])=>{const x1=sc.getPixelForValue(labels[a]),x2=sc.getPixelForValue(labels[b]);ctx.fillRect(x1,sy.top,x2-x1,sy.bottom-sy.top);});ctx.restore();}};
-const covChart=new Chart(document.getElementById('covChart'),{type:'line',data:{labels:labels,datasets:[]},plugins:[exonBgPlugin],options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'},tooltip:{mode:'index',intersect:false}},interaction:{mode:'index',intersect:false},scales:{x:{title:{display:true,text:'Genomic position (bp, simulated)'},ticks:{maxTicksLimit:8}},y:{title:{display:true,text:'Read depth'},beginAtZero:true,suggestedMax:160}}}});
+// Coverage sensitivity simulator — Poisson model: P(>=4 ALT) at depth d, given VAF v
+// expected ALT reads = d*v ; use Poisson approx
+function poisCDFAtLeast(k, lambda){let p=0;let term=Math.exp(-lambda);for(let i=0;i<k;i++){p+=term;term*=lambda/(i+1);}return 1-p;}
+const depths=[];for(let d=5;d<=100;d+=2)depths.push(d);
+const covChart=new Chart(document.getElementById('covChart'),{type:'line',data:{labels:depths,datasets:[{label:'P(detect)',data:[],borderColor:'#047857',backgroundColor:'rgba(4,120,87,.15)',borderWidth:2,fill:true,tension:.3,pointRadius:0}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},scales:{x:{title:{display:true,text:'Mean coverage (×)'}},y:{min:0,max:1,title:{display:true,text:'P(≥4 ALT reads)'}}}}});
+function updateCov(){const v=+document.getElementById('sliderVAF').value/100;document.getElementById('valVAF').textContent=Math.round(v*100)+'%';const data=depths.map(d=>poisCDFAtLeast(4,d*v));covChart.data.datasets[0].data=data;covChart.update('none');const L=I18n.get();const at30=Math.round(poisCDFAtLeast(4,30*v)*100);const at100=Math.round(poisCDFAtLeast(4,100*v)*100);document.getElementById('statRec').textContent=(L==='zh'?'30× 偵測率: ':'30× detect: ')+at30+'%';document.getElementById('statRule').textContent=(L==='zh'?'100× 偵測率: ':'100× detect: ')+at100+'%';}
+document.getElementById('sliderVAF').addEventListener('input',updateCov);document.addEventListener('langchange',updateCov);updateCov();
 
-function showCov(mode){
-  ['wgs','wes','both'].forEach(m=>document.getElementById('btn-'+m).classList.toggle('active',m===mode));
-  const ds=[];
-  if(mode==='wgs'||mode==='both') ds.push({label:'WGS (30×)',data:wgsCov,borderColor:'rgba(43,79,129,1)',backgroundColor:'rgba(43,79,129,0.18)',borderWidth:2,pointRadius:0,fill:true,tension:0.3});
-  if(mode==='wes'||mode==='both') ds.push({label:'WES (100×)',data:wesCov,borderColor:'rgba(200,132,43,1)',backgroundColor:'rgba(200,132,43,0.18)',borderWidth:2,pointRadius:0,fill:true,tension:0.2});
-  covChart.data.datasets=ds;covChart.update('none');
-  // Stats
-  const L=I18n.get();
-  const wgsExon=wgsCov.filter((_,i)=>isExon(i));
-  const wesExon=wesCov.filter((_,i)=>isExon(i));
-  const wgsIntron=wgsCov.filter((_,i)=>!isExon(i));
-  const wesIntron=wesCov.filter((_,i)=>!isExon(i));
-  const m=arr=>(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1);
-  const sd=arr=>{const u=arr.reduce((a,b)=>a+b,0)/arr.length;return Math.sqrt(arr.reduce((a,b)=>a+(b-u)**2,0)/arr.length).toFixed(1);};
-  const labels={zh:{wgsE:'WGS exon 平均',wgsI:'WGS intron 平均',wesE:'WES exon 平均',wesI:'WES intron 平均',cv:'CV (異質性)'},en:{wgsE:'WGS exon mean',wgsI:'WGS intron mean',wesE:'WES exon mean',wesI:'WES intron mean',cv:'CV (variability)'}};
-  let html='';
-  if(mode==='wgs'||mode==='both') html+=`<span class="sim-stat pass">${labels[L].wgsE}: ${m(wgsExon)}×</span><span class="sim-stat pass">${labels[L].wgsI}: ${m(wgsIntron)}×</span>`;
-  if(mode==='wes'||mode==='both') html+=`<span class="sim-stat warn">${labels[L].wesE}: ${m(wesExon)}× (SD ${sd(wesExon)})</span><span class="sim-stat fail">${labels[L].wesI}: ${m(wesIntron)}×</span>`;
-  document.getElementById('covStats').innerHTML=html;
-}
-document.addEventListener('langchange',()=>{const a=document.querySelector('.toggle-btn.active');if(a) showCov(a.id.replace('btn-',''));});
-showCov('wgs');
-
-// Quiz feedback
-const QF={
-  zh:{q1_y:'WES 看不到非編碼區。對於 WES 陰性的家族，WGS 是合邏輯的下一步。',q1_n:'正解已標示。',q2_y:'WES 對 GC-rich 區域捕獲偏差顯著，是其無法取代 WGS 的核心原因之一。',q2_n:'正解已標示。',q3_y:'PCR-free WGS 在編碼區的 coverage 完整性已被多項臨床研究證實優於 WES。',q3_n:'正解已標示。'},
-  en:{q1_y:'WES is blind to non-coding regions. For WES-negative families, WGS is the logical next step.',q1_n:'Correct answer highlighted.',q2_y:'WES capture is significantly biased against GC-rich regions — a core reason it cannot replace WGS.',q2_n:'Correct answer highlighted.',q3_y:'Multiple clinical studies confirm PCR-free WGS covers coding regions more completely than WES.',q3_n:'Correct answer highlighted.'}
-};
+const QF={zh:{q1_y:'WGS 30× 可同時偵測 SNV/Indel/CNV/SV/STR/MEI，是全面性的選擇。',q1_n:'正確答案：WGS 30×。',q2_y:'WES 的捕獲試劑成本高昂；2026 年 WGS 30× 整體常便宜於 100× WES。',q2_n:'正確答案：C。',q3_y:'低 VAF 變異需極深度 + UMI 才能可靠呼叫。',q3_n:'正確答案：B。'},en:{q1_y:'WGS 30× detects SNV/Indel/CNV/SV/STR/MEI in one workflow — most comprehensive.',q1_n:'Correct: WGS 30×.',q2_y:'WES capture reagents are expensive; in 2026 WGS 30× often beats 100× WES on total cost.',q2_n:'Correct: C.',q3_y:'Low-VAF variants need ultra-deep coverage + UMI to be reliably called.',q3_n:'Correct: B.'}};
 document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
 </script>
 </body></html>

@@ -1,362 +1,181 @@
 <!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Step 7: Variant Filtering — WGS/WES Tutorial</title>
+<title>Step 9: VQSR & Hard Filter — WGS/WES Tutorial</title>
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head><body>
 <nav class="top-nav"><div class="top-nav-inner">
   <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
-  <ul class="top-nav-links">
-    <li><a href="intro.html">Intro</a></li><li><a href="fastq-qc.html">FASTQ QC</a></li><li><a href="alignment.html">Align</a></li><li><a href="post-alignment.html">PostAln</a></li><li><a href="variant-calling.html">Calling</a></li><li><a href="joint-genotyping.html">Joint</a></li><li><a href="filtering.html" class="active">Filter</a></li><li><a href="annotation.html">Annot</a></li><li><a href="interpretation.html">Interp</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="structural-variants.html">SV/CNV</a></li><li><a href="wes-considerations.html">WES</a></li>
-  </ul>
+  <ul class="top-nav-links"><li><a href="intro.html">Intro</a></li><li><a href="qc.html">QC</a></li><li><a href="trimming.html">Trim</a></li><li><a href="alignment.html">Align</a></li><li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li><li><a href="coverage.html">Coverage</a></li><li><a href="germline-calling.html">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html" class="active">Filter</a></li><li><a href="annotation.html">Annot.</a></li><li><a href="cnv-sv.html">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html">Long-read</a></li><li><a href="acmg.html">ACMG</a></li><li><a href="clinical-report.html">Report</a></li><li><a href="cohort.html">Cohort</a></li><li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li></ul>
 </div></nav>
 <div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
-<header class="page-hero"><div class="step-badge">STEP 7 / 9</div>
-<h1 data-zh="變異過濾 (Variant Filtering)" data-en="Variant Filtering">變異過濾 (Variant Filtering)</h1>
-<p class="subtitle" data-lang="zh">從 raw cohort VCF 篩出可信的 variants——VQSR 機器學習 vs Hard Filtering 啟發式門檻。</p>
-<p class="subtitle" data-lang="en">Filter trustworthy variants from a raw cohort VCF — VQSR (machine learning) vs hard filtering (heuristic thresholds).</p>
+<header class="page-hero"><div class="step-badge">STEP 9 / 16</div>
+<h1 data-zh="VQSR 與 Hard Filter" data-en="VQSR & Hard Filter">VQSR 與 Hard Filter</h1>
+<p class="subtitle" data-lang="zh">用 Gaussian mixture 或 CNN 從 cohort 篩出真變異——什麼時候用哪個？</p>
+<p class="subtitle" data-lang="en">Filter true variants from cohort using Gaussian mixtures or CNNs — when to use which?</p>
 </header>
 <main class="content-wrap">
 
 <section class="section">
-<div class="section-label" data-zh="為什麼" data-en="WHY">為什麼</div>
-<h2 data-zh="一、為什麼還要過濾？" data-en="I. Why filter?">一、為什麼還要過濾？</h2>
-<div data-lang="zh">
-<p>剛 joint-call 完的 raw VCF 中，每個變異都有 caller 給的 QUAL 分數，但這只是「位點層級的信心」，不能直接區分真假變異。實際上：</p>
-<ul>
-<li><strong>30× human WGS 一個樣本</strong>：raw call 約 4-5 百萬 variants，其中 ~10-15% 是 false positives（多在重複區、低 mapability 區、或 strand bias 嚴重處）</li>
-<li><strong>不過濾的後果</strong>：下游關聯研究與臨床診斷會被 FP 淹沒，p-value inflation、診斷假陽性都會發生</li>
-</ul>
-<p>GATK 提供兩條路：<strong>VQSR (Variant Quality Score Recalibration)</strong> 用機器學習在 cohort 內訓練；<strong>Hard Filtering</strong> 用人工設定的閾值。兩者各有適用場景。</p>
-</div>
-<div data-lang="en">
-<p>The raw VCF straight from joint calling has a per-site QUAL from the caller, but that's site-level confidence — it can't separate true from false directly. Reality:</p>
-<ul>
-<li><strong>30× human WGS, single sample</strong>: ~4–5 M raw calls, of which ~10–15% are false positives (mostly in repetitive regions, low-mappability tracts, or strand-biased sites)</li>
-<li><strong>Without filtering</strong>: downstream association studies and clinical diagnostics get drowned in FPs — p-value inflation and diagnostic false positives ensue</li>
-</ul>
-<p>GATK offers two paths: <strong>VQSR (Variant Quality Score Recalibration)</strong> trains ML on the cohort; <strong>Hard Filtering</strong> applies hand-tuned thresholds. Each has its niche.</p>
-</div>
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="變異過濾的兩條路線" data-en="Two routes to variant filtering">變異過濾的兩條路線</h2>
+<div data-lang="zh"><p>Joint VCF 仍混雜大量假陽性 (PCR artefacts、mapping ambiguity、低複雜度區域)。過濾的目標是<strong>在不犧牲 sensitivity 的前提下移除 FP</strong>。GATK 提供兩條路徑：</p>
+<p><strong>路線 A — VQSR</strong>（Variant Quality Score Recalibration）：用 Gaussian mixture 模型，以 HapMap、1000G omni、dbSNP 等「known truth sites」為正例，學習 QD、MQ、FS、SOR、MQRankSum、ReadPosRankSum 等多維特徵的分佈，輸出 VQSLOD 分數。需要至少 <strong>30 個 exome 或 1 個 WGS</strong> 的資料量才能穩定收斂。</p>
+<p><strong>路線 B — Hard Filter</strong>：以固定閾值排除明顯異常的位點。用於 trio / 小 cohort 等樣本太少、VQSR 不穩定的情境。GATK 4 還新增了 <strong>CNNScoreVariants</strong>（1D 用序列、2D 用 pileup tensor），對單樣本可達接近 VQSR 的表現。</p></div>
+<div data-lang="en"><p>The joint VCF still contains many false positives (PCR artefacts, mapping ambiguity, low-complexity regions). Filtering aims to <strong>remove FPs without sacrificing sensitivity</strong>. GATK offers two paths:</p>
+<p><strong>Route A — VQSR</strong>: a Gaussian mixture over multi-dimensional features (QD, MQ, FS, SOR, MQRankSum, ReadPosRankSum), trained on truth sites (HapMap, 1000G omni, dbSNP) to output VQSLOD. Needs at least <strong>30 exomes or 1 WGS</strong> for stable fitting.</p>
+<p><strong>Route B — Hard Filter</strong>: fixed thresholds, for trios / small cohorts where VQSR cannot converge. GATK 4 added <strong>CNNScoreVariants</strong> (1D on sequence, 2D on pileup tensors), reaching near-VQSR performance on a single sample.</p></div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>2026 趨勢：</strong>DRAGEN 4.x 內建 <strong>DRAGEN-ML</strong> 過濾器（深度學習，無需訓練 cohort），單樣本即可使用，已逐步取代 VQSR；GATK 也持續強化 CNN 路線。</span>
+<span data-lang="en"><strong>2026 trend:</strong> DRAGEN 4.x ships <strong>DRAGEN-ML</strong> (deep learning, no cohort training needed) on single samples, displacing VQSR; GATK keeps strengthening the CNN route.</span>
+</div></div>
 </section>
 
 <section class="section">
-<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
-<h2 data-zh="二、VQSR 怎麼運作？" data-en="II. How VQSR works">二、VQSR 怎麼運作？</h2>
-<div data-lang="zh">
-<p>VQSR 把每個變異想成「多維特徵空間的一個點」：QD、FS、MQ、MQRankSum、ReadPosRankSum、SOR、DP（與選用的 InbreedingCoeff、HaplotypeScore）共 7-8 維。然後：</p>
-<ol>
-<li><strong>VariantRecalibrator</strong>：用「已知為真」的 truth set（HapMap、Omni、1000G）作正樣本訓練 GMM (Gaussian Mixture Model)，學出「真 variants 在特徵空間中的分布」</li>
-<li><strong>計算 VQSLOD</strong>：每個變異對 GMM 的 log-odds (log-likelihood of being a real variant)</li>
-<li><strong>ApplyVQSR</strong>：依使用者指定的 sensitivity tranche (e.g. 99.7% 找回所有 truth set 變異) 切閾值，pass 標 PASS、fail 標 VQSRTrancheSNP99.90to100.00 等</li>
-</ol>
-<p>SNV 與 indel 必須<strong>分開訓練</strong>（兩者特徵分布不同）。VQSR 對 cohort 規模有要求——SNV 至少 30 樣本，indel 至少 30 樣本（exome）/ 1 樣本（WGS，因 WGS variant 數量大）。</p>
-</div>
-<div data-lang="en">
-<p>VQSR treats each variant as a point in multi-dimensional feature space: QD, FS, MQ, MQRankSum, ReadPosRankSum, SOR, DP (plus optional InbreedingCoeff, HaplotypeScore) — 7-8 dimensions. Then:</p>
-<ol>
-<li><strong>VariantRecalibrator</strong>: trains a GMM (Gaussian Mixture Model) on a "known-true" truth set (HapMap, Omni, 1000G) to learn the distribution of real variants in feature space</li>
-<li><strong>Compute VQSLOD</strong>: log-odds (log-likelihood of being real) of each variant against the GMM</li>
-<li><strong>ApplyVQSR</strong>: cuts at a user-specified sensitivity tranche (e.g., 99.7% to recover all truth-set variants); passing variants get PASS, failing get e.g. VQSRTrancheSNP99.90to100.00</li>
-</ol>
-<p>SNVs and indels must be <strong>trained separately</strong> (different feature distributions). VQSR has cohort-size requirements: SNVs need ≥30 samples; indels need ≥30 (exome) or 1 (WGS, since WGS yields enough indels).</p>
-</div>
-</section>
-
-<section class="section">
-<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
-<h2 data-zh="三、Hard Filtering 推薦門檻" data-en="III. Hard Filtering Recommended Thresholds">三、Hard Filtering 推薦門檻</h2>
-<div data-lang="zh">
-<p>當 cohort 太小（&lt; 30 樣本）、non-model 物種，或無 truth set 時，GATK 官方建議直接套用以下門檻：</p>
-</div>
-<div data-lang="en">
-<p>When the cohort is too small (&lt;30 samples), the organism is non-model, or no truth set exists, GATK officially recommends the thresholds below:</p>
-</div>
-
-<div class="comp-table-wrap">
+<div class="section-label" data-zh="Hard Filter 閾值" data-en="HARD FILTER THRESHOLDS">Hard Filter 閾值</div>
+<h2 data-zh="一、GATK Best Practices 推薦閾值" data-en="I. GATK Best-Practices thresholds">一、GATK Best Practices 推薦閾值</h2>
 <table class="comp-table">
-<thead><tr><th data-zh="標籤" data-en="Tag">標籤</th><th data-zh="意義" data-en="Meaning">意義</th><th>SNV</th><th>Indel</th><th data-zh="說明" data-en="Notes">說明</th></tr></thead>
+<thead><tr><th>Annotation</th><th data-zh="意義" data-en="Meaning">意義</th><th>SNV</th><th>Indel</th></tr></thead>
 <tbody>
-<tr><td><code>QD</code></td><td data-zh="QualByDepth" data-en="QualByDepth">QualByDepth</td><td>&lt; 2.0</td><td>&lt; 2.0</td><td data-zh="QUAL / DP，過低代表單位深度的證據弱" data-en="QUAL / DP — too low means weak evidence per unit depth">QUAL / DP，過低代表單位深度的證據弱</td></tr>
-<tr><td><code>FS</code></td><td data-zh="FisherStrand" data-en="FisherStrand">FisherStrand</td><td>&gt; 60.0</td><td>&gt; 200.0</td><td data-zh="strand bias 的 Phred 值，過高代表 ALT 集中在某一 strand" data-en="Phred-scaled strand bias; high = ALT concentrated on one strand">strand bias 的 Phred 值，過高代表 ALT 集中在某一 strand</td></tr>
-<tr><td><code>SOR</code></td><td data-zh="StrandOddsRatio" data-en="StrandOddsRatio">StrandOddsRatio</td><td>&gt; 3.0</td><td>&gt; 10.0</td><td data-zh="另一種 strand bias 量度，與 FS 互補" data-en="Alternative strand-bias measure, complementary to FS">另一種 strand bias 量度，與 FS 互補</td></tr>
-<tr><td><code>MQ</code></td><td data-zh="RMSMappingQuality" data-en="RMSMappingQuality">RMSMappingQuality</td><td>&lt; 40.0</td><td>—</td><td data-zh="支持此 variant 的 reads 平均 MAPQ" data-en="Mean MAPQ of supporting reads">支持此 variant 的 reads 平均 MAPQ</td></tr>
-<tr><td><code>MQRankSum</code></td><td data-zh="MQ ranksum test" data-en="MQ ranksum test">MQ ranksum test</td><td>&lt; -12.5</td><td>—</td><td data-zh="REF vs ALT reads 的 MAPQ 是否系統性偏差" data-en="Tests for systematic MAPQ bias between REF and ALT reads">REF vs ALT reads 的 MAPQ 是否系統性偏差</td></tr>
-<tr><td><code>ReadPosRankSum</code></td><td data-zh="Read pos ranksum" data-en="Read pos ranksum">Read pos ranksum</td><td>&lt; -8.0</td><td>&lt; -20.0</td><td data-zh="變異是否總出現在 read 兩端 (容易出錯處)" data-en="Whether the variant is consistently at read ends (error-prone)">變異是否總出現在 read 兩端 (容易出錯處)</td></tr>
-</tbody>
-</table>
+<tr><td><strong>QD</strong></td><td data-lang="zh">QUAL / DP，質量密度</td><td>&lt; 2.0</td><td>&lt; 2.0</td><td data-lang="en">QUAL / DP, quality density</td></tr>
+<tr><td><strong>FS</strong></td><td data-lang="zh">Fisher Strand Bias (Phred)</td><td>&gt; 60</td><td>&gt; 200</td><td data-lang="en">Fisher Strand Bias (Phred)</td></tr>
+<tr><td><strong>MQ</strong></td><td data-lang="zh">RMS Mapping Quality</td><td>&lt; 40</td><td>—</td><td data-lang="en">RMS Mapping Quality</td></tr>
+<tr><td><strong>MQRankSum</strong></td><td data-lang="zh">alt vs ref MQ 比較</td><td>&lt; -12.5</td><td>—</td><td data-lang="en">alt vs ref MQ comparison</td></tr>
+<tr><td><strong>ReadPosRankSum</strong></td><td data-lang="zh">alt 位置偏向 read 端</td><td>&lt; -8.0</td><td>&lt; -20.0</td><td data-lang="en">alt biased near read end</td></tr>
+<tr><td><strong>SOR</strong></td><td data-lang="zh">對稱 Odds Ratio，鏈偏倚</td><td>&gt; 3.0</td><td>&gt; 10.0</td><td data-lang="en">Symmetric Odds Ratio, strand bias</td></tr>
+</tbody></table>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>FS vs SOR：</strong>FS 對深度敏感，深度高時容易誤判；SOR 對深度較穩。WGS 高深度位點建議以 SOR 為主、FS 為輔。</span>
+<span data-lang="en"><strong>FS vs SOR:</strong> FS is depth-sensitive (false positives at high depth); SOR is more depth-robust. Prefer SOR (with FS as backup) at high-depth WGS sites.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="二、何時用 VQSR、何時用 Hard Filter、何時用 CNN？" data-en="II. When VQSR vs Hard Filter vs CNN?">二、選擇路徑</h2>
+<div class="decision-tree">
+<h4>🌳 <span data-zh="過濾策略決策樹" data-en="Filtering decision tree">過濾策略決策樹</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>cohort 規模 ≥ 30 exomes 或 ≥ 1 WGS？ <span class="dt-arrow">→ 是 →</span> <strong>VQSR</strong>（SNV 與 Indel 各跑一次）。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>單樣本或小 trio？ <span class="dt-arrow">→ 是 →</span> <strong>CNNScoreVariants 2D</strong>（含 pileup），或退而求其次 <strong>Hard Filter</strong>。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>使用 DRAGEN 4.x？ <span class="dt-arrow">→ 是 →</span> 直接用 <strong>DRAGEN-ML</strong>，跳過 VQSR。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>已過濾，FP 仍多？ <span class="dt-arrow">→ 是 →</span> 套用 <strong>black-list bed</strong>（ENCODE blacklist、low-complexity regions、segmental duplication）。</div></div>
 </div>
-<p class="comp-note" data-lang="zh">符合<strong>任一</strong>條件即標記為對應 filter（如 <code>FS_filter</code>），FILTER 欄不再是 PASS。下游分析通常 <code>bcftools view -f PASS</code> 過掉。</p>
-<p class="comp-note" data-lang="en">Matching <strong>any</strong> condition flags the variant with that filter (e.g., <code>FS_filter</code>), and FILTER is no longer PASS. Downstream analyses typically use <code>bcftools view -f PASS</code> to drop them.</p>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>Cohort ≥ 30 exomes or ≥ 1 WGS? <span class="dt-arrow">→ Yes →</span> <strong>VQSR</strong> (run SNV and Indel separately).</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Single sample / small trio? <span class="dt-arrow">→ Yes →</span> <strong>CNNScoreVariants 2D</strong> (pileup), or <strong>Hard Filter</strong> fallback.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Running DRAGEN 4.x? <span class="dt-arrow">→ Yes →</span> Use <strong>DRAGEN-ML</strong>, skip VQSR.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>FP still high post-filter? <span class="dt-arrow">→ Yes →</span> Apply <strong>blacklists</strong> (ENCODE, low-complexity, segmental duplication).</div></div>
+</div>
+</div>
 </section>
 
 <section class="section">
 <div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
-<h2 data-zh="四、互動模擬：QD 與 FS 雙閾值" data-en="IV. Interactive: Tunable QD & FS Thresholds">四、互動模擬：QD 與 FS 雙閾值</h2>
-<div data-lang="zh">
-<p>調整 QD 與 FS 的閾值，看 5,000 個模擬 SNV 中 TP/FP 的分布如何被切。GATK 預設值（QD≥2、FS≤60）取得不錯平衡——太寬會放進 FP、太嚴會殺掉 TP。</p>
-</div>
-<div data-lang="en">
-<p>Adjust QD and FS thresholds to see how 5,000 simulated SNVs (TP/FP mixture) get partitioned. GATK defaults (QD≥2, FS≤60) strike a good balance — too loose admits FPs, too strict kills TPs.</p>
-</div>
-
+<h2 data-zh="VQSLOD 閾值 → TP / FP 權衡" data-en="VQSLOD threshold → TP/FP trade-off">VQSLOD 閾值 → TP / FP 權衡</h2>
+<div data-lang="zh"><p>VQSR 用 <strong>tranche</strong>（百分位）切點：tranche 99.0 = 保留 99% truth；tranche 99.9 = 更鬆但 FP 大幅上升。拖動觀察分佈。</p></div>
+<div data-lang="en"><p>VQSR uses <strong>tranches</strong> (percentiles): tranche 99.0 = retain 99% of truth; tranche 99.9 = looser but FP rises sharply. Drag to see distributions.</p></div>
 <div class="interactive-panel">
-<div class="sim-controls">
-<label>QD ≥</label>
-<input type="range" id="qdSlider" min="0" max="20" value="2" step="0.5">
-<span id="qdVal" class="sim-value">2.0</span>
-</div>
-<div class="sim-controls">
-<label>FS ≤</label>
-<input type="range" id="fsSlider" min="10" max="200" value="60" step="5">
-<span id="fsVal" class="sim-value">60</span>
-</div>
-<div id="filterStats" class="sim-stats"></div>
-<div class="chart-wrap"><canvas id="filterChart"></canvas></div>
-<div class="sim-note" data-lang="zh">綠 = True positives (kept), 紅 = False positives (kept), 灰 = filtered out。理想情況：左下塞滿 FP（被過濾掉）、右下與右上塞滿 TP（保留）。</div>
-<div class="sim-note" data-lang="en">Green = TPs kept; Red = FPs kept; Gray = filtered out. Ideal: lower-left full of FPs (filtered), right side full of TPs (kept).</div>
+<div class="slider-group"><label><span data-zh="VQSLOD 閾值" data-en="VQSLOD threshold">VQSLOD 閾值</span> <span id="valT">0</span></label><input type="range" id="sliderT" min="-5" max="10" value="0" step="0.5"></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statTP">—</span><span class="sim-stat fail" id="statFP">—</span></div>
+<div class="chart-container"><canvas id="fChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;" data-zh="綠=真變異 (TP)、橘=假陽性 (FP)、虛線=閾值" data-en="Green=true variants (TP), amber=FP, dashed=threshold">綠=TP、橘=FP、虛線=閾值</p>
 </div>
 </section>
 
 <section class="section">
-<div class="section-label" data-zh="決策" data-en="DECISION">決策</div>
-<h2 data-zh="五、VQSR vs Hard Filter，怎麼選？" data-en="V. VQSR vs Hard Filter — How to Choose">五、VQSR vs Hard Filter，怎麼選？</h2>
-<div class="decision-tree">
-<div class="dt-node dt-q">
-<div class="dt-q-text" data-zh="Q1: 樣本數 ≥ 30？" data-en="Q1: ≥ 30 samples?">Q1: 樣本數 ≥ 30？</div>
-<div class="dt-branches">
-<div class="dt-branch"><div class="dt-label" data-zh="否" data-en="No">否</div>
-<div class="dt-node dt-leaf dt-leaf-warn"><strong data-zh="→ Hard Filtering" data-en="→ Hard Filtering">→ Hard Filtering</strong><p data-zh="VQSR 訓練 GMM 需要充足變異數，cohort 太小會 fail。" data-en="VQSR's GMM training needs enough variants; small cohorts fail.">VQSR 訓練 GMM 需要充足變異數，cohort 太小會 fail。</p></div>
-</div>
-<div class="dt-branch"><div class="dt-label" data-zh="是" data-en="Yes">是</div>
-<div class="dt-node dt-q">
-<div class="dt-q-text" data-zh="Q2: 是 human 且有 truth set？" data-en="Q2: Human with available truth sets?">Q2: 是 human 且有 truth set？</div>
-<div class="dt-branches">
-<div class="dt-branch"><div class="dt-label" data-zh="否 (non-model)" data-en="No (non-model)">否 (non-model)</div>
-<div class="dt-node dt-leaf dt-leaf-warn"><strong data-zh="→ Hard Filtering" data-en="→ Hard Filtering">→ Hard Filtering</strong><p data-zh="無 truth set 無法訓練 VQSR；可考慮 bootstrap 自建 truth set。" data-en="No truth set means VQSR can't train; consider bootstrapping your own.">無 truth set 無法訓練 VQSR；可考慮 bootstrap 自建 truth set。</p></div>
-</div>
-<div class="dt-branch"><div class="dt-label" data-zh="是" data-en="Yes">是</div>
-<div class="dt-node dt-leaf dt-leaf-good"><strong data-zh="→ VQSR" data-en="→ VQSR">→ VQSR</strong><p data-zh="GATK Best Practices 首選；SNV 與 indel 分開訓練。" data-en="GATK Best Practices' first choice; train SNVs and indels separately.">GATK Best Practices 首選；SNV 與 indel 分開訓練。</p></div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</section>
-
-<section class="section">
-<div class="section-label" data-zh="實務指令" data-en="CODE">實務指令</div>
-<h2 data-zh="六、Pipeline 指令範例" data-en="VI. Pipeline Commands">六、Pipeline 指令範例</h2>
-<div class="code-tabs">
-<div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'tab-vqsr')">VQSR (SNV)</button><button class="code-tab-btn" onclick="switchTab(this,'tab-vqsr-i')">VQSR (Indel)</button><button class="code-tab-btn" onclick="switchTab(this,'tab-hard')">Hard Filter</button></div>
-
-<div id="tab-vqsr" class="code-tab-content active"><pre><code># SNV VQSR — Step A: 訓練 model
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作範例" data-en="Implementation">實作範例</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'f1')">VQSR</button><button class="code-tab-btn" onclick="switchTab(this,'f2')">Hard Filter</button><button class="code-tab-btn" onclick="switchTab(this,'f3')">CNNScoreVariants</button></div>
+<div class="code-tab-content active" id="f1"><pre><span class="comment"># SNV VQSR — 建模 + 套用</span>
 gatk VariantRecalibrator \
-    -R Homo_sapiens_assembly38.fasta \
-    -V cohort.vcf.gz \
-    --resource:hapmap,known=false,training=true,truth=true,prior=15.0 hapmap_3.3.hg38.vcf.gz \
-    --resource:omni,known=false,training=true,truth=true,prior=12.0 1000G_omni2.5.hg38.vcf.gz \
-    --resource:1000G,known=false,training=true,truth=false,prior=10.0 1000G_phase1.snps.high_confidence.hg38.vcf.gz \
-    --resource:dbsnp,known=true,training=false,truth=false,prior=2.0 Homo_sapiens_assembly38.dbsnp138.vcf \
-    -an QD -an MQ -an MQRankSum -an ReadPosRankSum -an FS -an SOR -an DP \
-    -mode SNP \
-    --max-gaussians 6 \
-    -O snp.recal --tranches-file snp.tranches
+    -V joint/cohort.vcf.gz \
+    --resource:hapmap,known=false,training=true,truth=true,prior=15 hapmap_3.3.hg38.vcf.gz \
+    --resource:omni,known=false,training=true,truth=true,prior=12 1000G_omni2.5.hg38.vcf.gz \
+    --resource:1000G,known=false,training=true,truth=false,prior=10 1000G_phase1.snps.high_confidence.hg38.vcf.gz \
+    --resource:dbsnp,known=true,training=false,truth=false,prior=2 dbsnp.vcf.gz \
+    -an QD -an FS -an MQ -an SOR -an MQRankSum -an ReadPosRankSum \
+    -mode SNP --tranches-file snv.tranches \
+    -O snv.recal --rscript-file snv.plots.R
 
-# Step B: 套用
-gatk ApplyVQSR \
-    -R Homo_sapiens_assembly38.fasta \
-    -V cohort.vcf.gz \
-    --recal-file snp.recal \
-    --tranches-file snp.tranches \
-    --truth-sensitivity-filter-level 99.7 \
-    -mode SNP \
-    -O cohort.snp_filt.vcf.gz</code></pre></div>
-
-<div id="tab-vqsr-i" class="code-tab-content"><pre><code># Indel VQSR — Step A
-gatk VariantRecalibrator \
-    -R Homo_sapiens_assembly38.fasta \
-    -V cohort.snp_filt.vcf.gz \
-    --resource:mills,known=false,training=true,truth=true,prior=12.0 Mills_and_1000G_gold_standard.indels.hg38.vcf.gz \
-    --resource:axiomPoly,known=false,training=true,truth=false,prior=10.0 Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz \
-    --resource:dbsnp,known=true,training=false,truth=false,prior=2.0 Homo_sapiens_assembly38.dbsnp138.vcf \
-    -an QD -an FS -an SOR -an ReadPosRankSum -an MQRankSum \
-    -mode INDEL \
-    --max-gaussians 4 \
-    -O indel.recal --tranches-file indel.tranches
-
-# Step B
-gatk ApplyVQSR \
-    -V cohort.snp_filt.vcf.gz \
-    --recal-file indel.recal --tranches-file indel.tranches \
-    --truth-sensitivity-filter-level 99.0 \
-    -mode INDEL \
-    -O cohort.filt.vcf.gz</code></pre></div>
-
-<div id="tab-hard" class="code-tab-content"><pre><code># 1. 拆 SNV 與 indel
-gatk SelectVariants -V cohort.vcf.gz --select-type-to-include SNP -O snp.vcf.gz
-gatk SelectVariants -V cohort.vcf.gz --select-type-to-include INDEL -O indel.vcf.gz
-
-# 2. SNV hard filter
-gatk VariantFiltration -V snp.vcf.gz \
+gatk ApplyVQSR -V joint/cohort.vcf.gz --recal-file snv.recal \
+    --tranches-file snv.tranches --truth-sensitivity-filter-level 99.0 \
+    -mode SNP -O joint/cohort.snv-recal.vcf.gz</pre></div>
+<div class="code-tab-content" id="f2"><pre><span class="comment"># Hard Filter — SNV</span>
+gatk VariantFiltration -V joint/cohort.snv.vcf.gz \
     --filter-expression "QD &lt; 2.0" --filter-name "QD2" \
     --filter-expression "FS &gt; 60.0" --filter-name "FS60" \
     --filter-expression "MQ &lt; 40.0" --filter-name "MQ40" \
-    --filter-expression "MQRankSum &lt; -12.5" --filter-name "MQRankSum-12.5" \
-    --filter-expression "ReadPosRankSum &lt; -8.0" --filter-name "ReadPosRankSum-8" \
+    --filter-expression "MQRankSum &lt; -12.5" --filter-name "MQRS" \
+    --filter-expression "ReadPosRankSum &lt; -8.0" --filter-name "RPRS" \
     --filter-expression "SOR &gt; 3.0" --filter-name "SOR3" \
-    -O snp.filt.vcf.gz
+    -O joint/cohort.snv.hardf.vcf.gz
 
-# 3. Indel hard filter
-gatk VariantFiltration -V indel.vcf.gz \
-    --filter-expression "QD &lt; 2.0" --filter-name "QD2" \
-    --filter-expression "FS &gt; 200.0" --filter-name "FS200" \
-    --filter-expression "ReadPosRankSum &lt; -20.0" --filter-name "ReadPosRankSum-20" \
-    --filter-expression "SOR &gt; 10.0" --filter-name "SOR10" \
-    -O indel.filt.vcf.gz
+<span class="comment"># Indel</span>
+gatk VariantFiltration -V joint/cohort.indel.vcf.gz \
+    --filter-expression "QD &lt; 2.0 || FS &gt; 200.0 || SOR &gt; 10.0 || ReadPosRankSum &lt; -20.0" \
+    --filter-name "INDEL_BAD" -O joint/cohort.indel.hardf.vcf.gz</pre></div>
+<div class="code-tab-content" id="f3"><pre><span class="comment"># CNNScoreVariants 2D — 單樣本深度學習過濾</span>
+gatk CNNScoreVariants \
+    -V single/cohort.vcf.gz \
+    -R Homo_sapiens.GRCh38.fa \
+    -I bam/S1.bqsr.bam \
+    --tensor-type read_tensor \
+    -O cnn/cohort.cnn.vcf.gz
 
-# 4. 合併
-gatk MergeVcfs -I snp.filt.vcf.gz -I indel.filt.vcf.gz -O cohort.hardfilt.vcf.gz
-
-# 5. 只留 PASS
-bcftools view -f PASS cohort.hardfilt.vcf.gz -Oz -o cohort.pass.vcf.gz</code></pre></div>
+gatk FilterVariantTranches -V cnn/cohort.cnn.vcf.gz \
+    --snp-tranche 99.95 --indel-tranche 99.4 \
+    --resource hapmap_3.3.hg38.vcf.gz --resource mills_indels.vcf.gz \
+    --info-key CNN_2D -O cnn/cohort.cnn-filt.vcf.gz</pre></div>
 </div>
 </section>
 
-<section class="section">
-<div class="section-label" data-zh="常見問題" data-en="FAQ">常見問題</div>
-<h2 data-zh="七、FAQ" data-en="VII. FAQ">七、FAQ</h2>
-<div class="accordion">
-<details><summary data-zh="truth sensitivity tranche 該設多少？" data-en="What truth-sensitivity tranche should I use?">truth sensitivity tranche 該設多少？</summary>
-<div data-lang="zh">SNV 常用 99.7%（保留 99.7% truth set 變異），Indel 用 99.0%（indel 較嘈雜）。臨床診斷可用更嚴格的 99.0% / 95.0%；族群研究偏好 99.9% / 99.5%。tranches 表格會列各 cutoff 的 TP/FP/Ti/Tv，可依需求權衡。</div>
-<div data-lang="en">SNV: typically 99.7% (retains 99.7% of truth-set variants). Indel: 99.0% (indels are noisier). Clinical diagnostics may use stricter 99.0%/95.0%; population studies prefer 99.9%/99.5%. The tranches table lists TP/FP/Ti/Tv at each cutoff for trade-off review.</div>
-</details>
-<details><summary data-zh="VQSR fail 的 variants 是不是就一定錯？" data-en="Are VQSR-failed variants definitely wrong?">VQSR fail 的 variants 是不是就一定錯？</summary>
-<div data-lang="zh">不是。被 fail 的 variants 富集 false positives，但仍含 ~1-5% true positives（特別在 truth set 不完整的區域，如 HLA、segmental duplication）。臨床診斷若臨床懷疑高的 variant 被 VQSR fail，常會手動 IGV review。</div>
-<div data-lang="en">No. Failed variants are enriched in false positives but still contain ~1-5% true positives (particularly in regions where truth sets are incomplete, e.g., HLA, segmental duplications). In clinical diagnostics, a clinically-suspect variant flagged by VQSR is often re-reviewed manually in IGV.</div>
-</details>
-<details><summary data-zh="--max-gaussians 該設多少？" data-en="What value for --max-gaussians?">--max-gaussians 該設多少？</summary>
-<div data-lang="zh">SNV 預設 8（充足樣本時），少樣本可降到 4-6。Indel 通常 4。如果出錯訊息「unable to retrieve enough variants for 8 Gaussians」就調低，這代表 cohort 太小。</div>
-<div data-lang="en">SNV: default 8 (when samples are abundant); reduce to 4–6 for fewer samples. Indel: typically 4. If you get "unable to retrieve enough variants for 8 Gaussians," reduce — your cohort is too small.</div>
-</details>
-<details><summary data-zh="DeepVariant / DRAGEN 的 VCF 也要做 VQSR 嗎？" data-en="Do DeepVariant/DRAGEN VCFs also need VQSR?">DeepVariant / DRAGEN 的 VCF 也要做 VQSR 嗎？</summary>
-<div data-lang="zh">不需要。兩者已經內建 ML-based filtering，輸出的 VCF 已經 PASS/Refcall 標好。再跑 VQSR 反而可能 over-filter。CNN-driven callers 就用其原生 quality score 即可。</div>
-<div data-lang="en">No. Both include ML-based filtering and output VCFs already labeled PASS/Refcall. Running VQSR on top may over-filter. For CNN-driven callers, just use their native quality scores.</div>
-</details>
-</div>
-</section>
-
-<section class="section quiz-section">
-<div class="section-label" data-zh="自我檢測" data-en="QUIZ">自我檢測</div>
-<h2 data-zh="八、小測驗" data-en="VIII. Quiz">八、小測驗</h2>
-
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
 <div class="quiz-q" data-answer="2">
-<p class="quiz-question" data-zh="Q1. VQSR 的核心想法是？" data-en="Q1. The core idea of VQSR is?">Q1. VQSR 的核心想法是？</p>
-<div class="quiz-opts">
-<button class="quiz-opt" data-idx="0" data-zh="人工設定 QD/FS/MQ 閾值" data-en="Manually set QD/FS/MQ thresholds">人工設定 QD/FS/MQ 閾值</button>
-<button class="quiz-opt" data-idx="1" data-zh="刪除 dbSNP 中沒有的所有變異" data-en="Drop all variants not in dbSNP">刪除 dbSNP 中沒有的所有變異</button>
-<button class="quiz-opt" data-idx="2" data-zh="用 truth set 訓練 GMM 學「真變異在多維特徵空間中長什麼樣」" data-en="Train a GMM on truth-set variants to learn what real variants look like in multi-dim feature space">用 truth set 訓練 GMM 學「真變異在多維特徵空間中長什麼樣」</button>
-</div>
-<div class="quiz-feedback" id="fb1"></div>
-</div>
-
-<div class="quiz-q" data-answer="0">
-<p class="quiz-question" data-zh="Q2. 你只有 5 個 mouse exome 樣本，想做 filtering，最佳方法？" data-en="Q2. You have 5 mouse exome samples and want to filter — best method?">Q2. 你只有 5 個 mouse exome 樣本，想做 filtering，最佳方法？</p>
-<div class="quiz-opts">
-<button class="quiz-opt" data-idx="0" data-zh="Hard filtering（樣本太少 + non-model 物種無 truth set）" data-en="Hard filtering (sample too few + non-model with no truth set)">Hard filtering（樣本太少 + non-model 物種無 truth set）</button>
-<button class="quiz-opt" data-idx="1" data-zh="VQSR 用 dbSNP 強訓" data-en="Force-train VQSR with dbSNP">VQSR 用 dbSNP 強訓</button>
-<button class="quiz-opt" data-idx="2" data-zh="跳過 filtering 直接 annotate" data-en="Skip filtering, go straight to annotation">跳過 filtering 直接 annotate</button>
-</div>
-<div class="quiz-feedback" id="fb2"></div>
-</div>
-
+<p data-lang="zh">1. VQSR 至少需要多大的資料量才能穩定收斂？</p>
+<p data-lang="en">1. What minimum dataset size does VQSR require to converge stably?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 1 個 trio (3 樣本)</span><span data-lang="en">A. 1 trio (3 samples)</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 10 個 exome</span><span data-lang="en">B. 10 exomes</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. ≥ 30 個 exome 或 ≥ 1 個 WGS</span><span data-lang="en">C. ≥ 30 exomes or ≥ 1 WGS</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 永遠可用，不限樣本數</span><span data-lang="en">D. Always usable, no minimum</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
 <div class="quiz-q" data-answer="1">
-<p class="quiz-question" data-zh="Q3. FS=350 的 SNV 通常代表什麼？" data-en="Q3. A SNV with FS=350 typically indicates?">Q3. FS=350 的 SNV 通常代表什麼？</p>
-<div class="quiz-opts">
-<button class="quiz-opt" data-idx="0" data-zh="非常高品質的 variant" data-en="A very high-quality variant">非常高品質的 variant</button>
-<button class="quiz-opt" data-idx="1" data-zh="嚴重 strand bias，幾乎可確認為 false positive" data-en="Severe strand bias, almost certainly a false positive">嚴重 strand bias，幾乎可確認為 false positive</button>
-<button class="quiz-opt" data-idx="2" data-zh="indel 的正常 FS 值" data-en="Normal FS for an indel">indel 的正常 FS 值</button>
-</div>
-<div class="quiz-feedback" id="fb3"></div>
-</div>
+<p data-lang="zh">2. GATK Best Practices 對 SNV 的 hard filter，下列哪一條為錯？</p>
+<p data-lang="en">2. Which GATK hard-filter rule for SNV is WRONG?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. QD &lt; 2.0 → 過濾</span><span data-lang="en">A. QD &lt; 2.0 → filter</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. MQ &gt; 60 → 過濾</span><span data-lang="en">B. MQ &gt; 60 → filter</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. FS &gt; 60 → 過濾</span><span data-lang="en">C. FS &gt; 60 → filter</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. SOR &gt; 3 → 過濾</span><span data-lang="en">D. SOR &gt; 3 → filter</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">3. 是非題：CNNScoreVariants 2D 比 VQSR 更適合「單樣本」過濾。</p>
+<p data-lang="en">3. True/False: CNNScoreVariants 2D suits single-sample filtering better than VQSR.</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對——CNN 用 pileup tensor，不需 cohort 訓練</span><span data-lang="en">A. True — CNN uses pileup tensor, no cohort training needed</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯</span><span data-lang="en">B. False</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
 </section>
 
 <nav class="page-nav">
-<a href="joint-genotyping.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 6: Joint Genotyping</span></a>
-<a href="annotation.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 8: Annotation</span></a>
+<a href="joint-genotyping.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 8: Joint Genotyping</span></a>
+<a href="annotation.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 10: Annotation</span></a>
 </nav>
 </main>
-<footer class="site-footer">© WGS/WES Interactive Tutorial</footer>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
 <script src="i18n.js"></script>
 <script>
 window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
 function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
-
-// Generate 5000 simulated variants — 80% TP (low FS, normal-high QD), 20% FP (high FS, low QD)
-const N=5000;
-const variants=[];
-function rng(){return Math.random();}
-function gauss(m,s){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return m+s*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
-for(let i=0;i<N;i++){
-  if(rng()<0.8){ // TP
-    const qd=Math.max(0.5,gauss(15,5));
-    const fs=Math.max(0,gauss(8,12));
-    variants.push({qd:qd,fs:fs,tp:true});
-  } else { // FP
-    const qd=Math.max(0.1,gauss(3,2));
-    const fs=Math.max(20,gauss(120,50));
-    variants.push({qd:qd,fs:fs,tp:false});
-  }
-}
-
-const filterChart=new Chart(document.getElementById('filterChart'),{type:'scatter',data:{datasets:[
-  {label:'TP kept',data:[],backgroundColor:'rgba(58,138,103,0.6)',pointRadius:2.5,pointHoverRadius:4},
-  {label:'FP kept',data:[],backgroundColor:'rgba(184,58,44,0.65)',pointRadius:2.5,pointHoverRadius:4},
-  {label:'Filtered out',data:[],backgroundColor:'rgba(140,140,140,0.25)',pointRadius:2,pointHoverRadius:3}
-]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},scales:{x:{title:{display:true,text:'QD'},min:0,max:35},y:{title:{display:true,text:'FS'},min:0,max:300}}}});
-
-function updateFilter(){
-  const L=I18n.get();
-  const qdT=+document.getElementById('qdSlider').value;
-  const fsT=+document.getElementById('fsSlider').value;
-  document.getElementById('qdVal').textContent=qdT.toFixed(1);
-  document.getElementById('fsVal').textContent=fsT;
-  let tpKept=0,fpKept=0,tpFilt=0,fpFilt=0;
-  const tpKeepArr=[],fpKeepArr=[],filtArr=[];
-  variants.forEach(v=>{
-    const pass=v.qd>=qdT && v.fs<=fsT;
-    if(pass){
-      if(v.tp){tpKept++;tpKeepArr.push({x:v.qd,y:v.fs});}
-      else{fpKept++;fpKeepArr.push({x:v.qd,y:v.fs});}
-    } else {
-      if(v.tp)tpFilt++; else fpFilt++;
-      filtArr.push({x:v.qd,y:v.fs});
-    }
-  });
-  const recall=(tpKept/(tpKept+tpFilt)*100).toFixed(1);
-  const prec=(tpKept/(tpKept+fpKept)*100).toFixed(1);
-  document.getElementById('filterStats').innerHTML=
-    `<span class="sim-stat pass">TP kept: ${tpKept}</span>`+
-    `<span class="sim-stat fail">FP kept: ${fpKept}</span>`+
-    `<span class="sim-stat warn">${L==='zh'?'真陽流失':'TP lost'}: ${tpFilt}</span>`+
-    `<span class="sim-stat">${L==='zh'?'召回':'Recall'}: ${recall}%</span>`+
-    `<span class="sim-stat">${L==='zh'?'精準度':'Precision'}: ${prec}%</span>`;
-  filterChart.data.datasets[0].data=tpKeepArr;
-  filterChart.data.datasets[1].data=fpKeepArr;
-  filterChart.data.datasets[2].data=filtArr;
-  filterChart.data.datasets[0].label=L==='zh'?'TP 保留':'TP kept';
-  filterChart.data.datasets[1].label=L==='zh'?'FP 保留':'FP kept';
-  filterChart.data.datasets[2].label=L==='zh'?'被過濾':'Filtered out';
-  filterChart.update('none');
-}
-['qdSlider','fsSlider'].forEach(id=>document.getElementById(id).addEventListener('input',updateFilter));
-document.addEventListener('langchange',updateFilter);
-updateFilter();
-
-const QF={
-  zh:{q1_y:'VQSR 是 GMM 在多維特徵空間中對「真變異形狀」的學習，這也是它與 hard filter 最大不同。',q1_n:'正解已標示。',q2_y:'兩個 dealbreaker：cohort 太小且 non-model 物種無 truth set，VQSR 都跑不動，hard filter 是唯一選擇。',q2_n:'正解已標示。',q3_y:'GATK 推薦 SNV FS&gt;60 即過濾，350 是極度 strand-biased，幾乎可確定 FP。',q3_n:'正解已標示。'},
-  en:{q1_y:'VQSR is a GMM learning the "shape" of real variants in multi-dim feature space — its biggest distinction from hard filtering.',q1_n:'Correct answer highlighted.',q2_y:'Two dealbreakers: cohort too small AND non-model with no truth set. VQSR can\'t run; hard filtering is the only option.',q2_n:'Correct answer highlighted.',q3_y:'GATK recommends filtering SNVs at FS>60; 350 is extreme strand bias — almost certainly an FP.',q3_n:'Correct answer highlighted.'}
-};
+function gauss(x,mu,sigma){return Math.exp(-0.5*Math.pow((x-mu)/sigma,2))/(sigma*Math.sqrt(2*Math.PI));}
+const xs=[];for(let x=-6;x<=12;x+=0.3)xs.push(+x.toFixed(1));
+const tpData=xs.map(x=>gauss(x,4,1.8)*1000);
+const fpData=xs.map(x=>gauss(x,-1,1.5)*600);
+const fChart=new Chart(document.getElementById('fChart'),{type:'line',data:{labels:xs,datasets:[{label:'TP (true variants)',data:tpData,borderColor:'#047857',backgroundColor:'rgba(4,120,87,.25)',borderWidth:2,fill:true,tension:.3,pointRadius:0},{label:'FP (false positives)',data:fpData,borderColor:'#d97706',backgroundColor:'rgba(217,119,6,.25)',borderWidth:2,fill:true,tension:.3,pointRadius:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{title:{display:true,text:'count'}},x:{title:{display:true,text:'VQSLOD'}}}}});
+function up(){const t=+document.getElementById('sliderT').value;document.getElementById('valT').textContent=t.toFixed(1);let tpKept=0,fpKept=0,tpAll=0,fpAll=0;xs.forEach((x,i)=>{tpAll+=tpData[i];fpAll+=fpData[i];if(x>=t){tpKept+=tpData[i];fpKept+=fpData[i];}});const L=I18n.get();document.getElementById('statTP').textContent=(L==='zh'?'TP 保留: ':'TP kept: ')+(tpKept/tpAll*100).toFixed(1)+'%';document.getElementById('statFP').textContent=(L==='zh'?'FP 保留: ':'FP kept: ')+(fpKept/fpAll*100).toFixed(1)+'%';}
+document.getElementById('sliderT').addEventListener('input',up);document.addEventListener('langchange',up);up();
+const QF={zh:{q1_y:'GATK 文件規定 30 exomes 或 1 WGS 起跳。',q1_n:'答案：C。',q2_y:'MQ &lt; 40 才該過濾，MQ &gt; 60 是好品質。',q2_n:'答案：B。MQ 是越高越好。',q3_y:'CNN 2D 用 pileup tensor，不需 cohort 訓練。',q3_n:'答案：A。'},en:{q1_y:'GATK doc specifies 30 exomes or 1 WGS minimum.',q1_n:'Correct: C.',q2_y:'MQ &lt; 40 should be filtered; MQ &gt; 60 is high quality.',q2_n:'Correct: B. MQ higher = better.',q3_y:'CNN 2D uses pileup tensor and needs no cohort training.',q3_n:'Correct: A.'}};
 document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
 </script>
 </body></html>

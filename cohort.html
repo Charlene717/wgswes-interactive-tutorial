@@ -1,0 +1,180 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 16: Trio / Cohort Analysis — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links"><li><a href="intro.html">Intro</a></li><li><a href="qc.html">QC</a></li><li><a href="trimming.html">Trim</a></li><li><a href="alignment.html">Align</a></li><li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li><li><a href="coverage.html">Coverage</a></li><li><a href="germline-calling.html">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot.</a></li><li><a href="cnv-sv.html">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html">Long-read</a></li><li><a href="acmg.html">ACMG</a></li><li><a href="clinical-report.html">Report</a></li><li><a href="cohort.html" class="active">Cohort</a></li><li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li></ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 16 / 16</div>
+<h1 data-zh="Trio / 大規模佇列分析" data-en="Trio / Large-Cohort Analysis">Trio / 大規模佇列分析</h1>
+<p class="subtitle" data-lang="zh">從家族 trio de novo 偵測，到 UK Biobank、All of Us、gnomAD v4 等百萬級佇列的 burden test 與 GWAS。</p>
+<p class="subtitle" data-lang="en">From family-trio de novo detection to million-scale cohort burden tests and GWAS (UK Biobank, All of Us, gnomAD v4).</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="Trio 與 Cohort：兩種尺度的問題" data-en="Trio vs Cohort: two scales of question">Trio 與 Cohort：兩種尺度的問題</h2>
+<div data-lang="zh"><p><strong>Trio (3 人 family)</strong> 是罕病診斷的黃金標準：父、母、proband 同時定序，可直接識別 <strong>de novo</strong> 變異（每代約 60-80 個 SNV de novo）並驗證遺傳模式。</p>
+<p><strong>大型 cohort</strong> 把焦點轉為「基因—疾病關聯」：gnomAD v4 (Karczewski 2024 Nature) 807,162 exomes + 76,215 genomes；<strong>UK Biobank 500k WGS</strong> (2023-2024 完整釋出)；<strong>All of Us</strong> 規劃 100 萬人（2024 釋出 ~245k WGS）。</p>
+<p><strong>分析框架：</strong>Hail (Spark-based)、Project Glow、Bigstack 可橫向處理 PB 級資料。</p></div>
+<div data-lang="en"><p><strong>Trio (3-person family)</strong> is the gold standard for rare-disease diagnosis: father, mother, and proband sequenced together — directly identifies <strong>de novo</strong> variants (~60–80 SNV de novo per generation) and validates inheritance modes.</p>
+<p><strong>Large cohorts</strong> shift focus to "gene-disease association": gnomAD v4 (Karczewski 2024 Nature) 807,162 exomes + 76,215 genomes; <strong>UK Biobank 500k WGS</strong> (released 2023–2024); <strong>All of Us</strong> targeting 1M (245k WGS released 2024).</p>
+<p><strong>Frameworks:</strong> Hail (Spark-based), Project Glow, Bigstack scale to PB-level data.</p></div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>PED 檔格式：</strong>6 欄純文字 — <code>FamilyID  IndividualID  PaternalID  MaternalID  Sex(1=M,2=F,0=?)  Phenotype(1=unaffected,2=affected,0=missing,-9=missing)</code>。Trio 通常 3 行。GATK CalculateGenotypePosteriors 必須帶 PED。</span>
+<span data-lang="en"><strong>PED format:</strong> 6 plain-text columns — <code>FamilyID  IndividualID  PaternalID  MaternalID  Sex(1=M,2=F,0=?)  Phenotype(1=unaffected,2=affected,0=missing,-9=missing)</code>. A trio = 3 rows. GATK CalculateGenotypePosteriors requires PED.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="De novo 偵測" data-en="DE NOVO DETECTION">De novo 偵測</h2>
+<h2 data-zh="一、De novo 變異判讀條件" data-en="I. De novo variant criteria">一、De novo 變異判讀條件</h2>
+<table class="comp-table">
+<thead><tr><th data-zh="條件" data-en="Criterion">條件</th><th data-zh="proband" data-en="proband">proband</th><th data-zh="父" data-en="father">父</th><th data-zh="母" data-en="mother">母</th></tr></thead>
+<tbody>
+<tr><td>Genotype</td><td>0/1 or 1/1</td><td>0/0</td><td>0/0</td></tr>
+<tr><td>QUAL / GQ</td><td data-lang="zh">高 (QUAL ≥ 50, GQ ≥ 30)</td><td data-lang="zh">高 (GQ ≥ 30)</td><td data-lang="zh">高 (GQ ≥ 30)</td><td data-lang="en">High (QUAL ≥ 50, GQ ≥ 30)</td><td data-lang="en">High (GQ ≥ 30)</td><td data-lang="en">High (GQ ≥ 30)</td></tr>
+<tr><td>Depth (DP)</td><td>≥ 15</td><td>≥ 15</td><td>≥ 15</td></tr>
+<tr><td>VAF</td><td data-lang="zh">0.3–0.7 (het)</td><td data-lang="zh">&lt; 0.05</td><td data-lang="zh">&lt; 0.05</td><td data-lang="en">0.3–0.7 (het)</td><td data-lang="en">&lt; 0.05</td><td data-lang="en">&lt; 0.05</td></tr>
+<tr><td data-lang="zh">Cohort AF</td><td colspan="3" data-lang="zh">gnomAD &lt; 10⁻⁵（極罕見）</td><td data-lang="en">Cohort AF</td><td colspan="3" data-lang="en">gnomAD &lt; 10⁻⁵ (ultra-rare)</td></tr>
+</tbody></table>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>陷阱：</strong>~85% 「明顯 de novo」其實是 <strong>technical artefact</strong>（mapping、low-complexity、parental low-depth dropout）。必須 IGV 視覺化複核 + Sanger 驗證才能發表。</span>
+<span data-lang="en"><strong>Pitfall:</strong> ~85% of "apparent de novo" calls are actually <strong>technical artefacts</strong> (mapping issues, low-complexity, parental low-depth dropout). Must IGV-visualise + Sanger-confirm before publication.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="Cohort 分析" data-en="COHORT METHODS">Cohort 分析</div>
+<h2 data-zh="二、Burden tests、GWAS 與 PRS" data-en="II. Burden tests, GWAS, PRS">二、Burden tests、GWAS 與 PRS</h2>
+<div class="decision-tree">
+<h4>🌳 <span data-zh="cohort 規模 → 工具" data-en="Cohort scale → tool">cohort 規模 → 工具</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>稀有變異 burden test（每基因聚合）？ <span class="dt-arrow">→</span> <strong>SKAT / SKAT-O / ACAT-V</strong>（Wu 2011, Liu 2019 AJHG）。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>常見變異 GWAS、cohort &gt; 100k？ <span class="dt-arrow">→</span> <strong>REGENIE</strong>（Mbatchou 2021 Nat Genet）或 BOLT-LMM（Loh 2015）。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>跨百萬樣本資料分析？ <span class="dt-arrow">→</span> <strong>Hail</strong>（Spark）+ MatrixTable / Glow（Databricks）。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>個體疾病風險預測？ <span class="dt-arrow">→</span> <strong>PGS Catalog</strong> + LDpred2 / PRS-CS 等。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>Rare-variant burden test (per-gene aggregation)? <span class="dt-arrow">→</span> <strong>SKAT / SKAT-O / ACAT-V</strong> (Wu 2011, Liu 2019 AJHG).</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Common-variant GWAS, cohort &gt; 100k? <span class="dt-arrow">→</span> <strong>REGENIE</strong> (Mbatchou 2021 Nat Genet) or BOLT-LMM (Loh 2015).</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Million-sample analysis? <span class="dt-arrow">→</span> <strong>Hail</strong> (Spark) + MatrixTable / Glow (Databricks).</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Individual disease-risk prediction? <span class="dt-arrow">→</span> <strong>PGS Catalog</strong> + LDpred2 / PRS-CS.</div></div>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="Pedigree + Mendel violation 檢查器" data-en="Pedigree + Mendel violation checker">Pedigree + Mendel violation 檢查器</h2>
+<div data-lang="zh"><p>調整 trio 各成員基因型，自動判定是 de novo、Mendel violation 還是合法遺傳。</p></div>
+<div data-lang="en"><p>Adjust trio genotypes; the panel labels de novo, Mendel violation, or legal inheritance.</p></div>
+<div class="interactive-panel">
+<div class="slider-group"><label><span data-zh="父 (alt alleles 0/1/2)" data-en="Father alt 0/1/2">父</span> <span id="valD">0</span></label><input type="range" id="sliderD" min="0" max="2" value="0" step="1"></div>
+<div class="slider-group"><label><span data-zh="母 (alt alleles 0/1/2)" data-en="Mother alt 0/1/2">母</span> <span id="valM">0</span></label><input type="range" id="sliderM" min="0" max="2" value="0" step="1"></div>
+<div class="slider-group"><label><span data-zh="proband (alt alleles 0/1/2)" data-en="Proband alt 0/1/2">proband</span> <span id="valP">1</span></label><input type="range" id="sliderP" min="0" max="2" value="1" step="1"></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statVerd">—</span><span class="sim-stat fail" id="statRate">—</span></div>
+<div class="chart-container"><canvas id="cohortChart"></canvas></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="PED、GATK trio、Hail" data-en="PED, GATK trio, Hail">PED、GATK trio、Hail</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'c1')">PED & GATK</button><button class="code-tab-btn" onclick="switchTab(this,'c2')">Hail MatrixTable</button><button class="code-tab-btn" onclick="switchTab(this,'c3')">REGENIE burden</button></div>
+<div class="code-tab-content active" id="c1"><pre><span class="comment"># trio.ped — 6 columns, tab-separated</span>
+FAM01  father    0          0          1  1
+FAM01  mother    0          0          2  1
+FAM01  proband   father     mother     1  2
+
+<span class="comment"># GATK posterior + de novo filter</span>
+gatk CalculateGenotypePosteriors \
+    -V joint.vcf.gz -ped trio.ped \
+    --supporting-callsets gnomad-af.vcf.gz \
+    -O trio.posterior.vcf.gz
+
+gatk VariantFiltration -V trio.posterior.vcf.gz \
+    --genotype-filter-expression "GQ &lt; 20" --genotype-filter-name lowGQ \
+    -O trio.filt.vcf.gz
+
+gatk VariantAnnotator -V trio.filt.vcf.gz -A PossibleDeNovo \
+    -ped trio.ped -O trio.deNovo.vcf.gz</pre></div>
+<div class="code-tab-content" id="c2"><pre><span class="comment"># Hail — load gnomAD-scale MatrixTable, query</span>
+import hail as hl
+hl.init()
+mt = hl.read_matrix_table('gs://gnomad-public/release/4.0/ht/exomes.mt')
+
+<span class="comment"># Filter by rarity + LoF</span>
+rare_lof = mt.filter_rows(
+    (mt.freq[0].AF &lt; 1e-5) &amp;
+    (mt.vep.most_severe_consequence == 'stop_gained'))
+
+<span class="comment"># Per-gene aggregation</span>
+per_gene = rare_lof.group_rows_by(rare_lof.vep.gene_symbol)\
+    .aggregate(n=hl.agg.count())</pre></div>
+<div class="code-tab-content" id="c3"><pre><span class="comment"># REGENIE — Step 1 (whole-genome model) + Step 2 (per-variant assoc)</span>
+regenie --step 1 \
+    --bed ukb500k_geno \
+    --phenoFile pheno.tsv --phenoCol T2D \
+    --bsize 1000 --bt --out fit_step1
+
+regenie --step 2 \
+    --bed ukb500k_geno \
+    --phenoFile pheno.tsv --phenoCol T2D \
+    --pred fit_step1_pred.list \
+    --bsize 400 --bt --firth --approx \
+    --out assoc_T2D</pre></div>
+</div>
+</section>
+
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. 標準 PED 檔的 6 欄是？</p>
+<p data-lang="en">1. The 6 columns of a standard PED file are?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. ID、chrom、pos、ref、alt、qual</span><span data-lang="en">A. ID, chrom, pos, ref, alt, qual</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. family、ID、age、sex、case、control</span><span data-lang="en">B. family, ID, age, sex, case, control</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. FamilyID, IndividualID, PaternalID, MaternalID, Sex, Phenotype</span><span data-lang="en">C. FamilyID, IndividualID, PaternalID, MaternalID, Sex, Phenotype</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. sample、tissue、batch、lane、index、barcode</span><span data-lang="en">D. sample, tissue, batch, lane, index, barcode</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">2. 下列哪一條件「不必要」用來篩選候選 de novo？</p>
+<p data-lang="en">2. Which is NOT required to filter candidate de novo variants?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 父母 GT = 0/0 且 GQ ≥ 30</span><span data-lang="en">A. Parents GT = 0/0 with GQ ≥ 30</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. proband 為 chrX 半合子 (hemizygous)——非 de novo 必要條件</span><span data-lang="en">B. Proband hemizygous on chrX — not required for de novo</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. gnomAD AF &lt; 10⁻⁵</span><span data-lang="en">C. gnomAD AF &lt; 10⁻⁵</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. proband VAF 0.3–0.7</span><span data-lang="en">D. Proband VAF 0.3–0.7</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">3. 是非題：Hail 適合用於 UK Biobank 規模的 cohort 分析。</p>
+<p data-lang="en">3. True/False: Hail is suitable for UK Biobank-scale cohort analysis.</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對——Hail 採 Spark 後端，支持百萬樣本 MatrixTable 操作</span><span data-lang="en">A. True — Hail uses Spark, supports million-sample MatrixTable</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯</span><span data-lang="en">B. False</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="clinical-report.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 15: Clinical Report</span></a>
+<a href="references/index.html"><span class="nav-dir" data-zh="📚 完成 →" data-en="📚 Done →">📚 完成 →</span><span class="nav-title" data-zh="參考資料" data-en="References">參考資料</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+const cohortChart=new Chart(document.getElementById('cohortChart'),{type:'bar',data:{labels:['Father','Mother','Proband'],datasets:[{label:'alt alleles',data:[0,0,1],backgroundColor:['#10b981','#10b981','#d97706']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:2,ticks:{stepSize:1},title:{display:true,text:'alt alleles'}}}}});
+function classify(d,m,p){if(d===0&&m===0&&p>0)return['DE_NOVO','#7f1d1d',true];const minP=Math.max(0,d-1)+Math.max(0,m-1);const maxP=Math.min(2,(d>0?1:0)+(m>0?1:0));if(p<minP||p>maxP)return['MENDEL_VIOLATION','#b91c1c',true];return['INHERITED_OK','#047857',false];}
+function up(){const d=+document.getElementById('sliderD').value,m=+document.getElementById('sliderM').value,p=+document.getElementById('sliderP').value;document.getElementById('valD').textContent=d;document.getElementById('valM').textContent=m;document.getElementById('valP').textContent=p;cohortChart.data.datasets[0].data=[d,m,p];const[v,c,flag]=classify(d,m,p);cohortChart.data.datasets[0].backgroundColor=['#10b981','#10b981',c];cohortChart.update('none');const L=I18n.get();document.getElementById('statVerd').textContent=(L==='zh'?'結果: ':'Verdict: ')+v;document.getElementById('statVerd').style.background=c;document.getElementById('statRate').textContent=flag?(L==='zh'?'⚠ 需 IGV 複核':'⚠ IGV review'):(L==='zh'?'✓ 符合孟德爾':'✓ Mendelian OK');}
+['sliderD','sliderM','sliderP'].forEach(id=>document.getElementById(id).addEventListener('input',up));document.addEventListener('langchange',up);up();
+const QF={zh:{q1_y:'PED 6 欄是 family/individual/父/母/sex/pheno。',q1_n:'答案：C。',q2_y:'chrX 半合子非通用必要條件。',q2_n:'答案：B。',q3_y:'Hail 為 Spark 後端、UK Biobank 標配。',q3_n:'答案：A。'},en:{q1_y:'PED 6 cols are family/individual/father/mother/sex/pheno.',q1_n:'Correct: C.',q2_y:'chrX hemizygous is not a general requirement.',q2_n:'Correct: B.',q3_y:'Hail uses Spark, the UK Biobank standard.',q3_n:'Correct: A.'}};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

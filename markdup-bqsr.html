@@ -1,0 +1,185 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 5: MarkDup & BQSR — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links"><li><a href="intro.html">Intro</a></li><li><a href="qc.html">QC</a></li><li><a href="trimming.html">Trim</a></li><li><a href="alignment.html">Align</a></li><li><a href="markdup-bqsr.html" class="active">MarkDup/BQSR</a></li><li><a href="coverage.html">Coverage</a></li><li><a href="germline-calling.html">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot.</a></li><li><a href="cnv-sv.html">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html">Long-read</a></li><li><a href="acmg.html">ACMG</a></li><li><a href="clinical-report.html">Report</a></li><li><a href="cohort.html">Cohort</a></li><li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li></ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 5 / 16</div>
+<h1 data-zh="MarkDup 與 BQSR" data-en="MarkDuplicates & BQSR">MarkDup 與 BQSR</h1>
+<p class="subtitle" data-lang="zh">去除 PCR/光學重複、校正鹼基品質——以及為什麼 DRAGEN 流程可以跳過 BQSR。</p>
+<p class="subtitle" data-lang="en">Remove PCR/optical duplicates and recalibrate base qualities — and why DRAGEN can skip BQSR.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為什麼要做 MarkDup 與 BQSR？" data-en="Why MarkDup and BQSR?">為什麼要做 MarkDup 與 BQSR？</h2>
+<div data-lang="zh"><p>比對完成後，BAM 中存在兩個必須處理的偏差：(1) <strong>重複 reads</strong>——PCR 或光學原因產生的「同一片段被測到多次」；(2) <strong>鹼基品質偏差</strong>——廠商給的 Phred Q 並非真實錯誤率，存在系統性偏移。兩者若不處理，會直接造成假陽性變異。</p>
+<p>標準順序：<strong>BWA-MEM2 → sort → MarkDuplicates → BQSR → variant calling</strong>。MarkDup 必須在 coordinate-sorted BAM 上跑；BQSR 必須在 MarkDup 之後 (否則重複 reads 會扭曲錯誤模型)。</p></div>
+<div data-lang="en"><p>After alignment, the BAM contains two biases that must be addressed: (1) <strong>duplicate reads</strong> — PCR or optical duplicates of the same fragment; (2) <strong>base-quality bias</strong> — vendor Phred Q is not the true error rate. Untreated, both inflate false positives.</p>
+<p>Standard order: <strong>BWA-MEM2 → sort → MarkDuplicates → BQSR → variant calling</strong>. MarkDup needs coordinate-sorted BAM; BQSR must follow MarkDup (or duplicate reads skew the error model).</p></div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>DRAGEN-GATK 功能等價：</strong>Illumina DRAGEN 引入了 hardware-aware 模型，可省略 BQSR 並仍與 GATK 結果相容 (Illumina/Broad DRAGEN-GATK best practices 2021)。但若使用 BWA-MEM2 + GATK，仍建議跑 BQSR。</span>
+<span data-lang="en"><strong>DRAGEN-GATK functional equivalence:</strong> Illumina DRAGEN's hardware-aware model lets you skip BQSR while staying GATK-compatible (DRAGEN-GATK best practices 2021). For BWA-MEM2 + GATK pipelines, keep BQSR on.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="重複類型" data-en="DUPLICATE TYPES">重複類型</div>
+<h2 data-zh="一、PCR vs Optical duplicates" data-en="I. PCR vs Optical duplicates">一、PCR vs Optical duplicates</h2>
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">🧪</div><h4>PCR duplicates</h4><div data-lang="zh"><p>library prep 時 PCR 過度放大同一原始分子。<strong>判別：</strong>同一 5' 對位起點且 insert size 相同。低 input DNA / 高 PCR cycles 是主因。</p></div><div data-lang="en"><p>Library PCR over-amplifying the same original molecule. <strong>Detect:</strong> identical 5' coordinate and insert size. Driven by low input or excessive PCR cycles.</p></div></div>
+<div class="card"><div class="card-icon">💡</div><h4>Optical duplicates</h4><div data-lang="zh"><p>NovaSeq patterned flowcell 中相鄰 well 互染。<strong>判別：</strong>同 tile、像素距離 &lt; 2500。比例高需檢查 cluster density。</p></div><div data-lang="en"><p>Adjacent wells on NovaSeq patterned flowcell cross-contaminate. <strong>Detect:</strong> same tile, pixel distance &lt; 2500. High rate flags over-clustering.</p></div></div>
+</div>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>NovaSeq 提醒：</strong>patterned flowcell 的 optical duplicate 比例 (常達 5–15%) 遠高於舊式 HiSeq。Picard MarkDuplicates 預設 <code>OPTICAL_DUPLICATE_PIXEL_DISTANCE=100</code>，對 NovaSeq 應設為 <strong>2500</strong>。</span>
+<span data-lang="en"><strong>NovaSeq note:</strong> optical duplicate fraction on patterned flowcells (often 5–15%) far exceeds legacy HiSeq. Picard default <code>OPTICAL_DUPLICATE_PIXEL_DISTANCE=100</code> should be raised to <strong>2500</strong> for NovaSeq.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="工具比較" data-en="TOOL COMPARISON">工具比較</div>
+<h2 data-zh="二、MarkDuplicates 工具選擇" data-en="II. MarkDuplicates tool options">二、MarkDuplicates 工具選擇</h2>
+<table class="comp-table">
+<thead><tr><th>Tool</th><th data-zh="特色" data-en="Features">特色</th><th data-zh="速度" data-en="Speed">速度</th><th data-zh="情境" data-en="Use case">情境</th></tr></thead>
+<tbody>
+<tr><td><strong>Picard MarkDuplicates</strong></td><td data-lang="zh">GATK best practice、單執行緒、最穩定</td><td data-lang="zh">★★</td><td data-lang="zh">臨床、validation</td><td data-lang="en">GATK best practice, single-threaded, most stable</td><td data-lang="en">★★</td><td data-lang="en">Clinical, validation</td></tr>
+<tr><td><strong>GATK MarkDuplicatesSpark</strong></td><td data-lang="zh">Spark 平行化；包含 sort+index</td><td>★★★★</td><td data-lang="zh">高通量 WGS</td><td data-lang="en">Spark-parallel; includes sort+index</td><td>★★★★</td><td data-lang="en">High-throughput WGS</td></tr>
+<tr><td><strong>samtools markdup</strong></td><td data-lang="zh">快、輕量；需先 fixmate + sort</td><td>★★★★</td><td data-lang="zh">研究、benchmark</td><td data-lang="en">Fast, lightweight; needs fixmate + sort</td><td>★★★★</td><td data-lang="en">Research, benchmark</td></tr>
+<tr><td><strong>DRAGEN MarkDup</strong></td><td data-lang="zh">HW 加速、含 optical 偵測</td><td>★★★★★</td><td data-lang="zh">DRAGEN 流程</td><td data-lang="en">HW-accelerated, optical detection</td><td>★★★★★</td><td data-lang="en">DRAGEN workflow</td></tr>
+</tbody></table>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="BQSR 原理" data-en="BQSR PRINCIPLE">BQSR 原理</div>
+<h2 data-zh="三、BQSR：用已知變異點校正錯誤" data-en="III. BQSR: recalibrate using known sites">三、BQSR：用已知變異點校正錯誤</h2>
+<div data-lang="zh"><p>BQSR (Base Quality Score Recalibration) 的核心假設：<strong>所有「非已知變異」的鹼基不一致，都是測序錯誤</strong>。GATK 使用 dbSNP + Mills_and_1000G_gold_standard.indels.vcf 作為已知位點，把這些位點 mask 掉，剩下的 mismatch 計算經驗錯誤率，再回頭校正報告的 Q 值。</p>
+<p><strong>四個 covariates：</strong>ReadGroup、ReportedQuality、Cycle (機台週期)、Context (前兩個鹼基)。每組組合給出 (reported Q, empirical Q)，建表後 ApplyBQSR 改寫 BAM 的 Q 欄位。</p></div>
+<div data-lang="en"><p>BQSR (Base Quality Score Recalibration) assumes: <strong>any mismatch outside known variant sites is a sequencing error</strong>. GATK masks dbSNP + Mills_and_1000G_gold_standard.indels.vcf; the remaining mismatches give an empirical error rate that corrects the reported Q.</p>
+<p><strong>Four covariates:</strong> ReadGroup, ReportedQuality, Cycle, Context (two preceding bases). Each combination yields (reported Q, empirical Q); ApplyBQSR rewrites Q fields in the BAM.</p></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="Reported Q vs Empirical Q" data-en="Reported Q vs Empirical Q">Reported Q vs Empirical Q</h2>
+<div data-lang="zh"><p>調整 reported Q 與校正偏移 (delta)，觀察 BQSR 校正後的曲線。理想情況下，校正後 reported = empirical (沿對角線)。</p></div>
+<div data-lang="en"><p>Tune reported Q and recalibration offset to see the BQSR-corrected curve. Ideally, after correction reported = empirical (along the diagonal).</p></div>
+<div class="interactive-panel">
+<div class="slider-group"><label><span data-zh="系統偏移 Δ" data-en="System offset Δ">系統偏移</span> <span id="valDelta">3</span></label><input type="range" id="sliderDelta" min="-6" max="6" value="3" step="1"></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statBefore">—</span><span class="sim-stat fail" id="statAfter">—</span></div>
+<div class="chart-container"><canvas id="bqsrChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;" data-zh="紅=校正前、綠=校正後、灰=ideal 對角線" data-en="Red=before, Green=after, Gray=ideal diagonal">紅=校正前、綠=校正後</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="四、什麼時候可以跳過 BQSR？" data-en="IV. When you can skip BQSR">四、什麼時候可以跳過 BQSR？</h2>
+<div class="decision-tree">
+<h4>🌳 <span data-zh="BQSR 必要性" data-en="Is BQSR needed?">BQSR 必要性</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>使用 DRAGEN 流程？ <span class="dt-arrow">→ 是 →</span> 可<strong>跳過 BQSR</strong> (DRAGEN-GATK 等價)。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>panel 深度 &gt;1000×？ <span class="dt-arrow">→ 是 →</span> BQSR 邊際效益小，可省略。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>非人類物種 (無 dbSNP 等已知位點)？ <span class="dt-arrow">→</span> 自行用高信度變異 bootstrap 或跳過。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>標準 30× WGS + GATK HaplotypeCaller？ <span class="dt-arrow">→</span> <strong>必須跑 BQSR</strong>。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>Running DRAGEN? <span class="dt-arrow">→ Yes →</span> <strong>Skip BQSR</strong> (DRAGEN-GATK equivalent).</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Panel depth &gt;1000×? <span class="dt-arrow">→ Yes →</span> Marginal benefit; safe to omit.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Non-human species (no known sites)? <span class="dt-arrow">→</span> Bootstrap with high-confidence calls or skip.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Standard 30× WGS + HaplotypeCaller? <span class="dt-arrow">→</span> <strong>Run BQSR</strong>.</div></div>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="MarkDup + BQSR 實作" data-en="MarkDup + BQSR implementation">MarkDup + BQSR 實作</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'m1')">Picard MarkDup</button><button class="code-tab-btn" onclick="switchTab(this,'m2')">GATK BQSR</button><button class="code-tab-btn" onclick="switchTab(this,'m3')">DRAGEN-equiv</button></div>
+<div class="code-tab-content active" id="m1"><pre><span class="comment"># Picard MarkDuplicates — NovaSeq pixel distance / NovaSeq 像素距離</span>
+gatk MarkDuplicates \
+    -I bam/S1.sorted.bam \
+    -O bam/S1.md.bam \
+    -M qc/S1.metrics.txt \
+    --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 \
+    --CREATE_INDEX true</pre></div>
+<div class="code-tab-content" id="m2"><pre><span class="comment"># BQSR: build table → apply</span>
+gatk BaseRecalibrator \
+    -I bam/S1.md.bam -R ref/GRCh38.fa \
+    --known-sites resources/dbsnp.vcf.gz \
+    --known-sites resources/Mills_and_1000G_gold_standard.indels.vcf.gz \
+    -O bqsr/S1.recal.table
+
+gatk ApplyBQSR \
+    -I bam/S1.md.bam -R ref/GRCh38.fa \
+    --bqsr-recal-file bqsr/S1.recal.table \
+    -O bam/S1.recal.bam
+
+<span class="comment"># Optional QC: before/after table comparison</span>
+gatk AnalyzeCovariates \
+    -before bqsr/S1.recal.table -after bqsr/S1.recal.after.table \
+    -plots qc/S1.bqsr.pdf</pre></div>
+<div class="code-tab-content" id="m3"><pre><span class="comment"># DRAGEN-GATK equivalent: skip BQSR</span>
+dragen \
+    --ref-dir ref/GRCh38_dragen/ \
+    --fastq-list fastq_list.csv \
+    --output-directory out/ \
+    --output-file-prefix S1 \
+    --enable-map-align true \
+    --enable-duplicate-marking true \
+    --enable-variant-caller true \
+    --vc-emit-ref-confidence GVCF</pre></div>
+</div>
+</section>
+
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. PCR duplicate 與 optical duplicate 的關鍵判別？</p>
+<p data-lang="en">1. Key distinction between PCR and optical duplicates?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 兩者完全相同</span><span data-lang="en">A. They are identical</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 看 read 長度</span><span data-lang="en">B. By read length</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. Optical: 同一 tile 且像素距離很近；PCR: 跨 tile 但 5' 與 insert 完全一致</span><span data-lang="en">C. Optical: same tile + close pixel distance; PCR: identical 5' & insert across tiles</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 看 mapping quality</span><span data-lang="en">D. By mapping quality</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">2. BQSR 為什麼能校正鹼基品質？</p>
+<p data-lang="en">2. How does BQSR recalibrate base qualities?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 直接調整 Q 值 +5</span><span data-lang="en">A. Add +5 to every Q</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 將「非已知變異位點」的 mismatch 視為錯誤，計算經驗 Q 並對照 reported Q 修正</span><span data-lang="en">B. Treat mismatches outside known sites as errors; compute empirical Q and correct reported Q</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 從 FASTQ 重新讀取</span><span data-lang="en">C. Re-read from FASTQ</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 使用機器學習黑盒</span><span data-lang="en">D. Use a black-box ML model</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">3. 是非題：所有 WGS pipeline 都必須跑 BQSR，否則 GATK 結果無效。</p>
+<p data-lang="en">3. True/False: Every WGS pipeline must run BQSR or GATK results are invalid.</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對</span><span data-lang="en">A. True</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯——DRAGEN-GATK 流程與極深 panel 可省略，仍維持效能</span><span data-lang="en">B. False — DRAGEN-GATK and very-deep panels can skip BQSR with no harm</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="alignment.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 4: Alignment</span></a>
+<a href="coverage.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 6: Coverage QC</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+const reportedQ=[];for(let q=10;q<=42;q+=2)reportedQ.push(q);
+const bqsrChart=new Chart(document.getElementById('bqsrChart'),{type:'line',data:{labels:reportedQ,datasets:[{label:'Ideal',data:reportedQ.map(q=>q),borderColor:'#80968a',borderDash:[4,4],borderWidth:1.5,fill:false,pointRadius:0},{label:'Before BQSR',data:[],borderColor:'#b91c1c',backgroundColor:'rgba(185,28,28,.1)',borderWidth:2,fill:false,tension:.2,pointRadius:2},{label:'After BQSR',data:[],borderColor:'#047857',backgroundColor:'rgba(4,120,87,.1)',borderWidth:2,fill:false,tension:.2,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{title:{display:true,text:'Empirical Q'},min:5,max:50},x:{title:{display:true,text:'Reported Q'}}}}});
+function up(){const d=+document.getElementById('sliderDelta').value;document.getElementById('valDelta').textContent=d;const before=reportedQ.map(q=>Math.max(5,q-d));const after=reportedQ.map(q=>q+(Math.random()-.5)*.6);bqsrChart.data.datasets[1].data=before;bqsrChart.data.datasets[2].data=after;bqsrChart.update('none');const meanBefore=before.reduce((a,b,i)=>a+Math.abs(b-reportedQ[i]),0)/before.length;const meanAfter=after.reduce((a,b,i)=>a+Math.abs(b-reportedQ[i]),0)/after.length;const L=I18n.get();document.getElementById('statBefore').textContent=(L==='zh'?'校正前 |Δ|: ':'Before |Δ|: ')+meanBefore.toFixed(2);document.getElementById('statAfter').textContent=(L==='zh'?'校正後 |Δ|: ':'After |Δ|: ')+meanAfter.toFixed(2);}
+document.getElementById('sliderDelta').addEventListener('input',up);document.addEventListener('langchange',up);up();
+const QF={zh:{q1_y:'PCR 看 5'+"'"+'+insert；optical 看 tile+pixel。',q1_n:'答案：C。',q2_y:'BQSR 以非已知位點 mismatch 作經驗 Q。',q2_n:'答案：B。',q3_y:'DRAGEN 與極深 panel 可省略。',q3_n:'答案：B。'},en:{q1_y:'PCR by 5'+"'"+'+insert; optical by tile+pixel.',q1_n:'Correct: C.',q2_y:'BQSR uses non-known-site mismatches as empirical Q.',q2_n:'Correct: B.',q3_y:'DRAGEN and ultra-deep panels can skip it.',q3_n:'Correct: B.'}};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

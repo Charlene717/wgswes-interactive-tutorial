@@ -1,0 +1,155 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 6: Coverage & QC Metrics — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links"><li><a href="intro.html">Intro</a></li><li><a href="qc.html">QC</a></li><li><a href="trimming.html">Trim</a></li><li><a href="alignment.html">Align</a></li><li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li><li><a href="coverage.html" class="active">Coverage</a></li><li><a href="germline-calling.html">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot.</a></li><li><a href="cnv-sv.html">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html">Long-read</a></li><li><a href="acmg.html">ACMG</a></li><li><a href="clinical-report.html">Report</a></li><li><a href="cohort.html">Cohort</a></li><li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li></ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 6 / 16</div>
+<h1 data-zh="覆蓋率與 QC 指標" data-en="Coverage & QC Metrics">覆蓋率與 QC 指標</h1>
+<p class="subtitle" data-lang="zh">「30× WGS」到底是什麼意思？均勻性、Lorenz/Gini、WES bait 效率與臨床 ≥20× 門檻。</p>
+<p class="subtitle" data-lang="en">What does "30× WGS" really mean? Uniformity, Lorenz/Gini, WES bait efficiency and the clinical ≥20× threshold.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為什麼平均深度不夠用？" data-en="Why mean depth isn't enough">為什麼平均深度不夠用？</h2>
+<div data-lang="zh"><p>業界常說「30× WGS」，但這個 30× 究竟是<strong>平均 (mean)</strong> 還是<strong>中位數 (median)</strong>？兩者在偏態分佈下差異巨大。少數高覆蓋區 (rDNA、粒線體、衛星) 能把 mean 拉高很多，但 median 與「目標區能否呼叫變異」更相關。</p>
+<p>真正關鍵的是<strong>均勻性 (uniformity)</strong>：有沒有夠多 base 達到呼叫所需深度？臨床標準通常要求<strong>目標區 ≥20× 覆蓋率 &gt; 95–98%</strong>。</p></div>
+<div data-lang="en"><p>People say "30× WGS" — but is that <strong>mean</strong> or <strong>median</strong>? In a skewed distribution they differ greatly. A few hyper-covered regions (rDNA, mtDNA, satellites) inflate the mean; median better reflects "can we call here?"</p>
+<p>The real key is <strong>uniformity</strong>: how much of the target region reaches callable depth? Clinical reporting typically requires <strong>&gt;95–98% of target at ≥20×</strong>.</p></div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心工具：</strong>Picard <code>CollectWgsMetrics</code> / <code>CollectHsMetrics</code> (WES 用)、<strong>mosdepth</strong> (Pedersen 2018) 快速 per-region 深度、<strong>Qualimap</strong> (Okonechnikov 2016) 一站式 alignment QC。最後用 MultiQC 整合。</p></span>
+<span data-lang="en"><strong>Core tools:</strong> Picard <code>CollectWgsMetrics</code> / <code>CollectHsMetrics</code> (WES), <strong>mosdepth</strong> (Pedersen 2018) for fast per-region depth, <strong>Qualimap</strong> (Okonechnikov 2016) for one-stop alignment QC. Aggregate with MultiQC.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="核心指標" data-en="CORE METRICS">核心指標</div>
+<h2 data-zh="一、必看的 6 個覆蓋率指標" data-en="I. The 6 metrics you must read">一、必看的 6 個覆蓋率指標</h2>
+<div class="card-grid cols-3">
+<div class="card"><div class="card-icon">📏</div><h4>Mean / Median depth</h4><div data-lang="zh"><p>WGS 報 mean；中位數較不受極端值影響。理想 mean ≈ median，偏離大代表分佈不均。</p></div><div data-lang="en"><p>WGS reports mean; median is robust to extremes. Ideally mean ≈ median; large gap = uneven coverage.</p></div></div>
+<div class="card"><div class="card-icon">📈</div><h4>% Bases ≥ 20×</h4><div data-lang="zh"><p>臨床報告核心指標：目標區內達 20× 的比例。WES 應 &gt;95%；WGS 30× 通常 &gt;90%。</p></div><div data-lang="en"><p>Clinical workhorse: fraction of target ≥20×. WES expected &gt;95%; 30× WGS usually &gt;90%.</p></div></div>
+<div class="card"><div class="card-icon">⚖️</div><h4>Gini coefficient</h4><div data-lang="zh"><p>Lorenz 曲線下面積。0 = 完全均勻；越高越不均。WGS 良好 &lt; 0.20。</p></div><div data-lang="en"><p>Area under the Lorenz curve. 0 = perfectly uniform; higher = less uniform. Good WGS &lt; 0.20.</p></div></div>
+<div class="card"><div class="card-icon">🎯</div><h4>On-bait %</h4><div data-lang="zh"><p>WES 限定：reads 落在 bait 區的比例。良好 &gt;60–70%；&lt; 50% 表示 capture 效率差。</p></div><div data-lang="en"><p>WES only: fraction of reads on bait. Good &gt;60–70%; &lt; 50% means poor capture.</p></div></div>
+<div class="card"><div class="card-icon">🌀</div><h4>Fold-80 base penalty</h4><div data-lang="zh"><p>Picard 指標：將 80% base 拉到 mean 需要的倍數。1 = 完美均勻；越大越不均。</p></div><div data-lang="en"><p>Picard metric: fold-coverage needed to bring 80% of bases to mean. 1 = perfect; higher = uneven.</p></div></div>
+<div class="card"><div class="card-icon">🔬</div><h4>GC bias / AT-dropout</h4><div data-lang="zh"><p>GC &lt;30% 或 &gt;65% 區域深度下降。AT-rich exon (例：HBB 啟動子) 為常見盲區。</p></div><div data-lang="en"><p>Depth drops at GC &lt;30% or &gt;65%. AT-rich exons (e.g. HBB promoter) are common blind spots.</p></div></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="WGS vs WES" data-en="WGS vs WES">WGS vs WES</h2>
+<h2 data-zh="二、WGS 與 WES 的 QC 重點不同" data-en="II. WGS and WES emphasize different QC">二、WGS 與 WES 的 QC 重點不同</h2>
+<table class="comp-table">
+<thead><tr><th></th><th>WGS</th><th>WES</th></tr></thead>
+<tbody>
+<tr><td data-zh="目標區" data-en="Target">目標區</td><td data-lang="zh">整個基因組 (~3 Gb)</td><td data-lang="zh">外顯子 + UTR (~30–60 Mb)</td><td data-lang="en">Whole genome (~3 Gb)</td><td data-lang="en">Exons + UTRs (~30–60 Mb)</td></tr>
+<tr><td data-zh="典型深度" data-en="Typical depth">典型深度</td><td data-lang="zh">30× (germline) / 60× (cancer matched)</td><td data-lang="zh">100× (germline) / 500× (somatic deep panel)</td><td data-lang="en">30× germline / 60× cancer matched</td><td data-lang="en">100× germline / 500× somatic deep panel</td></tr>
+<tr><td data-zh="關鍵 Picard 工具" data-en="Picard tool">關鍵 Picard 工具</td><td><code>CollectWgsMetrics</code></td><td><code>CollectHsMetrics</code> (需 bait + target intervals)</td><td><code>CollectWgsMetrics</code></td><td><code>CollectHsMetrics</code> (needs bait + target intervals)</td></tr>
+<tr><td data-zh="off-target 預期" data-en="Off-target">off-target 預期</td><td data-lang="zh">N/A</td><td data-lang="zh">30–40% 為常態</td><td data-lang="en">N/A</td><td data-lang="en">30–40% is normal</td></tr>
+<tr><td data-zh="均勻性挑戰" data-en="Uniformity challenge">均勻性挑戰</td><td data-lang="zh">GC bias、centromere</td><td data-lang="zh">bait 效率、GC、AT-dropout</td><td data-lang="en">GC bias, centromeres</td><td data-lang="en">Bait efficiency, GC, AT-dropout</td></tr>
+</tbody></table>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>WES 陷阱：</strong>capture kit 廠商之間 bait 設計差異大 (Twist vs Agilent vs IDT xGen)。比較不同 kit 的「mean coverage」毫無意義，應比較<strong>同一 target interval 內的 ≥20× %</strong>。</span>
+<span data-lang="en"><strong>WES pitfall:</strong> bait designs vary substantially across vendors (Twist vs Agilent vs IDT xGen). Comparing raw "mean coverage" across kits is meaningless — compare <strong>%≥20× over a shared target interval</strong>.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="深度分佈與均勻性" data-en="Depth distribution & uniformity">深度分佈與均勻性</h2>
+<div data-lang="zh"><p>調整 mean depth 與分佈偏度，觀察 % ≥20× 與 Gini 變化。即使 mean 很高，若分佈尾巴重，仍會有大量低覆蓋盲區。</p></div>
+<div data-lang="en"><p>Tune mean depth and dispersion to see how % ≥20× and Gini change. Even with high mean, heavy-tailed distributions leave many blind spots.</p></div>
+<div class="interactive-panel">
+<div class="slider-group"><label><span data-zh="平均深度" data-en="Mean depth">平均深度</span> <span id="valMean">30</span>×</label><input type="range" id="sliderMean" min="10" max="100" value="30" step="5"></div>
+<div class="slider-group"><label><span data-zh="不均勻度 σ" data-en="Dispersion σ">不均勻度</span> <span id="valSig">0.4</span></label><input type="range" id="sliderSig" min="10" max="100" value="40" step="5"></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statPct20">—</span><span class="sim-stat fail" id="statGini">—</span></div>
+<div class="chart-container"><canvas id="covChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;" data-zh="X: 覆蓋深度 | Y: base 計數密度" data-en="X: depth | Y: density">X: 覆蓋深度 | Y: density</p>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="覆蓋率工具實作" data-en="Coverage tool implementation">覆蓋率工具實作</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'c1')">Picard (WGS)</button><button class="code-tab-btn" onclick="switchTab(this,'c2')">Picard (WES)</button><button class="code-tab-btn" onclick="switchTab(this,'c3')">mosdepth</button></div>
+<div class="code-tab-content active" id="c1"><pre><span class="comment"># WGS coverage with CollectWgsMetrics</span>
+gatk CollectWgsMetrics \
+    -I bam/S1.recal.bam -R ref/GRCh38.fa \
+    -O qc/S1.wgs_metrics.txt \
+    --MINIMUM_BASE_QUALITY 20 \
+    --MINIMUM_MAPPING_QUALITY 20</pre></div>
+<div class="code-tab-content" id="c2"><pre><span class="comment"># WES with CollectHsMetrics — needs bait & target intervals</span>
+gatk BedToIntervalList \
+    -I capture/twist_baits.bed -SD ref/GRCh38.dict \
+    -O capture/baits.interval_list
+
+gatk CollectHsMetrics \
+    -I bam/S1.recal.bam -R ref/GRCh38.fa \
+    -BI capture/baits.interval_list \
+    -TI capture/targets.interval_list \
+    -O qc/S1.hs_metrics.txt \
+    --COVERAGE_CAP 1000</pre></div>
+<div class="code-tab-content" id="c3"><pre><span class="comment"># mosdepth — fast per-region depth (Pedersen 2018)</span>
+mosdepth --threads 4 --by capture/targets.bed \
+    --thresholds 1,10,20,30,50 \
+    --no-per-base \
+    qc/S1 bam/S1.recal.bam
+
+<span class="comment"># Aggregate everything with MultiQC</span>
+multiqc qc/ -o qc/multiqc</pre></div>
+</div>
+</section>
+
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. 為什麼 mean 與 median 深度可能差異很大？</p>
+<p data-lang="en">1. Why can mean and median depth differ substantially?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. samtools bug</span><span data-lang="en">A. samtools bug</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 兩者本來相同</span><span data-lang="en">B. They are always equal</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. rDNA / mtDNA / 衛星等高重複區大量讀數拉高 mean，但 median 不受影響</span><span data-lang="en">C. rDNA / mtDNA / satellites pile up reads and inflate mean while median is robust</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. BWA 隨機跳過 reads</span><span data-lang="en">D. BWA skips reads randomly</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">2. 哪個指標最能反映 WES capture kit 的捕獲效率？</p>
+<p data-lang="en">2. Which metric best reflects WES capture efficiency?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. Mean insert size</span><span data-lang="en">A. Mean insert size</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. % bases on/near bait (PCT_SELECTED_BASES) 與 fold-80 base penalty</span><span data-lang="en">B. % bases on/near bait (PCT_SELECTED_BASES) and fold-80 base penalty</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. duplication rate</span><span data-lang="en">C. Duplication rate</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. read length</span><span data-lang="en">D. Read length</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">3. 是非題：30× WGS 代表整個基因組每個 base 都被讀到 30 次以上。</p>
+<p data-lang="en">3. True/False: 30× WGS means every base in the genome is covered ≥30 times.</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對</span><span data-lang="en">A. True</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯——30× 是平均；實際分佈下仍有 5–10% 區域 &lt;20×</span><span data-lang="en">B. False — 30× is an average; 5–10% of the genome typically remains &lt;20×</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="markdup-bqsr.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 5: MarkDup & BQSR</span></a>
+<a href="germline-calling.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 7: Germline Calling</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+const xs=[];for(let i=0;i<=120;i++)xs.push(i);
+function lognormPDF(x,mu,sig){if(x<=0)return 0;return(1/(x*sig*Math.sqrt(2*Math.PI)))*Math.exp(-Math.pow(Math.log(x)-mu,2)/(2*sig*sig));}
+const covChart=new Chart(document.getElementById('covChart'),{type:'line',data:{labels:xs,datasets:[{label:'Density',data:[],borderColor:'#047857',backgroundColor:'rgba(4,120,87,.2)',fill:true,tension:.25,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},annotation:{}},scales:{x:{title:{display:true,text:'Depth (×)'}},y:{title:{display:true,text:'Density'}}}}});
+function up(){const m=+document.getElementById('sliderMean').value;const sigSlider=+document.getElementById('sliderSig').value;const sig=sigSlider/100;document.getElementById('valMean').textContent=m;document.getElementById('valSig').textContent=sig.toFixed(2);const mu=Math.log(m)-sig*sig/2;const y=xs.map(x=>lognormPDF(x,mu,sig));covChart.data.datasets[0].data=y;covChart.update('none');let cdf20=0,total=0;y.forEach((d,i)=>{total+=d;if(xs[i]>=20)cdf20+=d;});const pct=total>0?(cdf20/total*100):0;const gini=Math.min(0.9,sig*0.5);const L=I18n.get();document.getElementById('statPct20').textContent=(L==='zh'?'≥20× 比例: ':'%≥20×: ')+pct.toFixed(1)+'%';document.getElementById('statGini').textContent=(L==='zh'?'Gini 約: ':'Gini ≈ ')+gini.toFixed(2);}
+['sliderMean','sliderSig'].forEach(id=>document.getElementById(id).addEventListener('input',up));document.addEventListener('langchange',up);up();
+const QF={zh:{q1_y:'rDNA/mtDNA 等讀數堆積拉高 mean。',q1_n:'答案：C。',q2_y:'PCT_SELECTED_BASES + fold-80 是核心 WES QC。',q2_n:'答案：B。',q3_y:'30× 為平均，仍有低覆蓋盲區。',q3_n:'答案：B。'},en:{q1_y:'Pileups at rDNA/mtDNA inflate the mean.',q1_n:'Correct: C.',q2_y:'PCT_SELECTED_BASES + fold-80 are core WES QC.',q2_n:'Correct: B.',q3_y:'30× is a mean; blind spots remain.',q3_n:'Correct: B.'}};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

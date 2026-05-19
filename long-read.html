@@ -1,0 +1,166 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 13: Long-read Analysis — WGS/WES Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
+  <ul class="top-nav-links"><li><a href="intro.html">Intro</a></li><li><a href="qc.html">QC</a></li><li><a href="trimming.html">Trim</a></li><li><a href="alignment.html">Align</a></li><li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li><li><a href="coverage.html">Coverage</a></li><li><a href="germline-calling.html">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html">Annot.</a></li><li><a href="cnv-sv.html">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html" class="active">Long-read</a></li><li><a href="acmg.html">ACMG</a></li><li><a href="clinical-report.html">Report</a></li><li><a href="cohort.html">Cohort</a></li><li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li></ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 13 / 16</div>
+<h1 data-zh="長讀長定序分析 (Long-read)" data-en="Long-read Sequencing Analysis">長讀長定序分析 (Long-read)</h1>
+<p class="subtitle" data-lang="zh">PacBio HiFi 與 ONT R10.4.1：解開 short-read 的盲區、SV、phasing 與表觀基因組。</p>
+<p class="subtitle" data-lang="en">PacBio HiFi and ONT R10.4.1: unlock short-read blind spots, SVs, phasing, and epigenome.</p>
+</header>
+<main class="content-wrap">
+
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為什麼需要 Long-read？" data-en="Why long reads?">為什麼需要 Long-read？</h2>
+<div data-lang="zh"><p>Short-read 在 (1) <strong>重複區域</strong> (segmental duplications、tandem repeats、centromere)、(2) <strong>大型 SV</strong>、(3) <strong>haplotype phasing</strong>、(4) <strong>5mC/6mA 表觀修飾</strong> 都有先天限制。Long-read 一條讀就可橫跨數 kb–Mb，直接解這些問題。</p>
+<p><strong>2026 兩大平台：</strong>(1) <strong>PacBio HiFi</strong>（CCS reads，Q30+ 共識準確）— Revio 平台高通量、~15–25 kb 讀長；(2) <strong>ONT R10.4.1 + Dorado</strong> basecaller — raw ~99.5%，duplex 模式可達 HiFi 等級，讀長可 &gt; 100 kb。</p></div>
+<div data-lang="en"><p>Short reads struggle with (1) <strong>repeat regions</strong> (segdup, tandem repeats, centromere), (2) <strong>large SVs</strong>, (3) <strong>haplotype phasing</strong>, (4) <strong>5mC/6mA epigenome</strong>. One long read spans kb–Mb and resolves these directly.</p>
+<p><strong>Two 2026 platforms:</strong> (1) <strong>PacBio HiFi</strong> (CCS reads, Q30+ consensus) — Revio platform, ~15–25 kb; (2) <strong>ONT R10.4.1 + Dorado</strong> basecaller — raw ~99.5%, duplex matches HiFi, reads &gt; 100 kb.</p></div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>T2T-CHM13 v2.0：</strong>Nurk 2022 (Science) 發表首個真正 telomere-to-telomere 完整人類基因組——包含過去 GRCh38 缺失的 ~200 Mb 重複序列。Long-read 是這項里程碑的關鍵。</span>
+<span data-lang="en"><strong>T2T-CHM13 v2.0:</strong> Nurk 2022 (Science) — first true telomere-to-telomere human genome, adding ~200 Mb of repeat regions missing from GRCh38. Long-read made this milestone possible.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="工具比較" data-en="TOOL COMPARISON">工具比較</div>
+<h2 data-zh="一、Aligner、Caller、SV、Phasing" data-en="I. Aligners, callers, SV, phasing">一、Aligner、Caller、SV、Phasing</h2>
+<table class="comp-table">
+<thead><tr><th data-zh="任務" data-en="Task">任務</th><th>PacBio HiFi</th><th>ONT R10.4.1</th></tr></thead>
+<tbody>
+<tr><td data-lang="zh">比對</td><td>minimap2 -ax map-hifi / pbmm2</td><td>minimap2 -ax map-ont / lra</td><td data-lang="en">Alignment</td><td></td><td></td></tr>
+<tr><td data-lang="zh">小變異 (SNV/Indel)</td><td>DeepVariant (HiFi model) / Clair3</td><td>Clair3 (Zheng 2022) / PEPPER-Margin-DeepVariant</td><td data-lang="en">Small variants</td><td></td><td></td></tr>
+<tr><td data-lang="zh">結構變異 (SV)</td><td>Sniffles2 / pbsv / cuteSV</td><td>Sniffles2 (Smolka 2024) / cuteSV (Jiang 2020)</td><td data-lang="en">Structural variants</td><td></td><td></td></tr>
+<tr><td data-lang="zh">Haplotype phasing</td><td>HiPhase (PacBio) / WhatsHap / LongPhase</td><td>WhatsHap / LongPhase</td><td data-lang="en">Phasing</td><td></td><td></td></tr>
+<tr><td data-lang="zh">5mC 甲基化</td><td>jasmine / primrose（內建於 CCS）</td><td>Dorado --modified-bases 5mCG / Remora</td><td data-lang="en">5mC methylation</td><td></td><td></td></tr>
+</tbody></table>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>表觀基因組大優勢：</strong>Long-read 可<strong>從原始訊號直接讀出 5mC/6mA</strong>——不需 bisulfite conversion（化學損傷 + 降低複雜度的傳統方法）。一次定序同時得到 SNV/SV/methylation 三合一。</span>
+<span data-lang="en"><strong>Epigenome advantage:</strong> long reads <strong>call 5mC/6mA directly from raw signal</strong> — no bisulfite needed (which causes chemical damage and reduces complexity). One run delivers SNV/SV/methylation in one go.</span>
+</div></div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="二、HiFi vs ONT：怎麼選？" data-en="II. HiFi vs ONT: how to choose?">二、HiFi vs ONT：怎麼選？</h2>
+<div class="decision-tree">
+<h4>🌳 <span data-zh="專案需求 → 平台" data-en="Project needs → platform">專案需求 → 平台</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>需要高準確 SNV/Indel calling？ <span class="dt-arrow">→</span> <strong>HiFi</strong>（Q30+，等同 short-read 準度）。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>需要 &gt; 100 kb 超長 read 解 segmental duplication？ <span class="dt-arrow">→</span> <strong>ONT ultra-long</strong>（可達數 Mb）。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>需要即時/床邊定序、低初期成本？ <span class="dt-arrow">→</span> <strong>ONT MinION/PromethION</strong>。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>需 RNA isoform 同時看甲基化？ <span class="dt-arrow">→</span> <strong>兩者皆可</strong>（PacBio Iso-Seq / ONT direct RNA）。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>High-accuracy SNV/Indel? <span class="dt-arrow">→</span> <strong>HiFi</strong> (Q30+, matches short-read).</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Need &gt;100 kb to resolve segdup? <span class="dt-arrow">→</span> <strong>ONT ultra-long</strong> (multi-Mb possible).</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Real-time / bedside / low upfront cost? <span class="dt-arrow">→</span> <strong>ONT MinION/PromethION</strong>.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>RNA isoforms + methylation? <span class="dt-arrow">→</span> Both (PacBio Iso-Seq / ONT direct RNA).</div></div>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="Read length 分佈瀏覽器" data-en="Read length distribution viewer">Read length 分佈瀏覽器</h2>
+<div data-lang="zh"><p>調整 N50 觀察讀長分佈。HiFi 典型 N50 ≈ 18 kb；ONT 標準 ≈ 30 kb；ONT ultra-long 可 &gt; 100 kb。</p></div>
+<div data-lang="en"><p>Adjust N50 to view length distribution. HiFi typical N50 ≈ 18 kb; ONT standard ≈ 30 kb; ONT ultra-long &gt; 100 kb.</p></div>
+<div class="interactive-panel">
+<div class="slider-group"><label><span data-zh="N50 (kb)" data-en="N50 (kb)">N50</span> <span id="valN50">18</span></label><input type="range" id="sliderN50" min="5" max="120" value="18" step="1"></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statMed">—</span><span class="sim-stat fail" id="statMax">—</span></div>
+<div class="chart-container"><canvas id="lrChart"></canvas></div>
+</div>
+</section>
+
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="Long-read 三步驟" data-en="Long-read three steps">Long-read 三步驟</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'l1')">minimap2</button><button class="code-tab-btn" onclick="switchTab(this,'l2')">Clair3</button><button class="code-tab-btn" onclick="switchTab(this,'l3')">Sniffles2</button></div>
+<div class="code-tab-content active" id="l1"><pre><span class="comment"># minimap2 — HiFi vs ONT presets</span>
+minimap2 -ax map-hifi -t 16 ref.fa hifi.fq.gz | samtools sort -@8 -o hifi.bam
+minimap2 -ax map-ont  -t 16 ref.fa ont.fq.gz  | samtools sort -@8 -o ont.bam
+samtools index hifi.bam && samtools index ont.bam
+
+<span class="comment"># T2T-CHM13 v2.0 — use as reference for full genome coverage</span>
+wget https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/chm13v2.0.fa.gz</pre></div>
+<div class="code-tab-content" id="l2"><pre><span class="comment"># Clair3 — small variant caller for ONT &amp; HiFi</span>
+run_clair3.sh \
+    --bam_fn=ont.bam \
+    --ref_fn=ref.fa \
+    --threads=16 \
+    --platform=ont \
+    --model_path=/clair3_models/r1041_e82_400bps_sup_v500 \
+    --output=clair3_out
+
+<span class="comment"># DeepVariant for HiFi</span>
+run_deepvariant --model_type=PACBIO --ref=ref.fa \
+    --reads=hifi.bam --output_vcf=hifi.vcf.gz</pre></div>
+<div class="code-tab-content" id="l3"><pre><span class="comment"># Sniffles2 — SV calling for long reads</span>
+sniffles \
+    --input ont.bam \
+    --reference ref.fa \
+    --vcf sv.vcf.gz \
+    --tandem-repeats human_GRCh38_no_alt_analysis_set.trf.bed \
+    --threads 8
+
+<span class="comment"># Phasing with WhatsHap</span>
+whatshap phase -o phased.vcf --reference ref.fa snv.vcf.gz hifi.bam
+
+<span class="comment"># Methylation directly from ONT raw signal</span>
+dorado basecaller sup --modified-bases 5mCG_5hmCG pod5/ &gt; mod.bam</pre></div>
+</div>
+</section>
+
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">1. PacBio HiFi 與 ONT R10.4.1 raw read 準確度大致為？</p>
+<p data-lang="en">1. PacBio HiFi vs ONT R10.4.1 raw read accuracy is approximately?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. HiFi 90% / ONT 80%</span><span data-lang="en">A. HiFi 90% / ONT 80%</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. HiFi Q30+（99.9%）/ ONT ~99.5%（duplex 可達 HiFi）</span><span data-lang="en">B. HiFi Q30+ (99.9%) / ONT ~99.5% (duplex ≈ HiFi)</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 兩者皆 70%</span><span data-lang="en">C. Both ~70%</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 兩者皆 50%</span><span data-lang="en">D. Both ~50%</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">2. 為什麼長讀長對 SV 偵測較有利？</p>
+<p data-lang="en">2. Why are long reads better for SV calling?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 因為基因組變小</span><span data-lang="en">A. Genome becomes smaller</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 因為 SV 都很小</span><span data-lang="en">B. SVs are all small</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 一條讀可跨越斷點與重複區，直接看出 insertion/inversion，不靠 PE 統計</span><span data-lang="en">C. A single read can span breakpoints &amp; repeats, directly revealing INS/INV, no PE stats needed</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 長讀長無 mapping error</span><span data-lang="en">D. Long reads have no mapping error</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">3. 是非題：ONT/PacBio 可直接從原始訊號讀出 5mC 甲基化，毋須 bisulfite conversion。</p>
+<p data-lang="en">3. True/False: ONT/PacBio can call 5mC methylation directly from raw signal — no bisulfite needed.</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對</span><span data-lang="en">A. True</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯</span><span data-lang="en">B. False</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="somatic.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 12: Somatic</span></a>
+<a href="acmg.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 14: ACMG</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+const bins=[1,3,5,8,10,15,20,25,30,40,50,70,100,150,200];
+const lrChart=new Chart(document.getElementById('lrChart'),{type:'bar',data:{labels:bins,datasets:[{label:'Reads',data:[],backgroundColor:'rgba(4,120,87,.65)'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{title:{display:true,text:'Reads (relative)'}},x:{title:{display:true,text:'Read length (kb)'}}}}});
+function up(){const n50=+document.getElementById('sliderN50').value;document.getElementById('valN50').textContent=n50;const scale=n50/Math.LN2;const arr=bins.map(b=>{const x=b/scale;return Math.exp(-x)*x;});const sum=arr.reduce((a,b)=>a+b,0);const norm=arr.map(a=>a/sum*100);lrChart.data.datasets[0].data=norm;lrChart.update('none');const L=I18n.get();const maxL=Math.round(n50*3);document.getElementById('statMed').textContent=(L==='zh'?'N50: ':'N50: ')+n50+' kb';document.getElementById('statMax').textContent=(L==='zh'?'最長 ~':'Max ~')+maxL+' kb';}
+document.getElementById('sliderN50').addEventListener('input',up);document.addEventListener('langchange',up);up();
+const QF={zh:{q1_y:'HiFi 因 CCS 共識達 Q30+，ONT R10.4.1 duplex 也已接近。',q1_n:'答案：B。',q2_y:'單條讀直接跨越重複/斷點。',q2_n:'答案：C。',q3_y:'原始訊號可直接呼叫 modified bases。',q3_n:'答案：A。'},en:{q1_y:'HiFi CCS consensus reaches Q30+; ONT duplex approaches it.',q1_n:'Correct: B.',q2_y:'A single read spans repeats/breakpoints.',q2_n:'Correct: C.',q3_y:'Raw signal directly yields modified-base calls.',q3_n:'Correct: A.'}};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

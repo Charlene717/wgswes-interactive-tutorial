@@ -1,340 +1,157 @@
 <!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Step 8: Variant Annotation — WGS/WES Tutorial</title>
+<title>Step 10: Variant Annotation — WGS/WES Tutorial</title>
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head><body>
 <nav class="top-nav"><div class="top-nav-inner">
   <a href="index.html" class="top-nav-brand"><span>🧬</span> <span data-zh="WGS / WES 教學" data-en="WGS / WES Tutorial">WGS / WES 教學</span></a>
-  <ul class="top-nav-links">
-    <li><a href="intro.html">Intro</a></li><li><a href="fastq-qc.html">FASTQ QC</a></li><li><a href="alignment.html">Align</a></li><li><a href="post-alignment.html">PostAln</a></li><li><a href="variant-calling.html">Calling</a></li><li><a href="joint-genotyping.html">Joint</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html" class="active">Annot</a></li><li><a href="interpretation.html">Interp</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="structural-variants.html">SV/CNV</a></li><li><a href="wes-considerations.html">WES</a></li>
-  </ul>
+  <ul class="top-nav-links"><li><a href="intro.html">Intro</a></li><li><a href="qc.html">QC</a></li><li><a href="trimming.html">Trim</a></li><li><a href="alignment.html">Align</a></li><li><a href="markdup-bqsr.html">MarkDup/BQSR</a></li><li><a href="coverage.html">Coverage</a></li><li><a href="germline-calling.html">Germline VC</a></li><li><a href="joint-genotyping.html">Joint GT</a></li><li><a href="filtering.html">Filter</a></li><li><a href="annotation.html" class="active">Annot.</a></li><li><a href="cnv-sv.html">CNV/SV</a></li><li><a href="somatic.html">Somatic</a></li><li><a href="long-read.html">Long-read</a></li><li><a href="acmg.html">ACMG</a></li><li><a href="clinical-report.html">Report</a></li><li><a href="cohort.html">Cohort</a></li><li><a href="references/index.html" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li></ul>
 </div></nav>
 <div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
-<header class="page-hero"><div class="step-badge">STEP 8 / 9</div>
-<h1 data-zh="變異註解 (Variant Annotation)" data-en="Variant Annotation">變異註解 (Variant Annotation)</h1>
-<p class="subtitle" data-lang="zh">給每個 variant 標上「它影響什麼基因、後果有多嚴重、人群中多常見」——VEP、ANNOVAR、SnpEff 三大選擇。</p>
-<p class="subtitle" data-lang="en">Tag each variant with the gene it affects, the severity of its consequence, and how common it is in populations — VEP, ANNOVAR, SnpEff: choosing among three.</p>
+<header class="page-hero"><div class="step-badge">STEP 10 / 16</div>
+<h1 data-zh="變異註釋 (VEP / SnpEff)" data-en="Variant Annotation (VEP / SnpEff)">變異註釋 (VEP / SnpEff)</h1>
+<p class="subtitle" data-lang="zh">把座標變成「臨床意義」：轉錄本選擇、功能預測、族群頻率與深度學習評分整合。</p>
+<p class="subtitle" data-lang="en">From coordinates to clinical meaning: transcript choice, functional prediction, population frequency, and deep-learning scores combined.</p>
 </header>
 <main class="content-wrap">
 
 <section class="section">
-<div class="section-label" data-zh="為什麼" data-en="WHY">為什麼</div>
-<h2 data-zh="一、為什麼需要 annotation？" data-en="I. Why annotation?">一、為什麼需要 annotation？</h2>
-<div data-lang="zh">
-<p>過濾後的 VCF 還只是「一堆位點與基因型」。要回答「這個變異會不會致病」、「在人群中多常見」、「影響哪個 transcript 的哪個 codon」，必須註解：</p>
-<ul>
-<li><strong>Gene context</strong>：variant 落在哪個 gene、transcript、exon、intron？是 coding 還是 UTR？</li>
-<li><strong>Functional consequence</strong>：synonymous、missense、nonsense、frameshift、splice site？</li>
-<li><strong>Population frequency</strong>：gnomAD、TOPMed、1000 Genomes 中的 allele frequency？</li>
-<li><strong>Clinical significance</strong>：ClinVar 是否已收錄？是 Pathogenic / Benign / VUS？</li>
-<li><strong>In silico predictions</strong>：SIFT、PolyPhen-2、CADD、REVEL、AlphaMissense 預測致病性</li>
-</ul>
-<p>後續的 ACMG/AMP 變異判讀（Step 9）幾乎完全建立在 annotation 結果之上。</p>
-</div>
-<div data-lang="en">
-<p>A filtered VCF is still just "positions and genotypes." To answer whether a variant is pathogenic, how common it is, and which codon of which transcript it hits — it must be annotated:</p>
-<ul>
-<li><strong>Gene context</strong>: which gene, transcript, exon, intron? Coding or UTR?</li>
-<li><strong>Functional consequence</strong>: synonymous, missense, nonsense, frameshift, splice site?</li>
-<li><strong>Population frequency</strong>: AF in gnomAD, TOPMed, 1000 Genomes?</li>
-<li><strong>Clinical significance</strong>: in ClinVar? Pathogenic / Benign / VUS?</li>
-<li><strong>In silico predictions</strong>: SIFT, PolyPhen-2, CADD, REVEL, AlphaMissense pathogenicity scores</li>
-</ul>
-<p>Downstream ACMG/AMP variant classification (Step 9) is almost entirely built on annotation output.</p>
-</div>
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="變異註釋要回答的問題" data-en="Questions annotation must answer">變異註釋要回答的問題</h2>
+<div data-lang="zh"><p>一個 chr7:140,453,136 A&gt;T 的座標對臨床無意義，必須回答：(1) 落在哪個基因 / 轉錄本？(2) coding / non-coding / splice / UTR？(3) 改變胺基酸嗎？(4) 族群頻率多少？(5) 致病性預測？(6) 是否有 ClinVar / OMIM 紀錄？這就是「註釋」要做的事。</p>
+<p>關鍵挑戰：<strong>同一個位置可能屬於多個轉錄本</strong>（人類平均每基因 5–10 條 transcript），導致註釋輸出不一致。2022 年 NCBI 與 Ensembl 共同發布 <strong>MANE Select</strong> (Morales 2022, Nature)，為每個 protein-coding gene 指定唯一「最具代表性」的轉錄本，已成臨床標準。</p></div>
+<div data-lang="en"><p>A bare coordinate (chr7:140,453,136 A&gt;T) has no clinical meaning. Annotation answers: (1) which gene/transcript? (2) coding / non-coding / splice / UTR? (3) amino-acid change? (4) population AF? (5) pathogenicity prediction? (6) ClinVar/OMIM record?</p>
+<p>Key challenge: <strong>one site can map to multiple transcripts</strong> (5–10 per gene on average), making annotation inconsistent. In 2022 NCBI + Ensembl jointly released <strong>MANE Select</strong> (Morales 2022, Nature) — one canonical transcript per protein-coding gene — now the clinical standard.</p></div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心三件套：</strong>(1) 註釋器 (VEP 或 SnpEff)　(2) 族群頻率 (gnomAD v4)　(3) 致病性預測 (CADD / REVEL / AlphaMissense / SpliceAI)。透過 dbNSFP 一次取得 40+ 種預測分數。</span>
+<span data-lang="en"><strong>The core trio:</strong> (1) annotator (VEP or SnpEff) (2) population AF (gnomAD v4) (3) pathogenicity (CADD / REVEL / AlphaMissense / SpliceAI) — dbNSFP bundles 40+ scores at once.</span>
+</div></div>
 </section>
 
 <section class="section">
-<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
-<h2 data-zh="二、三大註解工具比較" data-en="II. Three Major Annotation Tools Compared">二、三大註解工具比較</h2>
-<div class="comp-table-wrap">
+<div class="section-label" data-zh="工具比較" data-en="TOOL COMPARISON">工具比較</div>
+<h2 data-zh="一、三大主流註釋器" data-en="I. Three major annotators">一、三大主流註釋器</h2>
 <table class="comp-table">
-<thead><tr><th>Tool</th><th data-zh="開發單位" data-en="Developer">開發單位</th><th data-zh="輸出" data-en="Output">輸出</th><th data-zh="優勢" data-en="Strengths">優勢</th><th data-zh="弱點" data-en="Weaknesses">弱點</th></tr></thead>
+<thead><tr><th>Tool</th><th data-zh="發表" data-en="Reference">發表</th><th data-zh="特色" data-en="Features">特色</th><th data-zh="速度" data-en="Speed">速度</th><th data-zh="推薦情境" data-en="Best for">推薦情境</th></tr></thead>
 <tbody>
-<tr><td><strong>VEP</strong></td><td>Ensembl / EBI</td><td data-zh="VCF (CSQ field) / TXT / JSON" data-en="VCF (CSQ field) / TXT / JSON">VCF (CSQ field) / TXT / JSON</td><td data-zh="社群最活躍、Ensembl/RefSeq 雙轉錄本支援、外掛系統 (REVEL, SpliceAI, AlphaMissense...)、Sequence Ontology 標準化" data-en="Most active community, dual Ensembl/RefSeq transcripts, plugin system (REVEL, SpliceAI, AlphaMissense), Sequence Ontology standardized">社群最活躍、Ensembl/RefSeq 雙轉錄本支援、外掛系統 (REVEL, SpliceAI, AlphaMissense...)、Sequence Ontology 標準化</td><td data-zh="安裝較複雜（需要 cache 或 API）、執行較慢" data-en="Trickier install (needs cache or API), slower execution">安裝較複雜（需要 cache 或 API）、執行較慢</td></tr>
-<tr><td><strong>ANNOVAR</strong></td><td>USC</td><td data-zh="TXT / CSV (multi-anno table)" data-en="TXT / CSV (multi-anno table)">TXT / CSV (multi-anno table)</td><td data-zh="速度最快、表格輸出方便人讀、龐大 db 生態 (refGene, dbNSFP, ClinVar, gnomAD)" data-en="Fastest, table output is human-readable, large db ecosystem (refGene, dbNSFP, ClinVar, gnomAD)">速度最快、表格輸出方便人讀、龐大 db 生態 (refGene, dbNSFP, ClinVar, gnomAD)</td><td data-zh="非自由軟體 (商用付費)、註解術語非標準化、輸出非 VCF" data-en="Non-free (commercial license required), non-standardized terminology, output isn't VCF">非自由軟體 (商用付費)、註解術語非標準化、輸出非 VCF</td></tr>
-<tr><td><strong>SnpEff</strong></td><td data-zh="開源社群" data-en="Open-source community">開源社群</td><td data-zh="VCF (ANN field)" data-en="VCF (ANN field)">VCF (ANN field)</td><td data-zh="完全開源、安裝最簡單、內建大量物種 db (~70,000 genomes)、SnpSift 強大查詢" data-en="Fully open-source, easiest install, built-in DBs for many species (~70,000 genomes), strong SnpSift querying">完全開源、安裝最簡單、內建大量物種 db (~70,000 genomes)、SnpSift 強大查詢</td><td data-zh="人類資料庫不如 VEP 即時、外掛較少" data-en="Human DBs less current than VEP's, fewer plugins">人類資料庫不如 VEP 即時、外掛較少</td></tr>
-</tbody>
-</table>
-</div>
-<div class="callout callout-warn" style="margin-top:18px">
-<strong data-zh="⚠ 三者結果並非完全一致" data-en="⚠ Results are not fully consistent across the three">⚠ 三者結果並非完全一致</strong>
-<p data-lang="zh">研究顯示三大工具在 Loss-of-Function (LoF) 變異的判定上只有約 <strong>65% concordance</strong>，主要差異來自：(1) 預設 transcript 不同（VEP 預設 Ensembl canonical，ANNOVAR 多 RefSeq）、(2) splice site 邊界定義差異、(3) Sequence Ontology vs ANNOVAR 自製術語對應差異。臨床診斷常推薦同時跑兩個工具交叉驗證。</p>
-<p data-lang="en">Studies show the three tools only reach about <strong>65% concordance</strong> for Loss-of-Function (LoF) calls. Differences trace to: (1) different default transcripts (VEP defaults to Ensembl canonical, ANNOVAR often RefSeq); (2) splice-site boundary definitions; (3) Sequence Ontology vs ANNOVAR's custom terminology. Clinical workflows often run two tools in parallel for cross-validation.</p>
-</div>
+<tr><td><strong>VEP</strong></td><td>McLaren 2016, Genome Biol</td><td data-lang="zh">Ensembl 官方、plugin 生態最完整、支援 MANE</td><td>★★★★</td><td data-lang="zh">研究與臨床雙用</td><td data-lang="en">Official Ensembl, richest plugin ecosystem, MANE-aware</td><td data-lang="en">★★★★</td><td data-lang="en">Research and clinical</td></tr>
+<tr><td><strong>SnpEff</strong></td><td>Cingolani 2012, Fly</td><td data-lang="zh">速度極快、可自建 DB（非模式生物友好）</td><td>★★★★★</td><td data-lang="zh">非人類、自建基因組</td><td data-lang="en">Very fast; build custom DB (non-model friendly)</td><td data-lang="en">★★★★★</td><td data-lang="en">Non-human, custom genomes</td></tr>
+<tr><td><strong>ANNOVAR</strong></td><td>Wang 2010, NAR</td><td data-lang="zh">商業免費版本、臨床實驗室常用、整合 RefGene</td><td>★★★</td><td data-lang="zh">臨床診斷</td><td data-lang="en">Free-for-academic; clinical-lab favourite; RefGene</td><td data-lang="en">★★★</td><td data-lang="en">Clinical diagnostics</td></tr>
+</tbody></table>
 </section>
 
 <section class="section">
-<div class="section-label" data-zh="格式" data-en="FORMAT">格式</div>
-<h2 data-zh="三、VEP CSQ 欄位結構" data-en="III. VEP CSQ Field Structure">三、VEP CSQ 欄位結構</h2>
-<div data-lang="zh">
-<p>VEP 把所有註解塞進 INFO 欄的 <code>CSQ</code> 子欄位，每個 transcript 一條紀錄，欄位以 <code>|</code> 分隔。header 中的 <code>##INFO=&lt;ID=CSQ,...&gt;</code> 會列出順序。</p>
+<div class="section-label" data-zh="致病性預測" data-en="PATHOGENICITY">致病性預測</div>
+<h2 data-zh="二、Missense 與 Splice 預測工具" data-en="II. Missense & Splice predictors">二、Missense 與 Splice 預測工具</h2>
+<div class="card-grid cols-3">
+<div class="card"><div class="card-icon">🔬</div><h4>CADD</h4><div data-lang="zh"><p>Kircher 2014, Nat Genet。整合 60+ 注釋，Phred-scaled，全基因組可用。CADD ≥ 20 ≈ 前 1% 有害變異。</p></div><div data-lang="en"><p>Kircher 2014. Integrates 60+ annotations; Phred-scaled; genome-wide. CADD ≥ 20 ≈ top 1% damaging.</p></div></div>
+<div class="card"><div class="card-icon">🎯</div><h4>REVEL</h4><div data-lang="zh"><p>Ioannidis 2016, AJHG。Random Forest 整合 13 個 missense 預測，分數 0-1。&gt; 0.5 一般視為致病傾向。</p></div><div data-lang="en"><p>Ioannidis 2016. Random forest of 13 missense predictors, score 0–1. &gt; 0.5 generally pathogenic-leaning.</p></div></div>
+<div class="card"><div class="card-icon">🧠</div><h4>AlphaMissense</h4><div data-lang="zh"><p>Cheng 2023, Science。DeepMind 用 AlphaFold 結構預測 missense 致病性，分類為 likely_benign / ambiguous / likely_pathogenic。</p></div><div data-lang="en"><p>Cheng 2023, Science. DeepMind uses AlphaFold structure to classify missense as likely_benign / ambiguous / likely_pathogenic.</p></div></div>
+<div class="card"><div class="card-icon">✂️</div><h4>SpliceAI</h4><div data-lang="zh"><p>Jaganathan 2019, Cell。Illumina 開發的深度學習 splice 預測，輸出 4 個分數（acceptor/donor × gain/loss）。&gt; 0.2 視為可能影響 splicing。</p></div><div data-lang="en"><p>Jaganathan 2019, Cell. Deep-learning splice predictor by Illumina; 4 scores (acceptor/donor × gain/loss). &gt; 0.2 = potentially splice-affecting.</p></div></div>
+<div class="card"><div class="card-icon">📚</div><h4>dbNSFP 4.x</h4><div data-lang="zh"><p>Liu 2020, Genome Med。預先計算所有可能 missense 變異的 40+ 種預測分數，VEP 可一次取得。</p></div><div data-lang="en"><p>Liu 2020. Precomputes 40+ predictor scores for every possible missense; VEP loads in one shot.</p></div></div>
+<div class="card"><div class="card-icon">🗂️</div><h4>ClinVar</h4><div data-lang="zh"><p>NIH 公開致病性資料庫。VEP 透過 --custom 即可整合 Pathogenic / Likely Pathogenic / VUS / Benign 五級分類。</p></div><div data-lang="en"><p>NIH public clinical variant database; VEP loads via --custom with five-level pathogenicity tiers.</p></div></div>
 </div>
-<div data-lang="en">
-<p>VEP packs all annotations into the INFO field's <code>CSQ</code> sub-field — one record per transcript, fields separated by <code>|</code>. The header's <code>##INFO=&lt;ID=CSQ,...&gt;</code> declares the order.</p>
-</div>
-
-<div class="format-block">
-<div><span class="lbl"># Header (描述欄位順序):</span></div>
-<div><span class="val">##INFO=&lt;ID=CSQ,Description="Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|HGVSc|HGVSp|gnomAD_AF|CLIN_SIG|REVEL"&gt;</span></div>
-<div><span class="lbl"># 範例 INFO 欄:</span></div>
-<div><span class="val">CSQ=A|missense_variant|MODERATE|BRCA1|ENSG00000012048|Transcript|ENST00000357654|protein_coding|10/23|c.1067A&gt;G|p.Asp356Gly|0.00012|likely_pathogenic|0.847</span></div>
-</div>
-
-<div class="card-grid" style="margin-top:18px">
-<div class="card"><h3>Consequence</h3><p data-lang="zh">Sequence Ontology 標準術語：<code>missense_variant</code>, <code>stop_gained</code>, <code>frameshift_variant</code>, <code>splice_donor_variant</code>, <code>synonymous_variant</code> ...</p><p data-lang="en">Sequence Ontology standard terms: <code>missense_variant</code>, <code>stop_gained</code>, <code>frameshift_variant</code>, <code>splice_donor_variant</code>, <code>synonymous_variant</code>, etc.</p></div>
-<div class="card"><h3>IMPACT</h3><p data-lang="zh">VEP 自評嚴重度：<code>HIGH</code> (LoF), <code>MODERATE</code> (missense), <code>LOW</code> (synonymous), <code>MODIFIER</code> (intron/UTR)。</p><p data-lang="en">VEP's severity tier: <code>HIGH</code> (LoF), <code>MODERATE</code> (missense), <code>LOW</code> (synonymous), <code>MODIFIER</code> (intron/UTR).</p></div>
-<div class="card"><h3>HGVSc / HGVSp</h3><p data-lang="zh">HGVS 命名標準。<code>HGVSc</code> = coding-level (如 <code>c.1067A&gt;G</code>)；<code>HGVSp</code> = protein-level (如 <code>p.Asp356Gly</code>)。臨床報告必備。</p><p data-lang="en">HGVS nomenclature standard. <code>HGVSc</code> = coding-level (e.g., <code>c.1067A&gt;G</code>); <code>HGVSp</code> = protein-level (e.g., <code>p.Asp356Gly</code>). Required in clinical reports.</p></div>
-<div class="card"><h3>CLIN_SIG</h3><p data-lang="zh">ClinVar 臨床顯著性：<code>pathogenic</code>, <code>likely_pathogenic</code>, <code>uncertain_significance</code>, <code>likely_benign</code>, <code>benign</code>。</p><p data-lang="en">ClinVar clinical significance: <code>pathogenic</code>, <code>likely_pathogenic</code>, <code>uncertain_significance</code>, <code>likely_benign</code>, <code>benign</code>.</p></div>
-</div>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<span data-lang="zh"><strong>不要盲信單一分數：</strong>AlphaMissense 也會錯（特別是結構未解析區域）。臨床上要結合 ACMG/AMP 規則、ClinVar、家系分離與功能實驗——分數只是 supporting evidence，不能單獨定性。</span>
+<span data-lang="en"><strong>Never trust a single score:</strong> AlphaMissense can be wrong (especially in poorly resolved regions). Clinically, combine ACMG/AMP rules, ClinVar, segregation, and functional assays — scores are supporting evidence only.</span>
+</div></div>
 </section>
 
 <section class="section">
 <div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
-<h2 data-zh="四、互動模擬：consequence 嚴重度排序" data-en="IV. Interactive: Consequence Severity Ranking">四、互動模擬：consequence 嚴重度排序</h2>
-<div data-lang="zh">
-<p>選擇不同的 variant consequence，看 VEP IMPACT 與一般遺傳學上的「致病可能性」對照。一個 variant 通常影響多個 transcript（each consequence per transcript），VEP 會報出所有，同時提供 <code>--pick</code> 選最嚴重那條。</p>
-</div>
-<div data-lang="en">
-<p>Pick different variant consequences to see how VEP's IMPACT lines up with the general genetic intuition for pathogenicity. A variant typically affects multiple transcripts (one consequence per transcript) — VEP reports all and offers <code>--pick</code> to choose the most severe.</p>
-</div>
-
+<h2 data-zh="致病性閾值 → 候選變異數" data-en="Pathogenicity cutoff → candidates">致病性閾值 → 候選變異數</h2>
+<div data-lang="zh"><p>典型 WES 一個樣本約 ~25,000 個 coding 變異。拖動 AlphaMissense 與 gnomAD AF 閾值，觀察候選變異如何「漏斗收斂」。</p></div>
+<div data-lang="en"><p>A typical WES sample yields ~25,000 coding variants. Drag AlphaMissense and gnomAD AF cutoffs to watch the candidate funnel narrow.</p></div>
 <div class="interactive-panel">
-<div class="sim-controls">
-<label data-zh="選擇 consequence:" data-en="Pick a consequence:">選擇 consequence:</label>
-<select id="consSelect" class="sim-select">
-<option value="0">stop_gained (premature stop)</option>
-<option value="1">frameshift_variant</option>
-<option value="2">splice_donor_variant</option>
-<option value="3">missense_variant</option>
-<option value="4">inframe_insertion</option>
-<option value="5">synonymous_variant</option>
-<option value="6">5_prime_UTR_variant</option>
-<option value="7">intron_variant</option>
-<option value="8">intergenic_variant</option>
-</select>
-</div>
-<div id="consStats" class="sim-stats"></div>
-<div class="chart-wrap"><canvas id="consChart"></canvas></div>
-<div class="sim-note" data-lang="zh">藍 = VEP IMPACT 分數 (HIGH=4, MODERATE=3, LOW=2, MODIFIER=1)；橘 = 該 consequence 在 ClinVar Pathogenic 中的相對富集（示意值）。</div>
-<div class="sim-note" data-lang="en">Blue = VEP IMPACT score (HIGH=4, MODERATE=3, LOW=2, MODIFIER=1); Orange = relative enrichment of this consequence in ClinVar Pathogenic (illustrative).</div>
+<div class="slider-group"><label><span data-zh="AlphaMissense 閾值" data-en="AlphaMissense cutoff">AM 閾值</span> <span id="valAM">0.5</span></label><input type="range" id="sliderAM" min="0" max="1" value="0.5" step="0.05"></div>
+<div class="slider-group"><label><span data-zh="gnomAD AF 上限" data-en="gnomAD AF max">AF 上限</span> <span id="valAF">0.001</span></label><input type="range" id="sliderAF" min="0.00001" max="0.05" value="0.001" step="0.0001"></div>
+<div class="sim-stats"><span class="sim-stat pass" id="statCand">—</span><span class="sim-stat fail" id="statDrop">—</span></div>
+<div class="chart-container"><canvas id="aChart"></canvas></div>
 </div>
 </section>
 
 <section class="section">
-<div class="section-label" data-zh="技術" data-en="TECHNICAL">技術</div>
-<h2 data-zh="五、in silico 致病性預測工具" data-en="V. In Silico Pathogenicity Predictors">五、in silico 致病性預測工具</h2>
-<div class="card-grid">
-<div class="card"><h3>SIFT</h3>
-<p data-lang="zh">最早期的 missense 預測工具之一，基於物種間保守性。輸出 0-1（&lt;0.05 = "deleterious"）。</p>
-<p data-lang="en">One of the earliest missense predictors; based on cross-species conservation. Outputs 0-1 (&lt;0.05 = "deleterious").</p>
-</div>
-<div class="card"><h3>PolyPhen-2</h3>
-<p data-lang="zh">結合保守性與蛋白質結構。輸出 0-1（&gt;0.85 = "probably damaging"）。常與 SIFT 一起報告。</p>
-<p data-lang="en">Combines conservation with protein structure. Outputs 0-1 (&gt;0.85 = "probably damaging"). Often reported alongside SIFT.</p>
-</div>
-<div class="card"><h3>CADD</h3>
-<p data-lang="zh">整合 60+ feature 的 ML 模型，給每個 SNV/indel 一個 PHRED 分數。CADD ≥ 20 約等於最嚴重 1%；ACMG 常用 ≥ 25 作為支持性證據。</p>
-<p data-lang="en">An ML model integrating 60+ features, giving each SNV/indel a PHRED score. CADD ≥ 20 ≈ top 1% most-deleterious; ACMG often uses ≥ 25 as supporting evidence.</p>
-</div>
-<div class="card"><h3>REVEL</h3>
-<p data-lang="zh">專為 missense 設計的 ensemble，整合 13 個工具。0-1 連續值，&gt; 0.5 視為 likely pathogenic。臨床診斷實務常用。</p>
-<p data-lang="en">A missense-specific ensemble combining 13 tools. Continuous 0-1; &gt;0.5 = likely pathogenic. Heavily used in clinical workflows.</p>
-</div>
-<div class="card"><h3>SpliceAI</h3>
-<p data-lang="zh">DeepMind 風格的 CNN，預測 splice gain/loss。delta score &gt; 0.2 即值得注意。可發現 deep intronic 隱性 splicing 變異。</p>
-<p data-lang="en">A CNN (DeepMind-style) predicting splice gain/loss. Delta score &gt; 0.2 is noteworthy. Can uncover deep-intronic cryptic splicing variants.</p>
-</div>
-<div class="card"><h3>AlphaMissense</h3>
-<p data-lang="zh">2023 DeepMind 推出，基於 AlphaFold 結構預測 missense pathogenicity。0-1 連續值，覆蓋全人類 71 M missense；ACMG 已有採用建議。</p>
-<p data-lang="en">Released 2023 by DeepMind; uses AlphaFold structures to predict missense pathogenicity. 0-1 continuous, covers all 71 M human missense variants; already cited in ACMG recommendations.</p>
-</div>
-</div>
-</section>
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作範例" data-en="Implementation">實作範例</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'a1')">VEP + plugins</button><button class="code-tab-btn" onclick="switchTab(this,'a2')">SnpEff</button><button class="code-tab-btn" onclick="switchTab(this,'a3')">bcftools filter</button></div>
+<div class="code-tab-content active" id="a1"><pre><span class="comment"># VEP — 全套臨床註釋（MANE + dbNSFP + SpliceAI + AlphaMissense + gnomAD）</span>
+vep -i joint/cohort.filt.vcf.gz \
+    -o annot/cohort.vep.vcf.gz --vcf --compress_output bgzip \
+    --species homo_sapiens --assembly GRCh38 \
+    --cache --dir_cache $VEP_CACHE --offline \
+    --mane --pick_allele_gene \
+    --plugin dbNSFP,dbNSFP4.7a.gz,REVEL_score,CADD_phred,AlphaMissense_score \
+    --plugin SpliceAI,snv=spliceai.snv.vcf.gz,indel=spliceai.indel.vcf.gz \
+    --custom gnomad.v4.exomes.vcf.gz,gnomADe,vcf,exact,0,AF,AF_popmax \
+    --custom clinvar.vcf.gz,ClinVar,vcf,exact,0,CLNSIG,CLNREVSTAT \
+    --fork 8</pre></div>
+<div class="code-tab-content" id="a2"><pre><span class="comment"># SnpEff — 快速 (適合非人類 / 自建 DB)</span>
+snpEff -v GRCh38.105 joint/cohort.filt.vcf.gz &gt; annot/cohort.snpeff.vcf
 
-<section class="section">
-<div class="section-label" data-zh="實務指令" data-en="CODE">實務指令</div>
-<h2 data-zh="六、Pipeline 指令範例" data-en="VI. Pipeline Commands">六、Pipeline 指令範例</h2>
-<div class="code-tabs">
-<div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'tab-vep')">VEP</button><button class="code-tab-btn" onclick="switchTab(this,'tab-anno')">ANNOVAR</button><button class="code-tab-btn" onclick="switchTab(this,'tab-snpe')">SnpEff</button><button class="code-tab-btn" onclick="switchTab(this,'tab-query')">SnpSift / bcftools</button></div>
+<span class="comment"># 自建非模式生物 DB</span>
+mkdir -p $SNPEFF_DATA/myorganism &amp;&amp; \
+    cp genes.gbk $SNPEFF_DATA/myorganism/
+snpEff build -genbank -v myorganism
 
-<div id="tab-vep" class="code-tab-content active"><pre><code># VEP 完整註解 (含 plugins)
-vep \
-    -i cohort.pass.vcf.gz \
-    -o cohort.vep.vcf.gz \
-    --vcf --compress_output bgzip \
-    --cache --offline --dir_cache /data/vep_cache \
-    --assembly GRCh38 \
-    --species homo_sapiens \
-    --everything \
-    --pick_allele_gene \
-    --plugin REVEL,/data/plugins/revel_grch38.tsv.gz \
-    --plugin SpliceAI,snv=/data/spliceai_scores.snv.vcf.gz,indel=/data/spliceai_scores.indel.vcf.gz \
-    --plugin AlphaMissense,file=/data/AlphaMissense_hg38.tsv.gz \
-    --custom /data/clinvar.vcf.gz,ClinVar,vcf,exact,0,CLNSIG,CLNDN \
-    --custom /data/gnomad.exomes.v4.1.sites.vcf.bgz,gnomAD,vcf,exact,0,AF,AF_popmax \
-    --fork 8</code></pre></div>
+<span class="comment"># 補上 dbNSFP 分數</span>
+SnpSift dbnsfp -v -db dbNSFP4.7a.gz -f REVEL_score,CADD_phred annot/cohort.snpeff.vcf \
+    &gt; annot/cohort.snpeff.dbnsfp.vcf</pre></div>
+<div class="code-tab-content" id="a3"><pre><span class="comment"># 漏斗篩選：罕見 + 致病傾向 + ClinVar Pathogenic</span>
+bcftools view -i 'INFO/gnomADe_AF&lt;0.001' annot/cohort.vep.vcf.gz \
+  | bcftools view -i 'INFO/CSQ ~ "HIGH" || INFO/CSQ ~ "MODERATE"' \
+  | bcftools view -i 'INFO/CSQ ~ "AlphaMissense_score=0\.[5-9]"' \
+  | bgzip &gt; candidates.vcf.gz
 
-<div id="tab-anno" class="code-tab-content"><pre><code># ANNOVAR — 把 VCF 轉成 ANNOVAR input
-convert2annovar.pl -format vcf4 cohort.pass.vcf.gz \
-    -outfile cohort.avinput -allsample -withfreq
-
-# 多 db 同時註解 (table_annovar)
-table_annovar.pl cohort.avinput humandb/ \
-    -buildver hg38 \
-    -out cohort \
-    -remove \
-    -protocol refGene,knownGene,clinvar_20240611,gnomad41_exome,dbnsfp42a,dbscsnv11 \
-    -operation g,g,f,f,f,f \
-    -nastring . \
-    -vcfinput \
-    -polish
-
-# 結果: cohort.hg38_multianno.txt (tab-separated table)
-#       cohort.hg38_multianno.vcf  (VCF format with INFO fields)</code></pre></div>
-
-<div id="tab-snpe" class="code-tab-content"><pre><code># SnpEff — 下載 db (一次)
-snpEff download -v GRCh38.105
-
-# 註解
-snpEff -v GRCh38.105 cohort.pass.vcf.gz &gt; cohort.snpeff.vcf
-# 同時產生 snpEff_summary.html 與 snpEff_genes.txt 統計報表
-
-# 加 ClinVar 註解 (SnpSift)
-SnpSift annotate clinvar.vcf.gz cohort.snpeff.vcf &gt; cohort.snpeff.clinvar.vcf
-
-# 加 dbNSFP (CADD, REVEL, SIFT, PolyPhen 等)
-SnpSift dbnsfp -db dbNSFP4.7a.txt.gz cohort.snpeff.clinvar.vcf &gt; cohort.full.vcf</code></pre></div>
-
-<div id="tab-query" class="code-tab-content"><pre><code># SnpSift filter — 找 high-impact rare variants
-SnpSift filter \
-    "(ANN[0].IMPACT = 'HIGH') &amp;&amp; (dbNSFP_gnomAD_exomes_AF &lt; 0.001 || na dbNSFP_gnomAD_exomes_AF)" \
-    cohort.full.vcf &gt; rare_lof.vcf
-
-# bcftools query — 提取 VEP CSQ 為表格
-bcftools +split-vep cohort.vep.vcf.gz \
-    -d -f '%CHROM\t%POS\t%SYMBOL\t%Consequence\t%IMPACT\t%HGVSp\t%gnomAD_AF\t%CLIN_SIG\n' \
-    | head
-
-# 找 PVS1 candidates: HIGH impact + gnomAD AF &lt; 0.0001 + ClinVar pathogenic OR no entry
-bcftools +split-vep cohort.vep.vcf.gz \
-    -i 'IMPACT="HIGH" &amp; (gnomAD_AF&lt;0.0001 | gnomAD_AF=".")' \
-    -f '%CHROM\t%POS\t%SYMBOL\t%Consequence\t%HGVSp\t%CLIN_SIG\n'</code></pre></div>
+<span class="comment"># 報表表格</span>
+bcftools +split-vep candidates.vcf.gz -f '%CHROM\t%POS\t%REF\t%ALT\t%SYMBOL\t%Consequence\t%AlphaMissense_score\t%gnomADe_AF\n' \
+    -d -A tab &gt; candidates.tsv</pre></div>
 </div>
 </section>
 
-<section class="section">
-<div class="section-label" data-zh="常見問題" data-en="FAQ">常見問題</div>
-<h2 data-zh="七、FAQ" data-en="VII. FAQ">七、FAQ</h2>
-<div class="accordion">
-<details><summary data-zh="一個 variant 為什麼會有多條 CSQ？" data-en="Why does one variant have multiple CSQ entries?">一個 variant 為什麼會有多條 CSQ？</summary>
-<div data-lang="zh">因為一個基因可能有多個 transcript（alternative splicing），同一變異對不同 transcript 的影響不同（在 transcript A 是 missense，transcript B 是 intron）。VEP 預設報所有，加 <code>--pick</code> / <code>--pick_allele_gene</code> / <code>--per_gene</code> 縮減。臨床報告通常用 MANE Select 或 Ensembl canonical transcript。</div>
-<div data-lang="en">Because one gene may have multiple transcripts (alternative splicing); the same variant has different consequences across them (missense in transcript A, intronic in transcript B). VEP reports all by default; use <code>--pick</code> / <code>--pick_allele_gene</code> / <code>--per_gene</code> to reduce. Clinical reports typically use the MANE Select or Ensembl canonical transcript.</div>
-</details>
-<details><summary data-zh="VEP cache 要多大空間？" data-en="How much space does the VEP cache need?">VEP cache 要多大空間？</summary>
-<div data-lang="zh">人類 GRCh38 完整 cache 約 25-30 GB（包含 GERP scores、regulatory features）。最小 indexed cache 約 5 GB。離線 cache 比 API 快 100 倍以上，強烈建議。</div>
-<div data-lang="en">Human GRCh38 full cache: ~25–30 GB (includes GERP scores, regulatory features). Minimal indexed cache: ~5 GB. Offline cache is 100×+ faster than the API — strongly recommended.</div>
-</details>
-<details><summary data-zh="CLIN_SIG 有矛盾解讀怎麼辦？" data-en="What if CLIN_SIG has conflicting interpretations?">CLIN_SIG 有矛盾解讀怎麼辦？</summary>
-<div data-lang="zh">ClinVar 對同一變異常有多家提交，可能 P / LP / VUS / LB / B 並存，這時欄位會出現 <code>conflicting_interpretations_of_pathogenicity</code>。實務上需到 ClinVar 網站查 review status (1-4 stars) 與 submitter 細節，以最新最高 review status 為準。</div>
-<div data-lang="en">ClinVar often has multiple submitters per variant, sometimes mixing P/LP/VUS/LB/B — the field then says <code>conflicting_interpretations_of_pathogenicity</code>. In practice, check the ClinVar website for review status (1–4 stars) and submitter details; defer to the most recent, highest-status assertion.</div>
-</details>
-<details><summary data-zh="MANE Select 是什麼？" data-en="What is MANE Select?">MANE Select 是什麼？</summary>
-<div data-lang="zh">NCBI 與 EMBL-EBI 共同維護的「每個基因一個官方代表 transcript」標準。MANE Select 通常是該基因臨床上最重要、最廣 used 的 transcript。臨床報告建議標 HGVS 時使用 MANE Select transcript ID。VEP 加 <code>--mane</code> flag 標記。</div>
-<div data-lang="en">A joint NCBI/EMBL-EBI standard providing "one official representative transcript per gene." MANE Select is typically the gene's most clinically relevant, most widely used transcript. Clinical reports should use the MANE Select transcript ID for HGVS. Add the <code>--mane</code> flag in VEP to mark it.</div>
-</details>
-</div>
-</section>
-
-<section class="section quiz-section">
-<div class="section-label" data-zh="自我檢測" data-en="QUIZ">自我檢測</div>
-<h2 data-zh="八、小測驗" data-en="VIII. Quiz">八、小測驗</h2>
-
-<div class="quiz-q" data-answer="1">
-<p class="quiz-question" data-zh="Q1. VEP、ANNOVAR、SnpEff 對同一變異有時給不同 LoF 判定，主因是？" data-en="Q1. VEP, ANNOVAR, SnpEff sometimes disagree on LoF for the same variant — main reason?">Q1. VEP、ANNOVAR、SnpEff 對同一變異有時給不同 LoF 判定，主因是？</p>
-<div class="quiz-opts">
-<button class="quiz-opt" data-idx="0" data-zh="演算法的 bug" data-en="Algorithm bugs">演算法的 bug</button>
-<button class="quiz-opt" data-idx="1" data-zh="預設 transcript 與 splice site 邊界定義不同" data-en="Different default transcripts and splice-site boundary definitions">預設 transcript 與 splice site 邊界定義不同</button>
-<button class="quiz-opt" data-idx="2" data-zh="VCF 格式版本不一致" data-en="VCF format version mismatch">VCF 格式版本不一致</button>
-</div>
-<div class="quiz-feedback" id="fb1"></div>
-</div>
-
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
 <div class="quiz-q" data-answer="2">
-<p class="quiz-question" data-zh="Q2. VEP IMPACT=HIGH 通常對應哪類變異？" data-en="Q2. VEP IMPACT=HIGH typically corresponds to which variant types?">Q2. VEP IMPACT=HIGH 通常對應哪類變異？</p>
-<div class="quiz-opts">
-<button class="quiz-opt" data-idx="0" data-zh="同義變異 (synonymous)" data-en="Synonymous variants">同義變異 (synonymous)</button>
-<button class="quiz-opt" data-idx="1" data-zh="5' UTR / intron 變異" data-en="5' UTR / intron variants">5' UTR / intron 變異</button>
-<button class="quiz-opt" data-idx="2" data-zh="LoF 類：stop_gained, frameshift, splice_donor/acceptor" data-en="LoF class: stop_gained, frameshift, splice_donor/acceptor">LoF 類：stop_gained, frameshift, splice_donor/acceptor</button>
-</div>
-<div class="quiz-feedback" id="fb2"></div>
-</div>
-
-<div class="quiz-q" data-answer="0">
-<p class="quiz-question" data-zh="Q3. 為什麼 ACMG 鼓勵使用 MANE Select transcript？" data-en="Q3. Why does ACMG encourage using the MANE Select transcript?">Q3. 為什麼 ACMG 鼓勵使用 MANE Select transcript？</p>
-<div class="quiz-opts">
-<button class="quiz-opt" data-idx="0" data-zh="統一臨床報告 transcript 選擇，避免不同實驗室因選不同 transcript 而報出不同 HGVS 與後果" data-en="Standardizes the clinical-report transcript choice, avoiding different labs reporting different HGVS/consequences for the same variant">統一臨床報告 transcript 選擇，避免不同實驗室因選不同 transcript 而報出不同 HGVS 與後果</button>
-<button class="quiz-opt" data-idx="1" data-zh="MANE Select 一定是最長的 transcript" data-en="MANE Select is always the longest transcript">MANE Select 一定是最長的 transcript</button>
-<button class="quiz-opt" data-idx="2" data-zh="MANE Select 是強制的法定要求" data-en="MANE Select is a legal mandate">MANE Select 是強制的法定要求</button>
-</div>
-<div class="quiz-feedback" id="fb3"></div>
-</div>
+<p data-lang="zh">1. MANE Select 解決了什麼問題？</p>
+<p data-lang="en">1. What problem does MANE Select solve?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 校正族群頻率</span><span data-lang="en">A. Calibrating population AF</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 提升 splice 預測準確度</span><span data-lang="en">B. Improving splice prediction</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 為每個 coding gene 指定 NCBI 與 Ensembl 共識的「最具代表」轉錄本，避免註釋不一致</span><span data-lang="en">C. Assigns one canonical transcript per coding gene agreed by NCBI & Ensembl, eliminating cross-DB inconsistency</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 取代 dbSNP</span><span data-lang="en">D. Replacing dbSNP</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">2. 想同時加 CADD、REVEL、AlphaMissense 與 SpliceAI 分數，最有效率的做法是？</p>
+<p data-lang="en">2. Most efficient way to add CADD + REVEL + AlphaMissense + SpliceAI?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 分別跑四次 ANNOVAR</span><span data-lang="en">A. Run ANNOVAR four times</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. VEP --plugin dbNSFP,...,SpliceAI 一次取得</span><span data-lang="en">B. VEP --plugin dbNSFP,...,SpliceAI in a single run</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 自寫 Python 從 paper 抓分數</span><span data-lang="en">C. Hand-scrape scores from papers</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 用 SnpEff 即可</span><span data-lang="en">D. SnpEff alone is enough</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">3. 是非題：AlphaMissense 分數 &gt; 0.564 (likely_pathogenic) 即可獨自做出致病性判定。</p>
+<p data-lang="en">3. True/False: AlphaMissense &gt; 0.564 (likely_pathogenic) alone is sufficient to call a variant pathogenic.</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 對</span><span data-lang="en">A. True</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 錯——須結合 ACMG/AMP 規則、ClinVar、家系與功能實驗</span><span data-lang="en">B. False — must combine with ACMG/AMP rules, ClinVar, segregation, and functional data</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
 </section>
 
 <nav class="page-nav">
-<a href="filtering.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 7: Filtering</span></a>
-<a href="interpretation.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 9: Clinical Interpretation</span></a>
+<a href="filtering.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 9: Filtering</span></a>
+<a href="cnv-sv.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 11: CNV / SV</span></a>
 </nav>
 </main>
-<footer class="site-footer">© WGS/WES Interactive Tutorial</footer>
+<footer class="site-footer">© Charlene — WGS / WES Interactive Tutorial</footer>
 <script src="i18n.js"></script>
 <script>
 window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
 function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
-
-// consequence severity simulator
-const CONS=[
-  {name:'stop_gained',impact:4,clinvarP:0.92,desc_zh:'產生過早終止密碼子，蛋白截短或 NMD 降解',desc_en:'Premature stop, protein truncation or NMD'},
-  {name:'frameshift_variant',impact:4,clinvarP:0.95,desc_zh:'插入/刪除非 3 倍數 → 整段下游編碼錯位',desc_en:'Indel of non-multiple-of-3 → entire downstream frame shifted'},
-  {name:'splice_donor_variant',impact:4,clinvarP:0.85,desc_zh:'破壞 GT 5\' splice site，常導致 exon skipping',desc_en:'Disrupts GT 5\' splice site, often causes exon skipping'},
-  {name:'missense_variant',impact:3,clinvarP:0.18,desc_zh:'單胺基酸取代，後果差異極大，需進一步預測',desc_en:'Single amino acid substitution; effect varies widely, needs prediction'},
-  {name:'inframe_insertion',impact:3,clinvarP:0.15,desc_zh:'3 倍數插入，frame 不變但加入新胺基酸',desc_en:'Multiple-of-3 insertion, frame preserved but new residues added'},
-  {name:'synonymous_variant',impact:2,clinvarP:0.005,desc_zh:'胺基酸不變，極少數影響 splicing 或 codon usage',desc_en:'No amino acid change; rarely affects splicing or codon usage'},
-  {name:'5_prime_UTR_variant',impact:1,clinvarP:0.008,desc_zh:'可能影響翻譯起始或 uORF',desc_en:'May affect translation initiation or uORFs'},
-  {name:'intron_variant',impact:1,clinvarP:0.003,desc_zh:'多數無功能，少數影響隱性 splicing',desc_en:'Mostly non-functional; rarely affects cryptic splicing'},
-  {name:'intergenic_variant',impact:1,clinvarP:0.001,desc_zh:'位於基因之間，多為調控或無功能',desc_en:'Between genes; mostly regulatory or non-functional'}
-];
-
-const consChart=new Chart(document.getElementById('consChart'),{type:'bar',data:{labels:CONS.map(c=>c.name),datasets:[
-  {label:'VEP IMPACT score',data:CONS.map(c=>c.impact),backgroundColor:'rgba(43,79,129,0.75)',borderWidth:0,yAxisID:'y'},
-  {label:'ClinVar Pathogenic enrichment',data:CONS.map(c=>c.clinvarP),backgroundColor:'rgba(200,132,43,0.75)',borderWidth:0,yAxisID:'y2'}
-]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},scales:{x:{ticks:{maxRotation:60,minRotation:45,font:{size:10}}},y:{title:{display:true,text:'IMPACT score'},min:0,max:5,position:'left'},y2:{title:{display:true,text:'P enrichment'},min:0,max:1,position:'right',grid:{drawOnChartArea:false}}}}});
-
-function updateCons(){
-  const L=I18n.get();
-  const idx=+document.getElementById('consSelect').value;
-  const c=CONS[idx];
-  const impactName=['','MODIFIER','LOW','MODERATE','HIGH'][c.impact];
-  const desc=L==='zh'?c.desc_zh:c.desc_en;
-  document.getElementById('consStats').innerHTML=
-    `<span class="sim-stat pass">IMPACT: ${impactName}</span>`+
-    `<span class="sim-stat">ClinVar P enrichment: ${(c.clinvarP*100).toFixed(1)}%</span>`+
-    `<span class="sim-stat">${desc}</span>`;
-  consChart.data.datasets[0].label=L==='zh'?'VEP IMPACT 分數':'VEP IMPACT score';
-  consChart.data.datasets[1].label=L==='zh'?'ClinVar Pathogenic 富集':'ClinVar Pathogenic enrichment';
-  // Highlight selected bar
-  consChart.data.datasets[0].backgroundColor=CONS.map((_,i)=>i===idx?'rgba(43,79,129,1)':'rgba(43,79,129,0.35)');
-  consChart.data.datasets[1].backgroundColor=CONS.map((_,i)=>i===idx?'rgba(200,132,43,1)':'rgba(200,132,43,0.35)');
-  consChart.update('none');
-}
-document.getElementById('consSelect').addEventListener('change',updateCons);
-document.addEventListener('langchange',updateCons);
-updateCons();
-
-const QF={
-  zh:{q1_y:'Transcript 與 splice 邊界差異是研究中發現的主要不一致來源 (~35% LoF 不一致)。',q1_n:'正解已標示。',q2_y:'HIGH 包含 stop_gained、frameshift、splice site 變異，這些是 LoF 的核心類型。',q2_n:'正解已標示。',q3_y:'統一 transcript 是 MANE 計畫的初衷，避免「同變異不同報告」的混亂。',q3_n:'正解已標示。'},
-  en:{q1_y:'Transcript and splice-boundary differences are the major sources of inconsistency (~35% LoF discordance) reported in the literature.',q1_n:'Correct answer highlighted.',q2_y:'HIGH covers stop_gained, frameshift, and splice site variants — the core LoF categories.',q2_n:'Correct answer highlighted.',q3_y:'Standardizing the transcript was the founding goal of MANE, avoiding "same variant, different report" chaos.',q3_n:'Correct answer highlighted.'}
-};
+const stages=['raw coding','rare (gnomAD)','AlphaMissense','ClinVar P/LP'];
+const aChart=new Chart(document.getElementById('aChart'),{type:'bar',data:{labels:stages,datasets:[{label:'Candidates',data:[25000,0,0,0],backgroundColor:['rgba(156,163,175,.7)','rgba(217,119,6,.7)','rgba(4,120,87,.7)','rgba(2,132,199,.7)']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{type:'logarithmic',title:{display:true,text:'Variant count'}}}}});
+function up(){const am=+document.getElementById('sliderAM').value,af=+document.getElementById('sliderAF').value;document.getElementById('valAM').textContent=am.toFixed(2);document.getElementById('valAF').textContent=af.toFixed(4);const raw=25000;const rare=Math.round(raw*Math.min(1,af*40));const am_keep=Math.round(rare*(1-am)*0.6);const clinvar=Math.round(am_keep*0.05);aChart.data.datasets[0].data=[raw,rare,am_keep,clinvar];aChart.update('none');const L=I18n.get();document.getElementById('statCand').textContent=(L==='zh'?'候選: ':'Candidates: ')+clinvar;document.getElementById('statDrop').textContent=(L==='zh'?'丟棄: ':'Dropped: ')+(raw-clinvar);}
+['sliderAM','sliderAF'].forEach(id=>document.getElementById(id).addEventListener('input',up));document.addEventListener('langchange',up);up();
+const QF={zh:{q1_y:'MANE Select 為每個 coding gene 定義共識轉錄本。',q1_n:'答案：C。',q2_y:'VEP plugin 機制最有效率。',q2_n:'答案：B。',q3_y:'分數僅 supporting evidence，臨床判定要 ACMG/AMP。',q3_n:'答案：B。'},en:{q1_y:'MANE Select defines one consensus transcript per coding gene.',q1_n:'Correct: C.',q2_y:'VEP plugins handle all four in one pass.',q2_n:'Correct: B.',q3_y:'Scores are supporting; ACMG/AMP rules required clinically.',q3_n:'Correct: B.'}};
 document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
 </script>
 </body></html>
